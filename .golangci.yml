@@ -18,19 +18,18 @@ linters:
     - gofmt
     - gosec
     - nilerr
+  settings:
+    gosec:
+      excludes:
+        - G104  # unhandled errors in deferred calls
+        - G304  # file path provided as taint input
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
 
-linters-settings:
-  gosec:
-    excludes:
-      - G104  # unhandled errors in deferred calls
-      - G304  # file path provided as taint input
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-
-issues:
-  exclude-rules:
+exclusions:
+  rules:
     - path: _test\.go
       linters:
         - gosec
