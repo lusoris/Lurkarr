@@ -27,10 +27,9 @@ linters:
       enabled-tags:
         - diagnostic
         - style
-
-exclusions:
-  rules:
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
