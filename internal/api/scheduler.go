@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/scheduler"
-	"github.com/google/uuid"
 )
 
 // SchedulerHandler handles scheduling endpoints.

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-co-op/gocron/v2"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
-	"github.com/go-co-op/gocron/v2"
 )
 
 // Scheduler manages cron-based scheduling via gocron/v2.

@@ -35,12 +35,12 @@ func ValidAppType(s string) bool {
 }
 
 type User struct {
-	ID         uuid.UUID  `json:"id"`
-	Username   string     `json:"username"`
-	Password   string     `json:"-"`
-	TOTPSecret *string    `json:"-"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID         uuid.UUID `json:"id"`
+	Username   string    `json:"username"`
+	Password   string    `json:"-"`
+	TOTPSecret *string   `json:"-"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type Session struct {
@@ -83,14 +83,14 @@ type AppSettings struct {
 }
 
 type GeneralSettings struct {
-	SecretKey             string `json:"secret_key"`
-	ProxyAuthBypass       bool   `json:"proxy_auth_bypass"`
-	SSLVerify             bool   `json:"ssl_verify"`
-	APITimeout            int    `json:"api_timeout"`
-	StatefulResetHours    int    `json:"stateful_reset_hours"`
-	CommandWaitDelay      int    `json:"command_wait_delay"`
-	CommandWaitAttempts   int    `json:"command_wait_attempts"`
-	MinDownloadQueueSize  int    `json:"min_download_queue_size"`
+	SecretKey            string `json:"secret_key"`
+	ProxyAuthBypass      bool   `json:"proxy_auth_bypass"`
+	SSLVerify            bool   `json:"ssl_verify"`
+	APITimeout           int    `json:"api_timeout"`
+	StatefulResetHours   int    `json:"stateful_reset_hours"`
+	CommandWaitDelay     int    `json:"command_wait_delay"`
+	CommandWaitAttempts  int    `json:"command_wait_attempts"`
+	MinDownloadQueueSize int    `json:"min_download_queue_size"`
 }
 
 type ProcessedItem struct {

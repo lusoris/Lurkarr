@@ -2,17 +2,19 @@ name: Helm
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
+    paths:
+      - "deploy/helm/**"
+  pull_request:
     paths:
       - "deploy/helm/**"
 
 permissions:
-  contents: write
-  pages: write
+  contents: read
 
 jobs:
-  package:
-    name: Package Helm Chart
+  lint-and-package:
+    name: Lint & Package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,9 +24,11 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
+      - name: Lint chart
+        run: helm lint deploy/helm/lurkarr
+
       - name: Package chart
-        run: |
-          helm package deploy/helm/lurkarr -d .helm-packages
+        run: helm package deploy/helm/lurkarr -d .helm-packages
 
       - name: Upload chart artifact
         uses: actions/upload-artifact@v4

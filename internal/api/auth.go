@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/csrf"
 	"github.com/lusoris/lurkarr/internal/auth"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/gorilla/csrf"
 )
 
 type loginRequest struct {
@@ -49,8 +49,8 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if user.TOTPSecret != nil && *user.TOTPSecret != "" {
 		if req.TOTPCode == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
-				"error":          "totp_required",
-				"totp_required":  true,
+				"error":         "totp_required",
+				"totp_required": true,
 			})
 			return
 		}

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
+	"github.com/lusoris/lurkarr/internal/database"
 )
 
 type contextKey string

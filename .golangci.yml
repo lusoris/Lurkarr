@@ -12,7 +12,6 @@ linters:
     - bodyclose
     - durationcheck
     - errname
-    - exportloopref
     - gocritic
     - gofmt
     - gosec
