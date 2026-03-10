@@ -69,7 +69,7 @@ func RateLimit(limiter *IPRateLimiter) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := extractIP(r)
 			if !limiter.Allow(ip) {
-					slog.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path) //nolint:gosec // G706: slog structured logging
+				slog.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path) //nolint:gosec // G706: slog structured logging
 				w.Header().Set("Retry-After", "60")
 				http.Error(w, `{"error":"too many requests"}`, http.StatusTooManyRequests)
 				return

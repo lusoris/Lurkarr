@@ -31,13 +31,13 @@ func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) 
 
 	qrc, qrErr := qrcode.NewWith(uri)
 	if qrErr != nil {
-		return secret, "", nil
+		return secret, "", nil //nolint:nilerr // intentional fallback without QR
 	}
 
 	var buf bytes.Buffer
 	wr := standard.NewWithWriter(nopCloser{&buf})
 	if saveErr := qrc.Save(wr); saveErr != nil {
-		return secret, "", nil
+		return secret, "", nil //nolint:nilerr // intentional fallback without QR
 	}
 
 	qrBase64 = base64.StdEncoding.EncodeToString(buf.Bytes())
