@@ -39,7 +39,7 @@ func (c *Client) apiCall(ctx context.Context, mode string, extra url.Values) (js
 		params[k] = v
 	}
 	reqURL := c.BaseURL + "/api?" + params.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -47,7 +47,7 @@ func (c *Client) apiCall(ctx context.Context, mode string, extra url.Values) (js
 	if err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)

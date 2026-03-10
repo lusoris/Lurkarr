@@ -39,7 +39,7 @@ func Load() (*Config, error) {
 
 	if v := os.Getenv("DB_MAX_CONNS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 10000 {
-			cfg.DBMaxConns = int32(n)
+			cfg.DBMaxConns = int32(n) //nolint:gosec // G109: n is bounds-checked above
 		}
 	}
 
