@@ -1,29 +1,22 @@
-FROM python:3.9-slim
+# Stage 1: Build frontend
+FROM node:22-alpine AS frontend
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
 
+# Stage 2: Build Go binary
+FROM golang:1.26-alpine AS backend
 WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=frontend /app/frontend/build ./frontend/build
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o lurkarr ./cmd/lurkarr
 
-# Install system dependencies including net-tools for health checks
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    net-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install required packages from the root requirements file
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . /app/
-
-# Create necessary directories
-RUN mkdir -p /config/settings /config/stateful /config/user /config/logs
-RUN chmod -R 755 /config
-
-# Set environment variables
-ENV PYTHONPATH=/app
-# ENV APP_TYPE=sonarr # APP_TYPE is likely managed via config now, remove if not needed
-
-# Expose port
+# Stage 3: Runtime
+FROM gcr.io/distroless/static-debian12
+COPY --from=backend /app/lurkarr /lurkarr
 EXPOSE 9705
-
-# Run the main application using the new entry point
-CMD ["python3", "main.py"]
+ENTRYPOINT ["/lurkarr"]

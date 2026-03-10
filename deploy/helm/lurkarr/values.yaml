@@ -1,0 +1,49 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/lusoris/lurkarr
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 9705
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: lurkarr.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+env:
+  DATABASE_URL: ""
+  SECRET_KEY: ""
+  LISTEN_ADDR: ":9705"
+
+postgresql:
+  enabled: true
+  auth:
+    database: lurkarr
+    username: lurkarr
+    password: lurkarr
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
