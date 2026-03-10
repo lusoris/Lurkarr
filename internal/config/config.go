@@ -3,12 +3,14 @@ package config
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 )
 
 // Config holds all application configuration from environment variables.
 type Config struct {
 	DatabaseURL    string
+	DBMaxConns     int32
 	ListenAddr     string
 	CSRFKey        string
 	AllowedOrigins []string
@@ -22,6 +24,7 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		DBMaxConns:   defaultDBMaxConns(),
 		ListenAddr:   getEnv("LISTEN_ADDR", ":8484"),
 		CSRFKey:      getEnv("CSRF_KEY", ""),
 		ProxyAuth:    getEnvBool("PROXY_AUTH", false),
@@ -34,6 +37,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
+	if v := os.Getenv("DB_MAX_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.DBMaxConns = int32(n)
+		}
+	}
+
 	origins := getEnv("ALLOWED_ORIGINS", "")
 	if origins != "" {
 		for _, o := range splitAndTrim(origins) {
@@ -44,6 +53,14 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func defaultDBMaxConns() int32 {
+	n := int32(runtime.NumCPU())
+	if n < 4 {
+		n = 4
+	}
+	return n
 }
 
 func getEnv(key, fallback string) string {

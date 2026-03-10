@@ -196,6 +196,16 @@ type QueueCleanerSettings struct {
 	CheckIntervalSeconds     int     `json:"check_interval_seconds"`
 	RemoveFromClient         bool    `json:"remove_from_client"`
 	BlocklistOnRemove        bool    `json:"blocklist_on_remove"`
+	// Per-privacy type settings
+	StrikePublic  bool `json:"strike_public"`  // Strike stalled public torrents
+	StrikePrivate bool `json:"strike_private"` // Strike stalled private torrents
+	// Slow detection exemptions
+	SlowIgnoreAboveBytes int64 `json:"slow_ignore_above_bytes"` // Don't flag as slow if remaining > this
+	// Failed import cleanup
+	FailedImportRemove    bool `json:"failed_import_remove"`    // Auto-remove failed imports
+	FailedImportBlocklist bool `json:"failed_import_blocklist"` // Blocklist failed imports on remove
+	// Metadata stuck
+	MetadataStuckMinutes int `json:"metadata_stuck_minutes"` // Minutes before metadata download is "stuck" (0=disabled)
 }
 
 // QueueStrike represents a strike against a problematic download.

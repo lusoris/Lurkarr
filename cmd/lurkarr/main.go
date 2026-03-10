@@ -44,7 +44,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db, err := database.New(ctx, cfg.DatabaseURL)
+	db, err := database.New(ctx, cfg.DatabaseURL, cfg.DBMaxConns)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -121,6 +121,13 @@ func main() {
 				if pruned > 0 {
 					slog.Info("pruned old logs", "count", pruned)
 				}
+				caps, _ := db.CleanupOldHourlyCaps(mCtx)
+				if caps > 0 {
+					slog.Info("cleaned old hourly caps", "count", caps)
+				}
+				_ = db.PruneStrikes(mCtx, 7*24*time.Hour)
+				_ = db.PruneAutoImportLog(mCtx, 30*24*time.Hour)
+				_ = db.PruneBlocklistLog(mCtx, 30*24*time.Hour)
 				mCancel()
 			case <-ctx.Done():
 				return

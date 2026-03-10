@@ -3,6 +3,8 @@ package queuecleaner
 import (
 	"testing"
 	"time"
+
+	"github.com/lusoris/lurkarr/internal/arrclient"
 )
 
 func TestParseReleaseResolution(t *testing.T) {
@@ -174,5 +176,91 @@ func TestParseTimeleft(t *testing.T) {
 		if got != tt.expected {
 			t.Errorf("parseTimeleft(%q) = %v, want %v", tt.input, got, tt.expected)
 		}
+	}
+}
+
+func TestHasImportFailure(t *testing.T) {
+	tests := []struct {
+		name     string
+		record   arrclient.QueueRecord
+		expected bool
+	}{
+		{
+			name: "healthy download",
+			record: arrclient.QueueRecord{
+				TrackedDownloadStatus: "ok",
+				TrackedDownloadState:  "downloading",
+			},
+			expected: false,
+		},
+		{
+			name: "import pending with failure message",
+			record: arrclient.QueueRecord{
+				TrackedDownloadStatus: "warning",
+				TrackedDownloadState:  "importPending",
+				StatusMessages: []arrclient.StatusMessage{
+					{Title: "test", Messages: []string{"Import failed - no matching series"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "import failed state",
+			record: arrclient.QueueRecord{
+				TrackedDownloadStatus: "warning",
+				TrackedDownloadState:  "importFailed",
+				StatusMessages: []arrclient.StatusMessage{
+					{Title: "test", Messages: []string{"Unable to import: file not found"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "warning but no import failure message",
+			record: arrclient.QueueRecord{
+				TrackedDownloadStatus: "warning",
+				TrackedDownloadState:  "importPending",
+				StatusMessages: []arrclient.StatusMessage{
+					{Title: "test", Messages: []string{"Download is slow"}},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "sample detection",
+			record: arrclient.QueueRecord{
+				TrackedDownloadStatus: "warning",
+				TrackedDownloadState:  "importPending",
+				StatusMessages: []arrclient.StatusMessage{
+					{Title: "test", Messages: []string{"File is a sample"}},
+				},
+			},
+			expected: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasImportFailure(tt.record)
+			if got != tt.expected {
+				t.Errorf("hasImportFailure() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestImportFailureReason(t *testing.T) {
+	record := arrclient.QueueRecord{
+		StatusMessages: []arrclient.StatusMessage{
+			{Title: "test", Messages: []string{"Import failed - no matching series"}},
+		},
+	}
+	reason := importFailureReason(record)
+	if reason != "Import failed - no matching series" {
+		t.Errorf("importFailureReason() = %q, want %q", reason, "Import failed - no matching series")
+	}
+
+	empty := arrclient.QueueRecord{}
+	if r := importFailureReason(empty); r != "unknown_import_failure" {
+		t.Errorf("importFailureReason(empty) = %q, want %q", r, "unknown_import_failure")
 	}
 }

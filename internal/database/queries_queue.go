@@ -15,11 +15,15 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 	err := db.Pool.QueryRow(ctx,
 		`SELECT app_type, enabled, stalled_threshold_minutes, slow_threshold_bytes_per_sec,
 		        max_strikes, strike_window_hours, check_interval_seconds,
-		        remove_from_client, blocklist_on_remove
+		        remove_from_client, blocklist_on_remove,
+		        strike_public, strike_private, slow_ignore_above_bytes,
+		        failed_import_remove, failed_import_blocklist, metadata_stuck_minutes
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
-		&s.RemoveFromClient, &s.BlocklistOnRemove)
+		&s.RemoveFromClient, &s.BlocklistOnRemove,
+		&s.StrikePublic, &s.StrikePrivate, &s.SlowIgnoreAboveBytes,
+		&s.FailedImportRemove, &s.FailedImportBlocklist, &s.MetadataStuckMinutes)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -31,11 +35,15 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		`UPDATE queue_cleaner_settings SET
 		        enabled = $2, stalled_threshold_minutes = $3, slow_threshold_bytes_per_sec = $4,
 		        max_strikes = $5, strike_window_hours = $6, check_interval_seconds = $7,
-		        remove_from_client = $8, blocklist_on_remove = $9
+		        remove_from_client = $8, blocklist_on_remove = $9,
+		        strike_public = $10, strike_private = $11, slow_ignore_above_bytes = $12,
+		        failed_import_remove = $13, failed_import_blocklist = $14, metadata_stuck_minutes = $15
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
-		s.RemoveFromClient, s.BlocklistOnRemove)
+		s.RemoveFromClient, s.BlocklistOnRemove,
+		s.StrikePublic, s.StrikePrivate, s.SlowIgnoreAboveBytes,
+		s.FailedImportRemove, s.FailedImportBlocklist, s.MetadataStuckMinutes)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

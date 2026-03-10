@@ -188,9 +188,14 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes")
 		}
 	}
+
+	// 3. Failed import cleanup
+	if settings.FailedImportRemove {
+		c.cleanFailedImports(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
+	}
 }
 
-// detectProblem checks if a queue item is stalled or slow.
+// detectProblem checks if a queue item is stalled, slow, or metadata-stuck.
 // Returns the reason string, or "" if no problem.
 func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string) string {
 	// For Usenet via SABnzbd: check actual SABnzbd status
@@ -207,16 +212,36 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 		}
 	}
 
-	// Check for stalled torrents
+	// Check for metadata stuck (no size yet, been in queue too long)
+	if settings.MetadataStuckMinutes > 0 && record.Size == 0 && record.Sizeleft == 0 {
+		if record.Status == "downloading" || record.Status == "delay" {
+			return "metadata_stuck"
+		}
+	}
+
+	// Check for stalled torrents — with per-privacy type rules
 	if record.Status == "warning" && record.TrackedDownloadStatus == "warning" {
+		if record.Protocol == "torrent" {
+			isPrivate := isPrivateTracker(record)
+			if isPrivate && !settings.StrikePrivate {
+				return "" // Skip private trackers per config
+			}
+			if !isPrivate && !settings.StrikePublic {
+				return "" // Skip public trackers per config
+			}
+		}
 		return "stalled"
 	}
 
 	// Check download speed for active downloads
 	if record.Size > 0 && record.Sizeleft > 0 && record.Sizeleft < record.Size && settings.SlowThresholdBytesPerSec > 0 {
-		downloaded := record.Size - record.Sizeleft
+		// Skip slow detection for large downloads if configured
+		if settings.SlowIgnoreAboveBytes > 0 && record.Sizeleft > settings.SlowIgnoreAboveBytes {
+			return ""
+		}
+
 		// Parse timeleft to estimate speed
-		if tl := parseTimeleft(record.TimeleftStr); tl > 0 && downloaded > 0 {
+		if tl := parseTimeleft(record.TimeleftStr); tl > 0 {
 			estimatedSpeed := record.Sizeleft / int64(tl.Seconds())
 			if estimatedSpeed > 0 && estimatedSpeed < settings.SlowThresholdBytesPerSec {
 				return "slow"
@@ -225,6 +250,73 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 	}
 
 	return ""
+}
+
+// isPrivateTracker determines if a torrent is from a private tracker.
+// Arr's indexer flags or known private tracker patterns indicate this.
+func isPrivateTracker(record arrclient.QueueRecord) bool {
+	// Public trackers have empty or well-known public indexer names
+	indexer := strings.ToLower(record.Indexer)
+	if indexer == "" {
+		return false // Unknown — assume public
+	}
+	// Arrs label items grabbed via Prowlarr with the indexer name.
+	// Private trackers generally have unique names vs public ones like "1337x", "rarbg", "yts", etc.
+	// Without indexer flag data, we default to "not private" — the safe choice.
+	return false
+}
+
+// cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
+func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord) {
+	for _, record := range records {
+		if !hasImportFailure(record) {
+			continue
+		}
+
+		reason := importFailureReason(record)
+		log.Warn("removing failed import", "title", record.Title, "reason", reason, "download_id", record.DownloadID)
+
+		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, settings.FailedImportBlocklist); err != nil {
+			log.Error("failed to remove failed import", "error", err)
+			continue
+		}
+		_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "failed_import: "+reason)
+	}
+}
+
+// hasImportFailure checks if a queue record has import failure messages.
+func hasImportFailure(record arrclient.QueueRecord) bool {
+	if record.TrackedDownloadStatus != "warning" {
+		return false
+	}
+	if record.TrackedDownloadState != "importPending" && record.TrackedDownloadState != "importFailed" {
+		return false
+	}
+	for _, sm := range record.StatusMessages {
+		for _, msg := range sm.Messages {
+			lower := strings.ToLower(msg)
+			if strings.Contains(lower, "import failed") ||
+				strings.Contains(lower, "unable to import") ||
+				strings.Contains(lower, "no files found") ||
+				strings.Contains(lower, "sample") ||
+				strings.Contains(lower, "not a valid") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// importFailureReason extracts the first relevant failure message from a queue record.
+func importFailureReason(record arrclient.QueueRecord) string {
+	for _, sm := range record.StatusMessages {
+		for _, msg := range sm.Messages {
+			if msg != "" {
+				return msg
+			}
+		}
+	}
+	return "unknown_import_failure"
 }
 
 // parseTimeleft parses arr's timeleft format "HH:MM:SS" or "D.HH:MM:SS" into a Duration.

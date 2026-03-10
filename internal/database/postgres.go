@@ -24,12 +24,12 @@ type DB struct {
 }
 
 // New creates a new database connection pool and runs migrations.
-func New(ctx context.Context, databaseURL string) (*DB, error) {
+func New(ctx context.Context, databaseURL string, maxConns int32) (*DB, error) {
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
-	config.MaxConns = 25
+	config.MaxConns = maxConns
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
