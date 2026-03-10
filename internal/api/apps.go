@@ -84,7 +84,7 @@ func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Reques
 	}
 
 	// If API key is masked, keep the existing one
-	if req.APIKey == "" || req.APIKey[:4] == "****" {
+	if req.APIKey == "" || (len(req.APIKey) >= 4 && req.APIKey[:4] == "****") {
 		existing, err := h.DB.GetInstance(r.Context(), id)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, errorResponse("instance not found"))

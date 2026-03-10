@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/lusoris/lurkarr/internal/autoimport"
 	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/queuecleaner"
 	"github.com/lusoris/lurkarr/internal/scheduler"
 	"github.com/lusoris/lurkarr/internal/server"
 )
@@ -38,7 +41,9 @@ func main() {
 
 	slog.Info("starting Lurkarr", "addr", cfg.ListenAddr)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	db, err := database.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
@@ -65,11 +70,22 @@ func main() {
 	}
 	defer sched.Stop()
 
+	cleaner := queuecleaner.New(db, logger)
+	cleaner.Start(ctx)
+	defer cleaner.Stop()
+
+	importer := autoimport.New(db, logger)
+	importer.Start(ctx)
+	defer importer.Stop()
+
 	csrfKey := []byte(cfg.CSRFKey)
 	if len(csrfKey) < 32 {
-		padded := make([]byte, 32)
-		copy(padded, csrfKey)
-		csrfKey = padded
+		csrfKey = make([]byte, 32)
+		if _, err := rand.Read(csrfKey); err != nil {
+			slog.Error("failed to generate CSRF key", "error", err)
+			os.Exit(1)
+		}
+		slog.Warn("no CSRF_KEY set, generated random key (sessions will not survive restarts)")
 	}
 
 	srv := server.New(server.Config{
@@ -91,7 +107,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				mCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				mCtx, mCancel := context.WithTimeout(ctx, 30*time.Second)
 				cleaned, _ := db.CleanExpiredSessions(mCtx)
 				if cleaned > 0 {
 					slog.Info("cleaned expired sessions", "count", cleaned)
@@ -104,7 +120,7 @@ func main() {
 				if pruned > 0 {
 					slog.Info("pruned old logs", "count", pruned)
 				}
-				cancel()
+				mCancel()
 			case <-ctx.Done():
 				return
 			}

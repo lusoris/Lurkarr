@@ -129,7 +129,17 @@ func (h *appHandler) Enabled(_ context.Context, _ slog.Level) bool {
 }
 
 func (h *appHandler) Handle(_ context.Context, r slog.Record) error {
-	h.logger.Log(h.appType, r.Level.String(), r.Message)
+	msg := r.Message
+	if len(h.attrs) > 0 {
+		for _, a := range h.attrs {
+			msg += " " + a.Key + "=" + a.Value.String()
+		}
+	}
+	r.Attrs(func(a slog.Attr) bool {
+		msg += " " + a.Key + "=" + a.Value.String()
+		return true
+	})
+	h.logger.Log(h.appType, r.Level.String(), msg)
 	return nil
 }
 

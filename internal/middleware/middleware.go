@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -30,12 +31,19 @@ func Recovery(next http.Handler) http.Handler {
 	})
 }
 
+// RequestIDFromContext returns the request ID stored in the context.
+func RequestIDFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(requestIDKey).(string)
+	return v
+}
+
 // RequestID adds a unique request ID to each request.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.New().String()
 		w.Header().Set("X-Request-ID", id)
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), requestIDKey, id)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -79,6 +87,7 @@ func CORS(cfg CORSConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
+			w.Header().Set("Vary", "Origin")
 			if origin != "" && origins[origin] {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

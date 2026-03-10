@@ -11,8 +11,11 @@ import (
 
 func TestRadarrGetMissing(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]RadarrMovie{
-			{ID: 1, Title: "Missing Movie", Monitored: true, HasFile: false},
+		json.NewEncoder(w).Encode(map[string]any{
+			"totalRecords": 1,
+			"records": []RadarrMovie{
+				{ID: 1, Title: "Missing Movie", Monitored: true, HasFile: false},
+			},
 		})
 	}))
 	defer server.Close()

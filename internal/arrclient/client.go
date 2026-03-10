@@ -76,6 +76,22 @@ func (c *Client) post(ctx context.Context, path string, body io.Reader, result a
 	return nil
 }
 
+func (c *Client) del(ctx context.Context, path string) error {
+	resp, err := c.doRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+// DeleteQueueItem removes an item from the arr queue.
+func (c *Client) DeleteQueueItem(ctx context.Context, apiVersion string, queueID int, removeFromClient, blocklist bool) error {
+	path := fmt.Sprintf("/api/%s/queue/%d?removeFromClient=%t&blocklist=%t",
+		apiVersion, queueID, removeFromClient, blocklist)
+	return c.del(ctx, path)
+}
+
 // SystemStatus represents the status response from any *Arr app.
 type SystemStatus struct {
 	AppName string `json:"appName"`
@@ -100,10 +116,68 @@ type CommandResponse struct {
 
 // QueueRecord represents an item in the download queue.
 type QueueRecord struct {
-	ID     int    `json:"id"`
-	Status string `json:"status"`
-	Title  string `json:"title"`
-	Size   int64  `json:"size"`
+	ID                    int             `json:"id"`
+	DownloadID            string          `json:"downloadId"`
+	Status                string          `json:"status"`
+	Title                 string          `json:"title"`
+	Size                  int64           `json:"size"`
+	Sizeleft              int64           `json:"sizeleft"`
+	TimeleftStr           string          `json:"timeleft"`
+	Protocol              string          `json:"protocol"`
+	Indexer               string          `json:"indexer"`
+	DownloadClient        string          `json:"downloadClient"`
+	TrackedDownloadStatus string          `json:"trackedDownloadStatus"`
+	TrackedDownloadState  string          `json:"trackedDownloadState"`
+	StatusMessages        []StatusMessage `json:"statusMessages"`
+	CustomFormatScore     int             `json:"customFormatScore"`
+	MovieID               int             `json:"movieId,omitempty"`
+	SeriesID              int             `json:"seriesId,omitempty"`
+	EpisodeID             int             `json:"episodeId,omitempty"`
+	AlbumID               int             `json:"albumId,omitempty"`
+	BookID                int             `json:"bookId,omitempty"`
+	Quality               *QualityInfo    `json:"quality,omitempty"`
+}
+
+// StatusMessage from arr queue items for detecting import issues.
+type StatusMessage struct {
+	Title    string   `json:"title"`
+	Messages []string `json:"messages"`
+}
+
+// QualityInfo holds quality profile data from the queue.
+type QualityInfo struct {
+	Quality struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"quality"`
+	Revision struct {
+		Version int `json:"version"`
+	} `json:"revision"`
+}
+
+// HasImportError checks if this queue item has an import problem.
+func (q *QueueRecord) HasImportError() bool {
+	return q.TrackedDownloadStatus == "warning" || q.TrackedDownloadState == "importPending"
+}
+
+// MediaID returns the media ID for this queue record based on which field is set.
+func (q *QueueRecord) MediaID() int {
+	if q.MovieID > 0 {
+		return q.MovieID
+	}
+	if q.EpisodeID > 0 {
+		return q.EpisodeID
+	}
+	if q.AlbumID > 0 {
+		return q.AlbumID
+	}
+	if q.BookID > 0 {
+		return q.BookID
+	}
+	if q.SeriesID > 0 {
+		return q.SeriesID
+	}
+	return 0
 }
 
 // QueueResponse wraps a paginated queue response.

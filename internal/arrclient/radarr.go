@@ -17,19 +17,16 @@ type RadarrMovie struct {
 	HasFile   bool   `json:"hasFile"`
 }
 
-// RadarrGetMissing fetches movies without files.
+// RadarrGetMissing fetches movies without files via the wanted/missing endpoint.
 func (c *Client) RadarrGetMissing(ctx context.Context) ([]RadarrMovie, error) {
-	var movies []RadarrMovie
-	if err := c.get(ctx, radarrAPI+"/movie", &movies); err != nil {
-		return nil, fmt.Errorf("radarr get movies: %w", err)
+	var resp struct {
+		TotalRecords int           `json:"totalRecords"`
+		Records      []RadarrMovie `json:"records"`
 	}
-	var missing []RadarrMovie
-	for _, m := range movies {
-		if m.Monitored && !m.HasFile {
-			missing = append(missing, m)
-		}
+	if err := c.get(ctx, radarrAPI+"/wanted/missing?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
+		return nil, fmt.Errorf("radarr get missing: %w", err)
 	}
-	return missing, nil
+	return resp.Records, nil
 }
 
 // RadarrGetCutoffUnmet fetches movies that haven't met quality cutoff.

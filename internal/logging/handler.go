@@ -61,7 +61,7 @@ func (h *Hub) Broadcast(entry database.LogEntry) {
 // HandleWebSocket upgrades HTTP to WebSocket and registers the client.
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // CORS handled by middleware
+		OriginPatterns: []string{"*"},
 	})
 	if err != nil {
 		slog.Error("websocket accept failed", "error", err)
@@ -81,7 +81,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// Writer goroutine
+	// Writer goroutine with ping/pong keepalive
 	go func() {
 		defer func() {
 			h.mu.Lock()
@@ -89,6 +89,9 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			h.mu.Unlock()
 			conn.Close(websocket.StatusNormalClosure, "")
 		}()
+
+		pingTicker := time.NewTicker(30 * time.Second)
+		defer pingTicker.Stop()
 
 		for {
 			select {
@@ -98,6 +101,13 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 				writeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				err := conn.Write(writeCtx, websocket.MessageText, msg)
+				cancel()
+				if err != nil {
+					return
+				}
+			case <-pingTicker.C:
+				pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				err := conn.Ping(pingCtx)
 				cancel()
 				if err != nil {
 					return

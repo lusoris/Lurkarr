@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+const maxRequestBodySize = 1 << 20 // 1 MB
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -13,4 +15,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func errorResponse(msg string) map[string]string {
 	return map[string]string{"error": msg}
+}
+
+// limitBody wraps the request body with MaxBytesReader.
+func limitBody(r *http.Request) {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxRequestBodySize)
 }

@@ -48,6 +48,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	prowlarrH := &api.ProwlarrHandler{DB: db}
 	sabnzbdH := &api.SABnzbdHandler{DB: db}
 	userH := &api.UserHandler{DB: db}
+	queueH := &api.QueueHandler{DB: db}
 
 	mux := http.NewServeMux()
 
@@ -131,6 +132,14 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("POST /api/sabnzbd/pause", sabnzbdH.HandlePause)
 	protected.HandleFunc("POST /api/sabnzbd/resume", sabnzbdH.HandleResume)
 	protected.HandleFunc("POST /api/sabnzbd/test", sabnzbdH.HandleTestConnection)
+
+	// Queue Management
+	protected.HandleFunc("GET /api/queue/settings/{app}", queueH.HandleGetQueueCleanerSettings)
+	protected.HandleFunc("PUT /api/queue/settings/{app}", queueH.HandleUpdateQueueCleanerSettings)
+	protected.HandleFunc("GET /api/queue/scoring/{app}", queueH.HandleGetScoringProfile)
+	protected.HandleFunc("PUT /api/queue/scoring/{app}", queueH.HandleUpdateScoringProfile)
+	protected.HandleFunc("GET /api/queue/blocklist/{app}", queueH.HandleGetBlocklistLog)
+	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
 
 	// WebSocket (no CSRF, but auth required)
 	mux.Handle("GET /ws/logs", authMw.RequireAuth(http.HandlerFunc(logsH.HandleWebSocketLogs)))

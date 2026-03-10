@@ -182,3 +182,66 @@ func (s *SABnzbdSettings) MaskedAPIKey() string {
 	}
 	return "****" + s.APIKey[len(s.APIKey)-4:]
 }
+
+// QueueCleanerSettings holds per-app queue cleaning configuration.
+type QueueCleanerSettings struct {
+	AppType                  AppType `json:"app_type"`
+	Enabled                  bool    `json:"enabled"`
+	StalledThresholdMinutes  int     `json:"stalled_threshold_minutes"`
+	SlowThresholdBytesPerSec int64   `json:"slow_threshold_bytes_per_sec"`
+	MaxStrikes               int     `json:"max_strikes"`
+	StrikeWindowHours        int     `json:"strike_window_hours"`
+	CheckIntervalSeconds     int     `json:"check_interval_seconds"`
+	RemoveFromClient         bool    `json:"remove_from_client"`
+	BlocklistOnRemove        bool    `json:"blocklist_on_remove"`
+}
+
+// QueueStrike represents a strike against a problematic download.
+type QueueStrike struct {
+	ID         int64     `json:"id"`
+	AppType    AppType   `json:"app_type"`
+	InstanceID uuid.UUID `json:"instance_id"`
+	DownloadID string    `json:"download_id"`
+	Title      string    `json:"title"`
+	Reason     string    `json:"reason"`
+	StruckAt   time.Time `json:"struck_at"`
+}
+
+// AutoImportLog records auto-import actions.
+type AutoImportLog struct {
+	ID          int64     `json:"id"`
+	AppType     AppType   `json:"app_type"`
+	InstanceID  uuid.UUID `json:"instance_id"`
+	MediaID     int       `json:"media_id"`
+	MediaTitle  string    `json:"media_title"`
+	QueueItemID int       `json:"queue_item_id"`
+	Action      string    `json:"action"`
+	Reason      string    `json:"reason"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// ScoringProfile defines how to score queue items for deduplication.
+type ScoringProfile struct {
+	ID                  uuid.UUID `json:"id"`
+	AppType             AppType   `json:"app_type"`
+	Name                string    `json:"name"`
+	PreferHigherQuality bool      `json:"prefer_higher_quality"`
+	PreferLargerSize    bool      `json:"prefer_larger_size"`
+	PreferIndexerFlags  bool      `json:"prefer_indexer_flags"`
+	CustomFormatWeight  int       `json:"custom_format_weight"`
+	SizeWeight          int       `json:"size_weight"`
+	AgeWeight           int       `json:"age_weight"`
+	SeedersWeight       int       `json:"seeders_weight"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
+// BlocklistLog records blocklisted downloads.
+type BlocklistLog struct {
+	ID            int64     `json:"id"`
+	AppType       AppType   `json:"app_type"`
+	InstanceID    uuid.UUID `json:"instance_id"`
+	DownloadID    string    `json:"download_id"`
+	Title         string    `json:"title"`
+	Reason        string    `json:"reason"`
+	BlocklistedAt time.Time `json:"blocklisted_at"`
+}
