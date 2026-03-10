@@ -19,7 +19,7 @@ func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				slog.Error("panic recovered",
+				slog.Error("panic recovered", //nolint:gosec // G706: slog structured logging
 					"error", err,
 					"stack", string(debug.Stack()),
 					"path", r.URL.Path,
@@ -63,7 +63,7 @@ func Logging(next http.Handler) http.Handler {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		slog.Info("request",
+		slog.Info("request", //nolint:gosec // G706: slog structured logging
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", sw.status,

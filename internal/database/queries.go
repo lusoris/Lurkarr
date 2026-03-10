@@ -282,7 +282,7 @@ func (db *DB) ResetState(ctx context.Context, appType AppType, instanceID uuid.U
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(ctx,
 		`DELETE FROM processed_items WHERE app_type = $1 AND instance_id = $2`,
@@ -540,13 +540,6 @@ func (db *DB) ListScheduleExecutions(ctx context.Context, limit int) ([]struct {
 	}
 	defer rows.Close()
 
-	type ScheduleExec struct {
-		ID         int64     `json:"id"`
-		ScheduleID uuid.UUID `json:"schedule_id"`
-		ExecutedAt time.Time `json:"executed_at"`
-		Result     *string   `json:"result"`
-	}
-
 	var result []struct {
 		ID         int64     `json:"id"`
 		ScheduleID uuid.UUID `json:"schedule_id"`
@@ -584,7 +577,7 @@ func (db *DB) InsertLogs(ctx context.Context, entries []LogEntry) error {
 	}
 
 	br := db.Pool.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	for range entries {
 		if _, err := br.Exec(); err != nil {

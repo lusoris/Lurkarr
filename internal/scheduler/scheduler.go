@@ -147,9 +147,9 @@ func (s *Scheduler) performAction(ctx context.Context, sched database.Schedule) 
 		return s.setAppEnabled(ctx, sched.AppType, true)
 	default:
 		// api-{N} pattern — set hourly cap
-		var cap int
-		if _, err := fmt.Sscanf(sched.Action, "api-%d", &cap); err == nil {
-			return s.setHourlyCap(ctx, sched.AppType, cap)
+		var capVal int
+		if _, err := fmt.Sscanf(sched.Action, "api-%d", &capVal); err == nil {
+			return s.setHourlyCap(ctx, sched.AppType, capVal)
 		}
 		return fmt.Errorf("unknown action: %s", sched.Action)
 	}
@@ -177,7 +177,7 @@ func (s *Scheduler) setAppEnabled(ctx context.Context, appType string, enabled b
 	return nil
 }
 
-func (s *Scheduler) setHourlyCap(ctx context.Context, appType string, cap int) error {
+func (s *Scheduler) setHourlyCap(ctx context.Context, appType string, capVal int) error {
 	if !database.ValidAppType(appType) && appType != "global" {
 		return fmt.Errorf("invalid app type: %s", appType)
 	}
@@ -190,7 +190,7 @@ func (s *Scheduler) setHourlyCap(ctx context.Context, appType string, cap int) e
 		if err != nil {
 			return err
 		}
-		settings.HourlyCap = cap
+		settings.HourlyCap = capVal
 		if err := s.db.UpdateAppSettings(ctx, settings); err != nil {
 			return err
 		}

@@ -22,7 +22,7 @@ var (
 	reCodec      = regexp.MustCompile(`(?i)\b(x265|h\.?265|HEVC|x264|h\.?264|AVC|AV1|VP9|MPEG-?2|XviD|DivX)\b`)
 	reSource     = regexp.MustCompile(`(?i)\b(Remux|Blu-?Ray|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|DVD|PDTV|SDTV|HDRip|CAM|TS|TELESYNC|SCR|SCREENER)\b`)
 	reAudio      = regexp.MustCompile(`(?i)(Atmos|TrueHD|DTS-HD[\. ]?MA|DTS-HD|DTS|DD[P\+]?[\. ]?(?:5\.1|7\.1|2\.0)?|AC3|AAC(?:\d\.\d)?|FLAC|EAC3|LPCM|PCM|Opus|MP3)`)
-	reHDR        = regexp.MustCompile(`(?i)\b(HDR10\+|HDR10|HDR|DV|DoVi|Dolby[\. ]?Vision)\b`)
+	reHDR        = regexp.MustCompile(`(?i)\b(HDR10\+|HDR10|HDR|DV|DoVi|Dolby[. ]?Vision)\b`)
 	reGroup      = regexp.MustCompile(`(?i)-([A-Za-z0-9]+)(?:\.[a-z]{2,4})?$`)
 	reProper     = regexp.MustCompile(`(?i)\b(PROPER)\b`)
 	reRepack     = regexp.MustCompile(`(?i)\b(REPACK|RERIP)\b`)

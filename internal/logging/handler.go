@@ -87,7 +87,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			h.mu.Lock()
 			delete(h.clients, client)
 			h.mu.Unlock()
-			conn.Close(websocket.StatusNormalClosure, "")
+			_ = conn.Close(websocket.StatusNormalClosure, "")
 		}()
 
 		pingTicker := time.NewTicker(30 * time.Second)

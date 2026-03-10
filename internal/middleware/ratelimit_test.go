@@ -37,7 +37,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 	}))
 
 	// First request: OK
-	req := httptest.NewRequest("POST", "/api/auth/login", nil)
+	req := httptest.NewRequest("POST", "/api/auth/login", http.NoBody)
 	req.RemoteAddr = "10.0.0.1:12345"
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -70,7 +70,7 @@ func TestExtractIP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", "/", nil)
+			r := httptest.NewRequest("GET", "/", http.NoBody)
 			r.RemoteAddr = tt.remote
 			if tt.xff != "" {
 				r.Header.Set("X-Forwarded-For", tt.xff)

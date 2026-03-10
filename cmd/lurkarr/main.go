@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -20,10 +21,16 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		slog.Error("fatal error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("failed to load config", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	var level slog.Level
@@ -46,8 +53,7 @@ func main() {
 
 	db, err := database.New(ctx, cfg.DatabaseURL, cfg.DBMaxConns)
 	if err != nil {
-		slog.Error("failed to connect to database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer db.Close()
 
@@ -61,14 +67,12 @@ func main() {
 
 	sched, err := scheduler.New(db, logger)
 	if err != nil {
-		slog.Error("failed to create scheduler", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("create scheduler: %w", err)
 	}
 	if err := sched.Start(ctx); err != nil {
-		slog.Error("failed to start scheduler", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("start scheduler: %w", err)
 	}
-	defer sched.Stop()
+	defer func() { _ = sched.Stop() }()
 
 	cleaner := queuecleaner.New(db, logger)
 	cleaner.Start(ctx)
@@ -82,8 +86,7 @@ func main() {
 	if len(csrfKey) < 32 {
 		csrfKey = make([]byte, 32)
 		if _, err := rand.Read(csrfKey); err != nil {
-			slog.Error("failed to generate CSRF key", "error", err)
-			os.Exit(1)
+			return fmt.Errorf("generate CSRF key: %w", err)
 		}
 		slog.Warn("no CSRF_KEY set, generated random key (sessions will not survive restarts)")
 	}
@@ -145,12 +148,13 @@ func main() {
 		slog.Error("server error", "error", err)
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown error", "error", err)
 	}
 
 	slog.Info("Lurkarr stopped")
+	return nil
 }

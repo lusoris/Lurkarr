@@ -48,7 +48,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		return nil, fmt.Errorf("do request: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(errBody))
 	}
@@ -60,7 +60,7 @@ func (c *Client) get(ctx context.Context, path string, result any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
@@ -69,7 +69,7 @@ func (c *Client) post(ctx context.Context, path string, body io.Reader, result a
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if result != nil {
 		return json.NewDecoder(resp.Body).Decode(result)
 	}
@@ -81,7 +81,7 @@ func (c *Client) del(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return nil
 }
 

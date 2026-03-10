@@ -58,7 +58,7 @@ func (db *DB) migrate(databaseURL string) error {
 	if err != nil {
 		return fmt.Errorf("open sql connection for migrations: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set goose dialect: %w", err)

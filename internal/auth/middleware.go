@@ -45,7 +45,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
-				slog.Warn("proxy auth bypass user not found", "username", username)
+				slog.Warn("proxy auth bypass user not found", "username", username) //nolint:gosec // G706: slog structured logging mitigates injection
 			}
 		}
 

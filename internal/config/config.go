@@ -38,7 +38,7 @@ func Load() (*Config, error) {
 	}
 
 	if v := os.Getenv("DB_MAX_CONNS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 10000 {
 			cfg.DBMaxConns = int32(n)
 		}
 	}
@@ -56,11 +56,14 @@ func Load() (*Config, error) {
 }
 
 func defaultDBMaxConns() int32 {
-	n := int32(runtime.NumCPU())
-	if n < 4 {
-		n = 4
+	cpus := runtime.NumCPU()
+	if cpus < 4 {
+		cpus = 4
 	}
-	return n
+	if cpus > 10000 {
+		cpus = 10000
+	}
+	return int32(cpus)
 }
 
 func getEnv(key, fallback string) string {
