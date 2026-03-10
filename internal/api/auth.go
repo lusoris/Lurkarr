@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/lusoris/lurkarr/internal/auth"
 	"github.com/lusoris/lurkarr/internal/database"
@@ -28,6 +29,7 @@ type AuthHandler struct {
 
 // HandleLogin handles POST /api/auth/login.
 func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -60,6 +62,13 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Session rotation: invalidate any existing session before creating a new one
+	if cookie, err := r.Cookie("lurkarr_session"); err == nil {
+		if oldID, err := uuid.Parse(cookie.Value); err == nil {
+			_ = h.DB.DeleteSession(r.Context(), oldID)
+		}
+	}
+
 	if err := h.Auth.SetSessionCookie(r.Context(), w, user.ID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create session"))
 		return
@@ -89,6 +98,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limitBody(r)
 	var req setupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -190,6 +200,7 @@ func (h *AuthHandler) Handle2FAVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Code string `json:"code"`
 	}

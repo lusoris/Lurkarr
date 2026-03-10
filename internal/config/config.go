@@ -14,18 +14,20 @@ type Config struct {
 	AllowedOrigins []string
 	ProxyAuth      bool
 	ProxyHeader    string
+	SecureCookie   bool
 	LogLevel       string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
 	cfg := &Config{
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		ListenAddr:  getEnv("LISTEN_ADDR", ":8484"),
-		CSRFKey:     getEnv("CSRF_KEY", ""),
-		ProxyAuth:   getEnvBool("PROXY_AUTH", false),
-		ProxyHeader: getEnv("PROXY_HEADER", "Remote-User"),
-		LogLevel:    getEnv("LOG_LEVEL", "info"),
+		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		ListenAddr:   getEnv("LISTEN_ADDR", ":8484"),
+		CSRFKey:      getEnv("CSRF_KEY", ""),
+		ProxyAuth:    getEnvBool("PROXY_AUTH", false),
+		ProxyHeader:  getEnv("PROXY_HEADER", "Remote-User"),
+		SecureCookie: getEnvBool("SECURE_COOKIE", false),
+		LogLevel:     getEnv("LOG_LEVEL", "info"),
 	}
 
 	if cfg.DatabaseURL == "" {

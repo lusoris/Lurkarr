@@ -41,6 +41,27 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	if err := s.Reload(ctx); err != nil {
 		return err
 	}
+
+	// Built-in daily cleanup of old hourly_caps entries
+	_, err := s.cron.NewJob(
+		gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(3, 0, 0))),
+		gocron.NewTask(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			deleted, err := s.db.CleanupOldHourlyCaps(ctx)
+			if err != nil {
+				slog.Error("hourly_caps cleanup failed", "error", err)
+				return
+			}
+			if deleted > 0 {
+				slog.Info("cleaned up old hourly_caps", "deleted", deleted)
+			}
+		}),
+	)
+	if err != nil {
+		slog.Warn("failed to schedule hourly_caps cleanup", "error", err)
+	}
+
 	s.cron.Start()
 	slog.Info("scheduler started")
 	return nil

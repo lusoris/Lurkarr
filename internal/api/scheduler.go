@@ -29,6 +29,7 @@ func (h *SchedulerHandler) HandleListSchedules(w http.ResponseWriter, r *http.Re
 
 // HandleCreateSchedule handles POST /api/schedules.
 func (h *SchedulerHandler) HandleCreateSchedule(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var sched database.Schedule
 	if err := json.NewDecoder(r.Body).Decode(&sched); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -59,6 +60,7 @@ func (h *SchedulerHandler) HandleUpdateSchedule(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	limitBody(r)
 	var sched database.Schedule
 	if err := json.NewDecoder(r.Body).Decode(&sched); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))

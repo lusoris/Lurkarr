@@ -30,6 +30,7 @@ type Middleware struct {
 	ProxyAuthBypass bool
 	ProxyHeader     string
 	CSRFKey         []byte
+	SecureCookie    bool
 }
 
 // RequireAuth is middleware that checks for a valid session cookie.
@@ -103,6 +104,7 @@ func (m *Middleware) SetSessionCookie(ctx context.Context, w http.ResponseWriter
 		Value:    session.ID.String(),
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   m.SecureCookie,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(sessionDuration.Seconds()),
 	})

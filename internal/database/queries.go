@@ -457,6 +457,17 @@ func (db *DB) GetAllHourlyCaps(ctx context.Context) ([]HourlyCap, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[HourlyCap])
 }
 
+// CleanupOldHourlyCaps removes hourly_caps entries older than 7 days.
+func (db *DB) CleanupOldHourlyCaps(ctx context.Context) (int64, error) {
+	tag, err := db.Pool.Exec(ctx,
+		`DELETE FROM hourly_caps WHERE hour_bucket < now() - interval '7 days'`,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // --- Schedules ---
 
 func (db *DB) ListSchedules(ctx context.Context) ([]Schedule, error) {

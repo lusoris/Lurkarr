@@ -44,6 +44,7 @@ func (h *AppsHandler) HandleCreateInstance(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Name   string `json:"name"`
 		APIURL string `json:"api_url"`
@@ -72,6 +73,7 @@ func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Name    string `json:"name"`
 		APIURL  string `json:"api_url"`
@@ -119,6 +121,7 @@ func (h *AppsHandler) HandleDeleteInstance(w http.ResponseWriter, r *http.Reques
 
 // HandleTestConnection handles POST /api/instances/test.
 func (h *AppsHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var req struct {
 		APIURL  string `json:"api_url"`
 		APIKey  string `json:"api_key"`

@@ -94,6 +94,7 @@ func main() {
 		AllowedOrigins: cfg.AllowedOrigins,
 		ProxyAuth:      cfg.ProxyAuth,
 		ProxyHeader:    cfg.ProxyHeader,
+		SecureCookie:   cfg.SecureCookie,
 	}, db, logger, hub, sched)
 
 	errCh := make(chan error, 1)

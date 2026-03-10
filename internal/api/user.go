@@ -36,6 +36,7 @@ func (h *UserHandler) HandleUpdateUsername(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Username string `json:"username"`
 	}
@@ -60,6 +61,7 @@ func (h *UserHandler) HandleUpdatePassword(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
