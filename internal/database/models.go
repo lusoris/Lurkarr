@@ -114,14 +114,16 @@ type HuntHistory struct {
 }
 
 type HuntStats struct {
-	AppType   AppType   `json:"app_type"`
-	Hunted    int64     `json:"hunted"`
-	Upgraded  int64     `json:"upgraded"`
-	UpdatedAt time.Time `json:"updated_at"`
+	AppType    AppType   `json:"app_type"`
+	InstanceID uuid.UUID `json:"instance_id"`
+	Hunted     int64     `json:"hunted"`
+	Upgraded   int64     `json:"upgraded"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type HourlyCap struct {
 	AppType    AppType   `json:"app_type"`
+	InstanceID uuid.UUID `json:"instance_id"`
 	HourBucket time.Time `json:"hour_bucket"`
 	APIHits    int       `json:"api_hits"`
 }
@@ -225,6 +227,8 @@ type ScoringProfile struct {
 	ID                  uuid.UUID `json:"id"`
 	AppType             AppType   `json:"app_type"`
 	Name                string    `json:"name"`
+	Strategy            string    `json:"strategy"` // "highest" (keep best score) or "adequate" (keep first above threshold)
+	AdequateThreshold   int       `json:"adequate_threshold"`
 	PreferHigherQuality bool      `json:"prefer_higher_quality"`
 	PreferLargerSize    bool      `json:"prefer_larger_size"`
 	PreferIndexerFlags  bool      `json:"prefer_indexer_flags"`

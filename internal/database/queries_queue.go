@@ -123,10 +123,10 @@ func (db *DB) PruneAutoImportLog(ctx context.Context, olderThan time.Duration) e
 func (db *DB) GetScoringProfile(ctx context.Context, appType AppType) (*ScoringProfile, error) {
 	var p ScoringProfile
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, app_type, name, prefer_higher_quality, prefer_larger_size, prefer_indexer_flags,
+		`SELECT id, app_type, name, strategy, adequate_threshold, prefer_higher_quality, prefer_larger_size, prefer_indexer_flags,
 		        custom_format_weight, size_weight, age_weight, seeders_weight, created_at
 		 FROM scoring_profiles WHERE app_type = $1`, appType,
-	).Scan(&p.ID, &p.AppType, &p.Name, &p.PreferHigherQuality, &p.PreferLargerSize, &p.PreferIndexerFlags,
+	).Scan(&p.ID, &p.AppType, &p.Name, &p.Strategy, &p.AdequateThreshold, &p.PreferHigherQuality, &p.PreferLargerSize, &p.PreferIndexerFlags,
 		&p.CustomFormatWeight, &p.SizeWeight, &p.AgeWeight, &p.SeedersWeight, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get scoring profile: %w", err)
@@ -137,10 +137,12 @@ func (db *DB) GetScoringProfile(ctx context.Context, appType AppType) (*ScoringP
 func (db *DB) UpdateScoringProfile(ctx context.Context, p *ScoringProfile) error {
 	_, err := db.Pool.Exec(ctx,
 		`UPDATE scoring_profiles SET
-		        name = $2, prefer_higher_quality = $3, prefer_larger_size = $4, prefer_indexer_flags = $5,
-		        custom_format_weight = $6, size_weight = $7, age_weight = $8, seeders_weight = $9
+		        name = $2, strategy = $3, adequate_threshold = $4,
+		        prefer_higher_quality = $5, prefer_larger_size = $6, prefer_indexer_flags = $7,
+		        custom_format_weight = $8, size_weight = $9, age_weight = $10, seeders_weight = $11
 		 WHERE id = $1`,
-		p.ID, p.Name, p.PreferHigherQuality, p.PreferLargerSize, p.PreferIndexerFlags,
+		p.ID, p.Name, p.Strategy, p.AdequateThreshold,
+		p.PreferHigherQuality, p.PreferLargerSize, p.PreferIndexerFlags,
 		p.CustomFormatWeight, p.SizeWeight, p.AgeWeight, p.SeedersWeight)
 	if err != nil {
 		return fmt.Errorf("update scoring profile: %w", err)

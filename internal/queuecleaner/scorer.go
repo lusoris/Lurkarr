@@ -38,7 +38,8 @@ func ScoreQueueItem(item *arrclient.QueueRecord, profile *database.ScoringProfil
 }
 
 // FindDuplicates groups queue records by media ID and identifies lower-scored duplicates.
-// Returns the queue item IDs that should be removed (lower-scored duplicates).
+// Strategy "highest": keep the best-scoring item, remove all others.
+// Strategy "adequate": keep the first item scoring above the threshold, remove all others.
 func FindDuplicates(records []arrclient.QueueRecord, profile *database.ScoringProfile) []DuplicateResult {
 	type scored struct {
 		record arrclient.QueueRecord
@@ -61,17 +62,27 @@ func FindDuplicates(records []arrclient.QueueRecord, profile *database.ScoringPr
 			continue
 		}
 
-		// Find best scoring item
-		bestIdx := 0
-		for i := 1; i < len(items); i++ {
-			if items[i].score > items[bestIdx].score {
-				bestIdx = i
+		keepIdx := 0
+		if profile.Strategy == "adequate" {
+			// Keep the first item that meets the threshold
+			for i, item := range items {
+				if item.score >= profile.AdequateThreshold {
+					keepIdx = i
+					break
+				}
+			}
+		} else {
+			// Default: keep highest score
+			for i := 1; i < len(items); i++ {
+				if items[i].score > items[keepIdx].score {
+					keepIdx = i
+				}
 			}
 		}
 
-		// Everything except the best is a duplicate to remove
+		// Everything except the kept item is a duplicate to remove
 		for i, item := range items {
-			if i == bestIdx {
+			if i == keepIdx {
 				continue
 			}
 			results = append(results, DuplicateResult{
@@ -79,9 +90,9 @@ func FindDuplicates(records []arrclient.QueueRecord, profile *database.ScoringPr
 				RemoveQueueID: item.record.ID,
 				RemoveTitle:   item.record.Title,
 				RemoveScore:   item.score,
-				KeepQueueID:   items[bestIdx].record.ID,
-				KeepTitle:     items[bestIdx].record.Title,
-				KeepScore:     items[bestIdx].score,
+				KeepQueueID:   items[keepIdx].record.ID,
+				KeepTitle:     items[keepIdx].record.Title,
+				KeepScore:     items[keepIdx].score,
 			})
 		}
 	}

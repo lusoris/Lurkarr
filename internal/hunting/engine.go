@@ -115,7 +115,7 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 	log = log.With("instance", inst.Name)
 
 	// Check hourly cap
-	hits, err := e.db.GetCurrentHourHits(ctx, appType)
+	hits, err := e.db.GetCurrentHourHits(ctx, appType, inst.ID)
 	if err != nil {
 		log.Error("failed to check hourly cap", "error", err)
 		return err
@@ -228,8 +228,8 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 	}
 
 	if hunted > 0 {
-		_ = e.db.IncrementStats(ctx, appType, int64(hunted), 0)
-		_ = e.db.IncrementHourlyHits(ctx, appType, hunted)
+		_ = e.db.IncrementStats(ctx, appType, inst.ID, int64(hunted), 0)
+		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, hunted)
 	}
 	return hunted
 }
@@ -271,8 +271,8 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 	}
 
 	if upgraded > 0 {
-		_ = e.db.IncrementStats(ctx, appType, 0, int64(upgraded))
-		_ = e.db.IncrementHourlyHits(ctx, appType, upgraded)
+		_ = e.db.IncrementStats(ctx, appType, inst.ID, 0, int64(upgraded))
+		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, upgraded)
 	}
 	return upgraded
 }
