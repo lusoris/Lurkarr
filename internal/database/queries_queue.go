@@ -76,6 +76,17 @@ func (db *DB) PruneStrikes(ctx context.Context, olderThan time.Duration) error {
 	return nil
 }
 
+// ResetStrikes removes all strikes for a specific download (e.g. when it makes progress).
+func (db *DB) ResetStrikes(ctx context.Context, appType AppType, instanceID uuid.UUID, downloadID string) error {
+	_, err := db.Pool.Exec(ctx,
+		`DELETE FROM queue_strikes WHERE app_type = $1 AND instance_id = $2 AND download_id = $3`,
+		appType, instanceID, downloadID)
+	if err != nil {
+		return fmt.Errorf("reset strikes: %w", err)
+	}
+	return nil
+}
+
 // --- Auto Import Log ---
 
 func (db *DB) LogAutoImport(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID int, mediaTitle string, queueItemID int, action, reason string) error {

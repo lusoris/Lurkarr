@@ -2,6 +2,7 @@ package queuecleaner
 
 import (
 	"testing"
+	"time"
 )
 
 func TestParseReleaseResolution(t *testing.T) {
@@ -153,5 +154,25 @@ func TestParseReleaseFullTitle(t *testing.T) {
 	}
 	if info.ReleaseGroup != "FraMeSToR" {
 		t.Errorf("ReleaseGroup = %q, want FraMeSToR", info.ReleaseGroup)
+	}
+}
+
+func TestParseTimeleft(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected time.Duration
+	}{
+		{"01:30:00", 1*time.Hour + 30*time.Minute},
+		{"00:05:30", 5*time.Minute + 30*time.Second},
+		{"2.03:00:00", 51 * time.Hour},
+		{"00:00:00", 0},
+		{"", 0},
+		{"invalid", 0},
+	}
+	for _, tt := range tests {
+		got := parseTimeleft(tt.input)
+		if got != tt.expected {
+			t.Errorf("parseTimeleft(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
 	}
 }

@@ -100,6 +100,8 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 		return
 	}
 
+	apiVersion := apiVersionFor(appType)
+
 	for _, record := range queue.Records {
 		if !isImportStuck(record) {
 			continue
@@ -110,14 +112,37 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 			continue
 		}
 
-		// The item is stuck on import. Trigger a rescan/refresh which often
-		// resolves "Unable to Import Automatically" issues.
-		log.Info("found stuck import, triggering rescan",
+		log.Info("found stuck import, checking manual import options",
 			"title", record.Title,
 			"media_id", mediaID,
 			"status", record.TrackedDownloadStatus,
 			"messages", formatStatusMessages(record.StatusMessages))
 
+		// Try manual import: check if files are available and have acceptable quality
+		if record.DownloadID != "" && apiVersion != "" {
+			items, err := client.GetManualImport(ctx, apiVersion, record.DownloadID)
+			if err != nil {
+				log.Warn("failed to get manual import options", "error", err)
+			} else if len(items) > 0 {
+				// Check if any available file has a better or equal custom format score
+				best := items[0]
+				for _, item := range items[1:] {
+					if item.CustomFormatScore > best.CustomFormatScore {
+						best = item
+					}
+				}
+				if len(best.Rejections) == 0 {
+					log.Info("manual import candidate found",
+						"file", best.Name,
+						"score", best.CustomFormatScore,
+						"queue_score", record.CustomFormatScore)
+					_ = imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "manual_import_available", best.Name)
+					continue
+				}
+			}
+		}
+
+		// Fallback: trigger rescan which often resolves import issues
 		if err := triggerRescan(ctx, client, appType, mediaID); err != nil {
 			log.Error("failed to trigger rescan", "title", record.Title, "error", err)
 			continue
@@ -174,6 +199,15 @@ func formatStatusMessages(msgs []arrclient.StatusMessage) string {
 		parts = append(parts, m.Messages...)
 	}
 	return strings.Join(parts, "; ")
+}
+
+func apiVersionFor(appType database.AppType) string {
+	switch appType {
+	case database.AppLidarr, database.AppReadarr:
+		return "v1"
+	default:
+		return "v3"
+	}
 }
 
 func sleep(ctx context.Context, d time.Duration) bool {

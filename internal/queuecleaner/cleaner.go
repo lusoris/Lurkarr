@@ -3,6 +3,8 @@ package queuecleaner
 import (
 	"context"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -149,6 +151,16 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			continue // Don't strike items waiting for import
 		}
 
+		// Reset strikes for downloads that are making progress
+		if record.Size > 0 && record.Sizeleft < record.Size {
+			progress := float64(record.Size-record.Sizeleft) / float64(record.Size)
+			if progress > 0.5 && record.TrackedDownloadStatus != "warning" {
+				// Over 50% and healthy — clear any old strikes
+				_ = c.db.ResetStrikes(ctx, appType, inst.ID, record.DownloadID)
+				continue
+			}
+		}
+
 		reason := c.detectProblem(record, settings, sabStatuses)
 		if reason == "" {
 			continue
@@ -201,20 +213,61 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 	}
 
 	// Check download speed for active downloads
-	if record.Size > 0 && record.Sizeleft > 0 && record.Sizeleft < record.Size {
+	if record.Size > 0 && record.Sizeleft > 0 && record.Sizeleft < record.Size && settings.SlowThresholdBytesPerSec > 0 {
 		downloaded := record.Size - record.Sizeleft
-		// Estimate speed: if less than threshold, it's slow
-		// We use a heuristic: if download has been going and hardly progressed
-		if downloaded > 0 && settings.SlowThresholdBytesPerSec > 0 {
-			progress := float64(downloaded) / float64(record.Size)
-			if progress > 0.01 && progress < 0.10 {
-				// Very low progress - might be slow
+		// Parse timeleft to estimate speed
+		if tl := parseTimeleft(record.TimeleftStr); tl > 0 && downloaded > 0 {
+			estimatedSpeed := record.Sizeleft / int64(tl.Seconds())
+			if estimatedSpeed > 0 && estimatedSpeed < settings.SlowThresholdBytesPerSec {
 				return "slow"
 			}
 		}
 	}
 
 	return ""
+}
+
+// parseTimeleft parses arr's timeleft format "HH:MM:SS" or "D.HH:MM:SS" into a Duration.
+func parseTimeleft(s string) time.Duration {
+	if s == "" || s == "00:00:00" {
+		return 0
+	}
+	parts := strings.Split(s, ":")
+	if len(parts) != 3 {
+		return 0
+	}
+
+	var hours int
+	// Handle "D.HH" format for days
+	dayParts := strings.SplitN(parts[0], ".", 2)
+	if len(dayParts) == 2 {
+		days, err := strconv.Atoi(dayParts[0])
+		if err != nil {
+			return 0
+		}
+		h, err := strconv.Atoi(dayParts[1])
+		if err != nil {
+			return 0
+		}
+		hours = days*24 + h
+	} else {
+		h, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return 0
+		}
+		hours = h
+	}
+
+	mins, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0
+	}
+	secs, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0
+	}
+
+	return time.Duration(hours)*time.Hour + time.Duration(mins)*time.Minute + time.Duration(secs)*time.Second
 }
 
 // getSABnzbdStatuses fetches the SABnzbd queue and returns a map of downloadID -> status.

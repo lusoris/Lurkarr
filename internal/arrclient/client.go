@@ -92,6 +92,29 @@ func (c *Client) DeleteQueueItem(ctx context.Context, apiVersion string, queueID
 	return c.del(ctx, path)
 }
 
+// ManualImportItem represents a file available for manual import.
+type ManualImportItem struct {
+	ID                int          `json:"id"`
+	Path              string       `json:"path"`
+	Name              string       `json:"name"`
+	Size              int64        `json:"size"`
+	Quality           *QualityInfo `json:"quality,omitempty"`
+	CustomFormatScore int          `json:"customFormatScore"`
+	Rejections        []struct {
+		Reason string `json:"reason"`
+	} `json:"rejections"`
+}
+
+// GetManualImport lists files available for manual import for a download ID.
+func (c *Client) GetManualImport(ctx context.Context, apiVersion, downloadID string) ([]ManualImportItem, error) {
+	var items []ManualImportItem
+	path := fmt.Sprintf("/api/%s/manualimport?downloadId=%s", apiVersion, downloadID)
+	if err := c.get(ctx, path, &items); err != nil {
+		return nil, fmt.Errorf("get manual import: %w", err)
+	}
+	return items, nil
+}
+
 // SystemStatus represents the status response from any *Arr app.
 type SystemStatus struct {
 	AppName string `json:"appName"`
