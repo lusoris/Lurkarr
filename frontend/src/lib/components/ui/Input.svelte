@@ -1,11 +1,12 @@
 <script lang="ts">
 	interface Props {
-		value?: string;
+		value?: string | number;
 		type?: string;
 		placeholder?: string;
 		label?: string;
 		error?: string;
 		disabled?: boolean;
+		class?: string;
 		oninput?: (e: Event) => void;
 	}
 
@@ -16,11 +17,12 @@
 		label = '',
 		error = '',
 		disabled = false,
+		class: className = '',
 		oninput
 	}: Props = $props();
 </script>
 
-<label class="block space-y-1.5">
+<label class="block space-y-1.5 {className}">
 	{#if label}
 		<span class="text-sm font-medium text-surface-300">{label}</span>
 	{/if}

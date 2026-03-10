@@ -35,7 +35,7 @@
 		<span
 			class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform mt-0.5
 				{checked ? 'translate-x-5.5 ml-0' : 'translate-x-0.5'}"
-		/>
+		></span>
 	</span>
 	{#if label}
 		<span class="text-sm text-surface-300">{label}</span>

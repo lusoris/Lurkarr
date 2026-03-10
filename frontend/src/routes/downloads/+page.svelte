@@ -74,7 +74,7 @@
 	{#if loading && !queue}
 		<div class="space-y-2">
 			{#each Array(3) as _}
-				<div class="h-16 rounded-lg bg-surface-800/50 animate-pulse" />
+				<div class="h-16 rounded-lg bg-surface-800/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if error}
@@ -98,7 +98,7 @@
 						<div
 							class="bg-lurk-500 h-1.5 rounded-full transition-all"
 							style="width: {slot.percentage}%"
-						/>
+						></div>
 					</div>
 					<div class="flex justify-between mt-1.5 text-xs text-surface-500">
 						<span>{slot.percentage}%</span>

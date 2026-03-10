@@ -35,9 +35,29 @@
 		category: string;
 	}
 
+	interface AppSettings {
+		app_type: string;
+		hunt_missing_count: number;
+		hunt_upgrade_count: number;
+		hunt_missing_mode: string;
+		upgrade_mode: string;
+		sleep_duration: number;
+		monitored_only: boolean;
+		skip_future: boolean;
+		hourly_cap: number;
+		random_selection: boolean;
+		debug_mode: boolean;
+	}
+
+	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
+	type Tab = 'general' | 'apps' | 'prowlarr' | 'sabnzbd';
+
+	let activeTab = $state<Tab>('general');
 	let general = $state<GeneralSettings | null>(null);
 	let prowlarr = $state<ProwlarrSettings | null>(null);
 	let sabnzbd = $state<SABnzbdSettings | null>(null);
+	let appSettings = $state<Record<string, AppSettings>>({});
+	let selectedApp = $state<string>('sonarr');
 	let saving = $state(false);
 
 	async function load() {
@@ -47,6 +67,12 @@
 				api.get<ProwlarrSettings>('/prowlarr/settings'),
 				api.get<SABnzbdSettings>('/sabnzbd/settings')
 			]);
+		} catch { /* handled */ }
+	}
+
+	async function loadAppSettings(app: string) {
+		try {
+			appSettings[app] = await api.get<AppSettings>(`/settings/${app}`);
 		} catch { /* handled */ }
 	}
 
@@ -86,6 +112,19 @@
 		saving = false;
 	}
 
+	async function saveAppSettings() {
+		const settings = appSettings[selectedApp];
+		if (!settings) return;
+		saving = true;
+		try {
+			await api.put(`/settings/${selectedApp}`, settings);
+			toasts.success(`${selectedApp} settings saved`);
+		} catch {
+			toasts.error(`Failed to save ${selectedApp} settings`);
+		}
+		saving = false;
+	}
+
 	async function testProwlarr() {
 		if (!prowlarr) return;
 		try {
@@ -107,21 +146,42 @@
 	}
 
 	$effect(() => { load(); });
+	$effect(() => { if (activeTab === 'apps') loadAppSettings(selectedApp); });
+
+	const tabs: { id: Tab; label: string }[] = [
+		{ id: 'general', label: 'General' },
+		{ id: 'apps', label: 'Hunt Settings' },
+		{ id: 'prowlarr', label: 'Prowlarr' },
+		{ id: 'sabnzbd', label: 'SABnzbd' }
+	];
 </script>
 
 <svelte:head><title>Settings - Lurkarr</title></svelte:head>
 
-<div class="space-y-8 max-w-2xl">
+<div class="space-y-6 max-w-2xl">
 	<h1 class="text-2xl font-bold text-surface-50">Settings</h1>
 
+	<!-- Tab navigation -->
+	<div class="flex gap-1 rounded-lg bg-surface-900 border border-surface-800 p-1">
+		{#each tabs as tab}
+			<button
+				onclick={() => activeTab = tab.id}
+				class="flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors
+					{activeTab === tab.id ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'}"
+			>{tab.label}</button>
+		{/each}
+	</div>
+
 	<!-- General Settings -->
-	{#if general}
+	{#if activeTab === 'general' && general}
 		<Card>
 			<h2 class="text-lg font-semibold text-surface-200 mb-4">General</h2>
 			<div class="space-y-4">
 				<Input bind:value={general.api_timeout} type="number" label="API Timeout (seconds)" />
 				<Input bind:value={general.stateful_reset_hours} type="number" label="State Reset (hours)" />
-				<Input bind:value={general.min_download_queue_size} type="number" label="Min Download Queue Size" />
+				<Input bind:value={general.command_wait_delay} type="number" label="Command Wait Delay (ms)" />
+				<Input bind:value={general.command_wait_attempts} type="number" label="Command Wait Attempts" />
+				<Input bind:value={general.min_download_queue_size} type="number" label="Min Download Queue Size (-1 = disabled)" />
 				<Toggle bind:checked={general.ssl_verify} label="SSL Verification" />
 				<Toggle bind:checked={general.proxy_auth_bypass} label="Proxy Auth Bypass" />
 				<Button onclick={saveGeneral} loading={saving}>Save General</Button>
@@ -129,8 +189,61 @@
 		</Card>
 	{/if}
 
+	<!-- Per-App Hunt Settings -->
+	{#if activeTab === 'apps'}
+		<Card>
+			<h2 class="text-lg font-semibold text-surface-200 mb-4">Hunt Settings</h2>
+			<div class="flex gap-1 mb-4 rounded-lg bg-surface-800/50 p-1">
+				{#each appTypes as app}
+					<button
+						onclick={() => { selectedApp = app; loadAppSettings(app); }}
+						class="flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors
+							{selectedApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700'}"
+					>{app}</button>
+				{/each}
+			</div>
+
+			{@const settings = appSettings[selectedApp]}
+			{#if settings}
+				<div class="space-y-4">
+					<div class="grid grid-cols-2 gap-4">
+						<Input bind:value={settings.hunt_missing_count} type="number" label="Hunt Missing Count" />
+						<Input bind:value={settings.hunt_upgrade_count} type="number" label="Hunt Upgrade Count" />
+					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<label class="block">
+							<span class="block text-sm font-medium text-surface-300 mb-1.5">Missing Mode</span>
+							<select bind:value={settings.hunt_missing_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+								<option value="oldest">Oldest First</option>
+								<option value="newest">Newest First</option>
+								<option value="random">Random</option>
+							</select>
+						</label>
+						<label class="block">
+							<span class="block text-sm font-medium text-surface-300 mb-1.5">Upgrade Mode</span>
+							<select bind:value={settings.upgrade_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+								<option value="oldest">Oldest First</option>
+								<option value="newest">Newest First</option>
+								<option value="random">Random</option>
+							</select>
+						</label>
+					</div>
+					<Input bind:value={settings.sleep_duration} type="number" label="Sleep Duration (ms)" />
+					<Input bind:value={settings.hourly_cap} type="number" label="Hourly API Cap (0 = unlimited)" />
+					<Toggle bind:checked={settings.monitored_only} label="Monitored Only" />
+					<Toggle bind:checked={settings.skip_future} label="Skip Future Releases" />
+					<Toggle bind:checked={settings.random_selection} label="Random Selection" />
+					<Toggle bind:checked={settings.debug_mode} label="Debug Mode" />
+					<Button onclick={saveAppSettings} loading={saving}>Save {selectedApp} Settings</Button>
+				</div>
+			{:else}
+				<p class="text-sm text-surface-500">Loading settings...</p>
+			{/if}
+		</Card>
+	{/if}
+
 	<!-- Prowlarr Settings -->
-	{#if prowlarr}
+	{#if activeTab === 'prowlarr' && prowlarr}
 		<Card>
 			<h2 class="text-lg font-semibold text-surface-200 mb-4">Prowlarr</h2>
 			<div class="space-y-4">
@@ -148,7 +261,7 @@
 	{/if}
 
 	<!-- SABnzbd Settings -->
-	{#if sabnzbd}
+	{#if activeTab === 'sabnzbd' && sabnzbd}
 		<Card>
 			<h2 class="text-lg font-semibold text-surface-200 mb-4">SABnzbd</h2>
 			<div class="space-y-4">
