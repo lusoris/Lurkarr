@@ -1,0 +1,30 @@
+services:
+  lurkarr:
+    build: .
+    ports:
+      - "9705:9705"
+    environment:
+      DATABASE_URL: postgres://lurkarr:lurkarr@db:5432/lurkarr?sslmode=disable
+      LISTEN_ADDR: ":9705"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lurkarr
+      POSTGRES_PASSWORD: lurkarr
+      POSTGRES_DB: lurkarr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lurkarr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

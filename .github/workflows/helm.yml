@@ -1,0 +1,33 @@
+name: Helm
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/helm/**"
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  package:
+    name: Package Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package chart
+        run: |
+          helm package deploy/helm/lurkarr -d .helm-packages
+
+      - name: Upload chart artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: .helm-packages/*.tgz
