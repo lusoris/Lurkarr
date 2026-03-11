@@ -55,7 +55,7 @@
 <div class="min-h-screen flex items-center justify-center bg-surface-950">
 	<div class="w-full max-w-sm space-y-6">
 		<div class="text-center">
-			<span class="text-5xl">&#x1F438;</span>
+			<img src="/logo.png" alt="Lurkarr" class="w-16 h-16 mx-auto rounded-xl" />
 			<h1 class="text-2xl font-bold text-surface-50 mt-3">Lurkarr</h1>
 			<p class="text-sm text-surface-500 mt-1">Sign in to continue</p>
 		</div>

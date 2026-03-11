@@ -41,7 +41,7 @@
 >
 	<!-- Logo -->
 	<div class="flex items-center gap-3 px-4 h-16 border-b border-surface-800">
-		<span class="text-2xl">&#x1F438;</span>
+		<img src="/logo.png" alt="Lurkarr" class="w-8 h-8 rounded" />
 		{#if !collapsed}
 			<span class="font-bold text-lurk-400 text-lg tracking-tight">Lurkarr</span>
 		{/if}
