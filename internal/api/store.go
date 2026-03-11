@@ -83,6 +83,10 @@ type Store interface {
 	UpdateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	DeleteNotificationProvider(ctx context.Context, id uuid.UUID) error
 
+	// Download Clients
+	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
+	UpdateDownloadClientSettings(ctx context.Context, s *database.DownloadClientSettings) error
+
 	// Seerr
 	GetSeerrSettings(ctx context.Context) (*database.SeerrSettings, error)
 	UpdateSeerrSettings(ctx context.Context, s *database.SeerrSettings) error

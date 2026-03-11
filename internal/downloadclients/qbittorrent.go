@@ -35,6 +35,10 @@ func (a *QBittorrentAdapter) GetItems(ctx context.Context) ([]DownloadItem, erro
 			ETA:           t.ETA,
 			Category:      t.Category,
 			SavePath:      t.SavePath,
+			Ratio:         t.Ratio,
+			SeedingTime:   t.TimeActive,
+			CompletedAt:   t.CompletionOn,
+			AddedAt:       t.AddedOn,
 		})
 	}
 	return items, nil

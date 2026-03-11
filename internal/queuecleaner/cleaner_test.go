@@ -7,6 +7,7 @@ import (
 
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
+	downloadclient "github.com/lusoris/lurkarr/internal/downloadclients"
 )
 
 func TestDetectProblemStalled(t *testing.T) {
@@ -280,5 +281,106 @@ func TestSleepCancelled(t *testing.T) {
 	ok := sleep(ctx, 1*time.Minute)
 	if ok {
 		t.Error("expected sleep to return false with cancelled context")
+	}
+}
+
+func TestSeedingLimitReached(t *testing.T) {
+	c := &Cleaner{}
+
+	tests := []struct {
+		name     string
+		settings *database.QueueCleanerSettings
+		item     downloadclient.DownloadItem
+		want     bool
+	}{
+		{
+			name:     "no limits configured",
+			settings: &database.QueueCleanerSettings{},
+			item:     downloadclient.DownloadItem{Ratio: 5.0, SeedingTime: 7200},
+			want:     false,
+		},
+		{
+			name:     "ratio exceeded or mode",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{Ratio: 2.5},
+			want:     true,
+		},
+		{
+			name:     "ratio not exceeded",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{Ratio: 1.5},
+			want:     false,
+		},
+		{
+			name:     "time exceeded or mode",
+			settings: &database.QueueCleanerSettings{SeedingMaxHours: 24, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{SeedingTime: 25 * 3600},
+			want:     true,
+		},
+		{
+			name:     "time not exceeded",
+			settings: &database.QueueCleanerSettings{SeedingMaxHours: 24, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{SeedingTime: 12 * 3600},
+			want:     false,
+		},
+		{
+			name:     "or mode either ratio",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMaxHours: 24, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{Ratio: 3.0, SeedingTime: 1 * 3600},
+			want:     true,
+		},
+		{
+			name:     "or mode either time",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMaxHours: 24, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{Ratio: 0.5, SeedingTime: 25 * 3600},
+			want:     true,
+		},
+		{
+			name:     "or mode neither met",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMaxHours: 24, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{Ratio: 0.5, SeedingTime: 12 * 3600},
+			want:     false,
+		},
+		{
+			name:     "and mode both met",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMaxHours: 24, SeedingMode: "and"},
+			item:     downloadclient.DownloadItem{Ratio: 3.0, SeedingTime: 25 * 3600},
+			want:     true,
+		},
+		{
+			name:     "and mode only ratio met",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMaxHours: 24, SeedingMode: "and"},
+			item:     downloadclient.DownloadItem{Ratio: 3.0, SeedingTime: 12 * 3600},
+			want:     false,
+		},
+		{
+			name:     "and mode only time met",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMaxHours: 24, SeedingMode: "and"},
+			item:     downloadclient.DownloadItem{Ratio: 0.5, SeedingTime: 25 * 3600},
+			want:     false,
+		},
+		{
+			name:     "exact ratio boundary",
+			settings: &database.QueueCleanerSettings{SeedingMaxRatio: 2.0, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{Ratio: 2.0},
+			want:     true,
+		},
+		{
+			name:     "exact time boundary",
+			settings: &database.QueueCleanerSettings{SeedingMaxHours: 24, SeedingMode: "or"},
+			item:     downloadclient.DownloadItem{SeedingTime: 24 * 3600},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := c.seedingLimitReached(tt.settings, tt.item)
+			if got != tt.want {
+				t.Errorf("seedingLimitReached() = %v, want %v (ratio=%.1f, seeding=%ds, maxRatio=%.1f, maxHours=%d, mode=%s)",
+					got, tt.want, tt.item.Ratio, tt.item.SeedingTime,
+					tt.settings.SeedingMaxRatio, tt.settings.SeedingMaxHours, tt.settings.SeedingMode)
+			}
+		})
 	}
 }

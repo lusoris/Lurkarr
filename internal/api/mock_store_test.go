@@ -246,6 +246,21 @@ func (mr *MockStoreMockRecorder) GetBlocklistLog(ctx, appType, limit any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlocklistLog", reflect.TypeOf((*MockStore)(nil).GetBlocklistLog), ctx, appType, limit)
 }
 
+// GetDownloadClientSettings mocks base method.
+func (m *MockStore) GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDownloadClientSettings", ctx, appType)
+	ret0, _ := ret[0].(*database.DownloadClientSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDownloadClientSettings indicates an expected call of GetDownloadClientSettings.
+func (mr *MockStoreMockRecorder) GetDownloadClientSettings(ctx, appType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDownloadClientSettings", reflect.TypeOf((*MockStore)(nil).GetDownloadClientSettings), ctx, appType)
+}
+
 // GetGeneralSettings mocks base method.
 func (m *MockStore) GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error) {
 	m.ctrl.T.Helper()
@@ -556,6 +571,20 @@ func (m *MockStore) UpdateAppSettings(ctx context.Context, s *database.AppSettin
 func (mr *MockStoreMockRecorder) UpdateAppSettings(ctx, s any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAppSettings", reflect.TypeOf((*MockStore)(nil).UpdateAppSettings), ctx, s)
+}
+
+// UpdateDownloadClientSettings mocks base method.
+func (m *MockStore) UpdateDownloadClientSettings(ctx context.Context, s *database.DownloadClientSettings) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateDownloadClientSettings", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateDownloadClientSettings indicates an expected call of UpdateDownloadClientSettings.
+func (mr *MockStoreMockRecorder) UpdateDownloadClientSettings(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDownloadClientSettings", reflect.TypeOf((*MockStore)(nil).UpdateDownloadClientSettings), ctx, s)
 }
 
 // UpdateInstance mocks base method.

@@ -217,6 +217,13 @@ type QueueCleanerSettings struct {
 	FailedImportBlocklist bool `json:"failed_import_blocklist"` // Blocklist failed imports on remove
 	// Metadata stuck
 	MetadataStuckMinutes int `json:"metadata_stuck_minutes"` // Minutes before metadata download is "stuck" (0=disabled)
+	// Seeding rules (torrent clients)
+	SeedingEnabled     bool    `json:"seeding_enabled"`      // Enable seeding rule enforcement
+	SeedingMaxRatio    float64 `json:"seeding_max_ratio"`    // Remove after reaching this ratio (0=disabled)
+	SeedingMaxHours    int     `json:"seeding_max_hours"`    // Remove after seeding this many hours (0=disabled)
+	SeedingMode        string  `json:"seeding_mode"`         // "and" (both conditions) or "or" (either condition)
+	SeedingDeleteFiles bool    `json:"seeding_delete_files"` // Delete downloaded files on seeding removal
+	SeedingSkipPrivate bool    `json:"seeding_skip_private"` // Skip seeding rules for private trackers
 }
 
 // QueueStrike represents a strike against a problematic download.
@@ -301,4 +308,23 @@ func (s *SeerrSettings) MaskedSeerrAPIKey() string {
 		return "****"
 	}
 	return "****" + s.APIKey[len(s.APIKey)-4:]
+}
+
+// DownloadClientSettings holds per-app download client configuration.
+type DownloadClientSettings struct {
+	AppType    AppType `json:"app_type"`
+	ClientType string  `json:"client_type"` // qbittorrent, transmission, deluge, sabnzbd, nzbget
+	URL        string  `json:"url"`
+	Username   string  `json:"username"`
+	Password   string  `json:"password"`
+	Enabled    bool    `json:"enabled"`
+	Timeout    int     `json:"timeout"`
+}
+
+// MaskedPassword returns the password masked for display.
+func (d *DownloadClientSettings) MaskedPassword() string {
+	if d.Password == "" {
+		return ""
+	}
+	return "****"
 }

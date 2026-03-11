@@ -17,13 +17,17 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        max_strikes, strike_window_hours, check_interval_seconds,
 		        remove_from_client, blocklist_on_remove,
 		        strike_public, strike_private, slow_ignore_above_bytes,
-		        failed_import_remove, failed_import_blocklist, metadata_stuck_minutes
+		        failed_import_remove, failed_import_blocklist, metadata_stuck_minutes,
+		        seeding_enabled, seeding_max_ratio, seeding_max_hours,
+		        seeding_mode, seeding_delete_files, seeding_skip_private
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
 		&s.RemoveFromClient, &s.BlocklistOnRemove,
 		&s.StrikePublic, &s.StrikePrivate, &s.SlowIgnoreAboveBytes,
-		&s.FailedImportRemove, &s.FailedImportBlocklist, &s.MetadataStuckMinutes)
+		&s.FailedImportRemove, &s.FailedImportBlocklist, &s.MetadataStuckMinutes,
+		&s.SeedingEnabled, &s.SeedingMaxRatio, &s.SeedingMaxHours,
+		&s.SeedingMode, &s.SeedingDeleteFiles, &s.SeedingSkipPrivate)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -37,13 +41,17 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        max_strikes = $5, strike_window_hours = $6, check_interval_seconds = $7,
 		        remove_from_client = $8, blocklist_on_remove = $9,
 		        strike_public = $10, strike_private = $11, slow_ignore_above_bytes = $12,
-		        failed_import_remove = $13, failed_import_blocklist = $14, metadata_stuck_minutes = $15
+		        failed_import_remove = $13, failed_import_blocklist = $14, metadata_stuck_minutes = $15,
+		        seeding_enabled = $16, seeding_max_ratio = $17, seeding_max_hours = $18,
+		        seeding_mode = $19, seeding_delete_files = $20, seeding_skip_private = $21
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
 		s.RemoveFromClient, s.BlocklistOnRemove,
 		s.StrikePublic, s.StrikePrivate, s.SlowIgnoreAboveBytes,
-		s.FailedImportRemove, s.FailedImportBlocklist, s.MetadataStuckMinutes)
+		s.FailedImportRemove, s.FailedImportBlocklist, s.MetadataStuckMinutes,
+		s.SeedingEnabled, s.SeedingMaxRatio, s.SeedingMaxHours,
+		s.SeedingMode, s.SeedingDeleteFiles, s.SeedingSkipPrivate)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}
@@ -207,6 +215,32 @@ func (db *DB) PruneBlocklistLog(ctx context.Context, olderThan time.Duration) er
 		`DELETE FROM blocklist_log WHERE blocklisted_at < $1`, time.Now().Add(-olderThan))
 	if err != nil {
 		return fmt.Errorf("prune blocklist log: %w", err)
+	}
+	return nil
+}
+
+// --- Download Client Settings ---
+
+func (db *DB) GetDownloadClientSettings(ctx context.Context, appType AppType) (*DownloadClientSettings, error) {
+	var s DownloadClientSettings
+	err := db.Pool.QueryRow(ctx,
+		`SELECT app_type, client_type, url, username, password, enabled, timeout
+		 FROM download_client_settings WHERE app_type = $1`, appType,
+	).Scan(&s.AppType, &s.ClientType, &s.URL, &s.Username, &s.Password, &s.Enabled, &s.Timeout)
+	if err != nil {
+		return nil, fmt.Errorf("get download client settings: %w", err)
+	}
+	return &s, nil
+}
+
+func (db *DB) UpdateDownloadClientSettings(ctx context.Context, s *DownloadClientSettings) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE download_client_settings SET
+		        client_type = $2, url = $3, username = $4, password = $5, enabled = $6, timeout = $7
+		 WHERE app_type = $1`,
+		s.AppType, s.ClientType, s.URL, s.Username, s.Password, s.Enabled, s.Timeout)
+	if err != nil {
+		return fmt.Errorf("update download client settings: %w", err)
 	}
 	return nil
 }

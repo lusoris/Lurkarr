@@ -17,6 +17,10 @@ type DownloadItem struct {
 	ETA           int64   `json:"eta"`            // seconds
 	Category      string  `json:"category"`
 	SavePath      string  `json:"save_path"`
+	Ratio         float64 `json:"ratio"`        // upload/download ratio (torrent only)
+	SeedingTime   int64   `json:"seeding_time"` // seconds spent seeding (torrent only)
+	CompletedAt   int64   `json:"completed_at"` // unix timestamp of completion (torrent only)
+	AddedAt       int64   `json:"added_at"`     // unix timestamp when added (torrent only)
 }
 
 // ClientStatus represents the overall status of a download client.

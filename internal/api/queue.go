@@ -140,3 +140,54 @@ func (h *QueueHandler) HandleGetAutoImportLog(w http.ResponseWriter, r *http.Req
 	}
 	writeJSON(w, http.StatusOK, logs)
 }
+
+// HandleGetDownloadClientSettings handles GET /api/queue/download-client/{app}.
+func (h *QueueHandler) HandleGetDownloadClientSettings(w http.ResponseWriter, r *http.Request) {
+	appType := r.PathValue("app")
+	if !database.ValidAppType(appType) {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+		return
+	}
+
+	settings, err := h.DB.GetDownloadClientSettings(r.Context(), database.AppType(appType))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get download client settings"))
+		return
+	}
+
+	settings.Password = settings.MaskedPassword()
+	writeJSON(w, http.StatusOK, settings)
+}
+
+// HandleUpdateDownloadClientSettings handles PUT /api/queue/download-client/{app}.
+func (h *QueueHandler) HandleUpdateDownloadClientSettings(w http.ResponseWriter, r *http.Request) {
+	appType := r.PathValue("app")
+	if !database.ValidAppType(appType) {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+		return
+	}
+
+	limitBody(w, r)
+	var s database.DownloadClientSettings
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+		return
+	}
+	s.AppType = database.AppType(appType)
+
+	// If masked password sent back, preserve existing.
+	if s.Password == "" || s.Password == "****" {
+		existing, err := h.DB.GetDownloadClientSettings(r.Context(), s.AppType)
+		if err == nil {
+			s.Password = existing.Password
+		}
+	}
+
+	if err := h.DB.UpdateDownloadClientSettings(r.Context(), &s); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to update download client settings"))
+		return
+	}
+
+	s.Password = s.MaskedPassword()
+	writeJSON(w, http.StatusOK, s)
+}

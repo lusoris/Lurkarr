@@ -35,6 +35,9 @@ func (a *DelugeAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) {
 			ETA:           t.ETA,
 			Category:      t.Label,
 			SavePath:      t.SavePath,
+			Ratio:         t.Ratio,
+			SeedingTime:   t.SeedingTime,
+			AddedAt:       int64(t.TimeAdded),
 		})
 	}
 	return items, nil

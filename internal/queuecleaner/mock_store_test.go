@@ -71,6 +71,21 @@ func (mr *MockStoreMockRecorder) CountStrikes(ctx, appType, instanceID, download
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountStrikes", reflect.TypeOf((*MockStore)(nil).CountStrikes), ctx, appType, instanceID, downloadID, windowHours)
 }
 
+// GetDownloadClientSettings mocks base method.
+func (m *MockStore) GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDownloadClientSettings", ctx, appType)
+	ret0, _ := ret[0].(*database.DownloadClientSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDownloadClientSettings indicates an expected call of GetDownloadClientSettings.
+func (mr *MockStoreMockRecorder) GetDownloadClientSettings(ctx, appType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDownloadClientSettings", reflect.TypeOf((*MockStore)(nil).GetDownloadClientSettings), ctx, appType)
+}
+
 // GetGeneralSettings mocks base method.
 func (m *MockStore) GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error) {
 	m.ctrl.T.Helper()

@@ -3,6 +3,7 @@ package downloadclient
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
 )
@@ -24,6 +25,10 @@ func (a *TransmissionAdapter) GetItems(ctx context.Context) ([]DownloadItem, err
 	}
 	items := make([]DownloadItem, 0, len(torrents))
 	for _, t := range torrents {
+		var seedingTime int64
+		if t.DoneDate > 0 {
+			seedingTime = time.Now().Unix() - t.DoneDate
+		}
 		items = append(items, DownloadItem{
 			ID:            strconv.Itoa(t.ID),
 			Name:          t.Name,
@@ -35,6 +40,10 @@ func (a *TransmissionAdapter) GetItems(ctx context.Context) ([]DownloadItem, err
 			UploadSpeed:   t.RateUpload,
 			ETA:           t.ETA,
 			SavePath:      t.DownloadDir,
+			Ratio:         t.UploadRatio,
+			SeedingTime:   seedingTime,
+			CompletedAt:   t.DoneDate,
+			AddedAt:       t.AddedDate,
 		})
 	}
 	return items, nil

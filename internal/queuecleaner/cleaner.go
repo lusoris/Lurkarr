@@ -13,11 +13,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
+	downloadclient "github.com/lusoris/lurkarr/internal/downloadclients"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/deluge"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
+	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
-	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 )
 
 // Store abstracts the database operations needed by the Cleaner.
@@ -31,6 +35,7 @@ type Store interface {
 	AddStrike(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID, title, reason string) error
 	CountStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string, windowHours int) (int, error)
 	GetSABnzbdSettings(ctx context.Context) (*database.SABnzbdSettings, error)
+	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
 }
 
 // Cleaner monitors download queues and removes stalled/slow/duplicate items.
@@ -231,6 +236,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	// 3. Failed import cleanup
 	if settings.FailedImportRemove {
 		c.cleanFailedImports(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
+	}
+
+	// 4. Seeding enforcement — remove completed torrents exceeding ratio/time limits
+	if settings.SeedingEnabled {
+		c.cleanSeeding(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
 	}
 }
 
@@ -435,6 +445,125 @@ func (c *Cleaner) notifyRemoval(ctx context.Context, appType database.AppType, i
 		Instance: instName,
 		Fields:   map[string]string{"Reason": reason},
 	})
+}
+
+// getTorrentClient builds a unified download client for the given app type's
+// configured torrent client, or returns nil if not configured/enabled.
+func (c *Cleaner) getTorrentClient(ctx context.Context, appType database.AppType) downloadclient.Client {
+	dcs, err := c.db.GetDownloadClientSettings(ctx, appType)
+	if err != nil || !dcs.Enabled || dcs.URL == "" {
+		return nil
+	}
+
+	timeout := time.Duration(dcs.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	switch downloadclient.ClientType(dcs.ClientType) {
+	case downloadclient.TypeQBittorrent:
+		native := qbittorrent.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
+		return downloadclient.NewQBittorrentAdapter(native)
+	case downloadclient.TypeTransmission:
+		native := transmission.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
+		return downloadclient.NewTransmissionAdapter(native)
+	case downloadclient.TypeDeluge:
+		native := deluge.NewClient(dcs.URL, dcs.Password, timeout)
+		return downloadclient.NewDelugeAdapter(native)
+	default:
+		return nil
+	}
+}
+
+// cleanSeeding checks completed torrent downloads against seeding rules and
+// removes items that have exceeded the configured ratio or seeding time.
+func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord) {
+	torrentClient := c.getTorrentClient(ctx, appType)
+	if torrentClient == nil {
+		return
+	}
+
+	items, err := torrentClient.GetItems(ctx)
+	if err != nil {
+		log.Error("failed to get torrent items for seeding check", "error", err)
+		return
+	}
+
+	// Build a map of download hash → torrent item for fast lookup.
+	itemsByID := make(map[string]downloadclient.DownloadItem, len(items))
+	for _, item := range items {
+		itemsByID[strings.ToLower(item.ID)] = item
+	}
+
+	for _, record := range records {
+		if record.Protocol != "torrent" {
+			continue
+		}
+		if record.DownloadID == "" {
+			continue
+		}
+		// Only look at completed downloads (imported or waiting for import).
+		if record.TrackedDownloadState != "imported" && record.TrackedDownloadState != "importPending" {
+			continue
+		}
+
+		item, ok := itemsByID[strings.ToLower(record.DownloadID)]
+		if !ok {
+			continue
+		}
+
+		// Skip private trackers if configured.
+		if settings.SeedingSkipPrivate && isPrivateTracker(record) {
+			continue
+		}
+
+		if !c.seedingLimitReached(settings, item) {
+			continue
+		}
+
+		log.Info("seeding limit reached, removing",
+			"title", record.Title,
+			"ratio", item.Ratio,
+			"seeding_hours", float64(item.SeedingTime)/3600,
+			"max_ratio", settings.SeedingMaxRatio,
+			"max_hours", settings.SeedingMaxHours,
+			"mode", settings.SeedingMode,
+		)
+
+		// Remove from the torrent client directly.
+		if err := torrentClient.RemoveItem(ctx, item.ID, settings.SeedingDeleteFiles); err != nil {
+			log.Error("failed to remove seeded torrent", "title", record.Title, "error", err)
+			continue
+		}
+
+		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "seeding_limit_reached")
+	}
+}
+
+// seedingLimitReached evaluates whether a torrent has exceeded the configured
+// seeding limits. In "or" mode either condition triggers; in "and" mode both must be met.
+func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, item downloadclient.DownloadItem) bool {
+	ratioMet := settings.SeedingMaxRatio > 0 && item.Ratio >= settings.SeedingMaxRatio
+	timeMet := settings.SeedingMaxHours > 0 && item.SeedingTime >= int64(settings.SeedingMaxHours)*3600
+
+	// If neither limit is configured, nothing to enforce.
+	if settings.SeedingMaxRatio <= 0 && settings.SeedingMaxHours <= 0 {
+		return false
+	}
+
+	// If only one limit is configured, use that one.
+	if settings.SeedingMaxRatio <= 0 {
+		return timeMet
+	}
+	if settings.SeedingMaxHours <= 0 {
+		return ratioMet
+	}
+
+	if settings.SeedingMode == "and" {
+		return ratioMet && timeMet
+	}
+	return ratioMet || timeMet // "or" mode (default)
 }
 
 // getSABnzbdStatuses fetches the SABnzbd queue and returns a map of downloadID -> status.

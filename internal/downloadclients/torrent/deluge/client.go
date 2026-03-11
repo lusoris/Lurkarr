@@ -163,6 +163,7 @@ type Torrent struct {
 	NumPeers      int     `json:"num_peers"`
 	SavePath      string  `json:"save_path"`
 	TimeAdded     float64 `json:"time_added"`
+	SeedingTime   int64   `json:"seeding_time"`
 	TotalDone     int64   `json:"total_done"`
 	TrackerHost   string  `json:"tracker_host"`
 	Label         string  `json:"label"`
@@ -171,8 +172,8 @@ type Torrent struct {
 var defaultFields = []string{
 	"hash", "name", "state", "total_size", "progress",
 	"download_payload_rate", "upload_payload_rate", "ratio", "eta",
-	"num_seeds", "num_peers", "save_path", "time_added", "total_done",
-	"tracker_host", "label",
+	"num_seeds", "num_peers", "save_path", "time_added", "seeding_time",
+	"total_done", "tracker_host", "label",
 }
 
 // GetTorrents returns all torrents with default fields.

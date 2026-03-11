@@ -196,6 +196,8 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("PUT /api/queue/scoring/{app}", queueH.HandleUpdateScoringProfile)
 	protected.HandleFunc("GET /api/queue/blocklist/{app}", queueH.HandleGetBlocklistLog)
 	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
+	protected.HandleFunc("GET /api/queue/download-client/{app}", queueH.HandleGetDownloadClientSettings)
+	protected.HandleFunc("PUT /api/queue/download-client/{app}", queueH.HandleUpdateDownloadClientSettings)
 
 	// Notifications
 	protected.HandleFunc("GET /api/notifications/providers", notificationH.HandleListProviders)
