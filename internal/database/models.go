@@ -283,7 +283,7 @@ type NotificationProvider struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 }
 
-// SeerrSettings holds Overseerr/Jellyseerr integration configuration.
+// SeerrSettings holds Seerr integration configuration.
 type SeerrSettings struct {
 	ID                  uuid.UUID `json:"id"`
 	URL                 string    `json:"url"`

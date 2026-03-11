@@ -2,7 +2,7 @@
 
 > All *arr apps share a common Servarr API base. Version: v3
 
-## Common Endpoints (Sonarr, Radarr, Lidarr, Readarr, Whisparr)
+## Common Endpoints (Sonarr, Radarr, Lidarr, Readarr)
 
 ### Authentication
 - Header: `X-Api-Key: <apikey>`
@@ -45,6 +45,172 @@
 - `GET /api/v3/movie` — all movies
 - `GET /api/v3/movie/{id}` — single movie
 - Radarr uses `digitalRelease` and `physicalRelease` dates
+
+## Whisparr v2 (Sonarr-based)
+
+> Source: https://github.com/Whisparr/Whisparr (branch: `v2-develop`)
+> Port: 6969, API version: v3
+
+Whisparr v2 is built on Sonarr. Studios are "series", scenes and movies are "episodes".
+
+### Core Resources
+
+- `GET /api/v3/series` — all studios (series)
+- `GET /api/v3/series/{id}` — single studio
+- `GET /api/v3/episode?seriesId={id}` — scenes/movies for a studio
+- `GET /api/v3/episode/{id}` — single scene/movie
+
+### Wanted/Missing
+
+```
+GET /api/v3/wanted/missing?sortKey=releaseDate&sortDirection=descending&pageSize=1000&monitored=true
+```
+
+Returns `EpisodeResourcePagingResource`:
+```json
+{
+  "page": 1,
+  "pageSize": 1000,
+  "totalRecords": 42,
+  "records": [
+    {
+      "id": 1,
+      "seriesId": 10,
+      "title": "Scene Title",
+      "seasonNumber": 1,
+      "monitored": true,
+      "hasFile": false,
+      "releaseDate": "2024-01-15"
+    }
+  ]
+}
+```
+
+### Cutoff Unmet (Upgrades)
+
+```
+GET /api/v3/wanted/cutoff?sortKey=releaseDate&sortDirection=descending&pageSize=1000&monitored=true
+```
+
+Same paginated response format as wanted/missing.
+
+### Search Commands
+
+```json
+POST /api/v3/command
+{"name": "EpisodeSearch", "episodeIds": [1, 2, 3]}
+{"name": "SeasonSearch", "seriesId": 10, "seasonNumber": 1}
+{"name": "SeriesSearch", "seriesId": 10}
+```
+
+### Special Fields
+
+- `Actor` resource has `tpdbId` (ThePornDB ID) and `Gender` enum
+- `EpisodeResource` has `releaseDate` (not `airDateUtc` like Sonarr)
+- Queue endpoint same as Sonarr: `GET /api/v3/queue?page=1&pageSize=50`
+
+## Whisparr v3 / Eros (Radarr-based)
+
+> Source: https://github.com/Whisparr/Whisparr (branch: `eros`)
+> Port: 6969, API version: v3
+
+Eros is built on Radarr. Scenes and movies are individual `MovieResource` items with an `itemType` field.
+
+### Core Resources
+
+- `GET /api/v3/movie` — all items (scenes + movies)
+- `GET /api/v3/movie/{id}` — single item
+- `GET /api/v3/performer` — all performers
+- `GET /api/v3/performer/{id}` — single performer
+- `GET /api/v3/studio` — all studios
+- `GET /api/v3/studio/{id}` — single studio
+
+### MovieResource
+
+```json
+{
+  "id": 1,
+  "title": "Title",
+  "itemType": "scene",
+  "monitored": true,
+  "hasFile": false,
+  "studio": {"id": 5, "title": "Studio Name"},
+  "credits": [{"personName": "...", "character": "..."}],
+  "stashId": "abc-123"
+}
+```
+
+`itemType` values: `"movie"` or `"scene"`
+
+### PerformerResource
+
+```json
+{
+  "id": 1,
+  "fullName": "Name",
+  "gender": "female",
+  "ethnicity": "...",
+  "careerStart": 2020,
+  "careerEnd": null,
+  "hasMovies": true,
+  "hasScenes": true,
+  "sceneCount": 42,
+  "foreignId": "..."
+}
+```
+
+### StudioResource
+
+```json
+{
+  "id": 1,
+  "title": "Studio Name",
+  "hasMovies": true,
+  "hasScenes": true,
+  "totalSceneCount": 100,
+  "foreignId": "..."
+}
+```
+
+### Wanted/Missing — NOT AVAILABLE
+
+Eros has **no** `/api/v3/wanted/missing` or `/api/v3/wanted/cutoff` endpoints.
+To find missing items, fetch all from `/api/v3/movie` and filter client-side:
+- Missing: `monitored == true && hasFile == false`
+- No cutoff/upgrade equivalent exists
+
+### Search Commands
+
+```json
+POST /api/v3/command
+{"name": "MoviesSearch", "movieIds": [1, 2, 3]}
+```
+
+### Lookup
+
+- `GET /api/v3/lookup/scene?term=query` — search for scenes
+- `GET /api/v3/lookup/movie?term=query` — search for movies
+
+### Naming Config
+
+```json
+{
+  "renameMovies": true,
+  "renameScenes": true,
+  "standardMovieFormat": "{Movie Title} ({Release Year})",
+  "standardSceneFormat": "{Scene Title} ({Release Year})",
+  "sceneFolderFormat": "...",
+  "sceneImportFolderFormat": "..."
+}
+```
+
+### Import Exclusion Types
+
+`ImportExclusionType` enum: `scene`, `movie`, `studio`, `performer`
+
+### Add Movie Methods
+
+`AddMovieMethod` enum: `manual`, `list`, `performer`, `studio`
 
 ## Prowlarr-Specific
 
@@ -163,12 +329,14 @@ editqueue("GroupDelete", "", [id])  # Delete
 status             # Server status (speed, remaining)
 ```
 
-## Overseerr/Jellyseerr API
+## Seerr API
 
-> Docs: https://api-docs.overseerr.dev/
+> Source: https://github.com/seerr-team/seerr
+> Port: 5055, API version: v1
 
 ### Authentication
 - Header: `X-Api-Key: <apikey>`
+- Or cookie-based session auth via `POST /api/v1/auth/local`
 
 ### Key Endpoints
 
@@ -180,13 +348,24 @@ POST /api/v1/request/{id}/decline                # Decline request
 GET  /api/v1/media?take=20&skip=0                # Media library
 GET  /api/v1/user                                # Users
 GET  /api/v1/status                              # Server status
+GET  /api/v1/settings/main                       # Main settings
 ```
 
-### Request Status Codes
-| Code | Meaning |
-|------|---------|
+### MediaStatus
+
+| Code | Constant |
+|------|----------|
+| 1 | Unknown |
+| 2 | Pending |
+| 3 | Processing |
+| 4 | Partially Available |
+| 5 | Available |
+| 6 | Deleted |
+
+### MediaRequestStatus
+
+| Code | Constant |
+|------|----------|
 | 1 | Pending |
 | 2 | Approved |
 | 3 | Declined |
-| 4 | Available |
-| 5 | Completed (processing done) |

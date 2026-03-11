@@ -150,7 +150,7 @@ export const settings = $state<Settings | null>(null);
 | / | Dashboard | ✅ |
 | /apps | Arr instance management | ✅ |
 | /downloads | Active downloads | ✅ |
-| /history | Lurk history | ✅ |
+| /history | Hunt history | ✅ |
 | /login | Authentication | ✅ |
 | /logs | Log viewer | ⚠️ Remove (use Grafana) |
 | /queue | Queue management | ✅ |
@@ -163,7 +163,7 @@ export const settings = $state<Settings | null>(null);
 | Route | Purpose |
 |-------|---------|
 | /notifications | Notification provider config |
-| /seerr | Overseerr/Jellyseerr config |
+| /seerr | Seerr config |
 | /download-clients | DL client management |
 | /monitoring | Grafana embed/links |
 | /auto-import | Auto-import config |

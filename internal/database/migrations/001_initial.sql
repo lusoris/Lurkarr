@@ -256,7 +256,7 @@ CREATE TABLE notification_providers (
 CREATE INDEX idx_notification_providers_type ON notification_providers (type);
 CREATE INDEX idx_notification_providers_enabled ON notification_providers (enabled);
 
--- ── Seerr (Overseerr/Jellyseerr) ─────────────────────────────────────────────
+-- ── Seerr ─────────────────────────────────────────────
 
 CREATE TABLE seerr_settings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

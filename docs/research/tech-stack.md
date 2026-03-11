@@ -65,4 +65,4 @@
 | Transmission | RPC | Torrent client |
 | Deluge | JSON-RPC | Torrent client |
 | NZBGet | XML-RPC | Usenet downloader |
-| Overseerr/Jellyseerr | v1 | Request management |
+| Seerr | v1 | Request management |

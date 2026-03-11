@@ -276,9 +276,11 @@ func TestReadarrLurkerGetQueue(t *testing.T) {
 
 func TestWhisparrLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]arrclient.WhisparrMovie{
-			{ID: 50, Title: "Has File", Monitored: true, HasFile: true},
-			{ID: 51, Title: "Missing", Monitored: true, HasFile: false},
+		json.NewEncoder(w).Encode(map[string]any{
+			"totalRecords": 1,
+			"records": []arrclient.WhisparrEpisode{
+				{ID: 51, SeriesID: 1, Title: "Missing", Monitored: true, HasFile: false},
+			},
 		})
 	})
 
@@ -296,7 +298,7 @@ func TestWhisparrLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
-			"records":      []arrclient.WhisparrMovie{{ID: 52, Title: "Upgrade"}},
+			"records":      []arrclient.WhisparrEpisode{{ID: 52, Title: "Upgrade"}},
 		})
 	})
 
@@ -312,7 +314,7 @@ func TestWhisparrLurkerGetUpgrades(t *testing.T) {
 
 func TestWhisparrLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "MoviesSearch"})
+		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "EpisodeSearch"})
 	})
 
 	h := LurkerFor(database.AppWhisparr)
@@ -357,10 +359,8 @@ func TestErosLurkerGetMissing(t *testing.T) {
 
 func TestErosLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"totalRecords": 1,
-			"records":      []arrclient.ErosMovie{{ID: 63, Title: "Upgrade Eros"}},
-		})
+		// Eros has no cutoff endpoint, should not be called
+		t.Error("unexpected HTTP request")
 	})
 
 	h := LurkerFor(database.AppEros)
@@ -368,8 +368,8 @@ func TestErosLurkerGetUpgrades(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("got %d, want 1", len(items))
+	if len(items) != 0 {
+		t.Fatalf("got %d, want 0 (Eros has no cutoff endpoint)", len(items))
 	}
 }
 

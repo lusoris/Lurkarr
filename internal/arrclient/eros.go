@@ -7,18 +7,20 @@ import (
 	"fmt"
 )
 
-// Eros (Whisparr v3) uses the v3 API but with different endpoint behavior.
+// Eros (Whisparr v3) is Radarr-based: scenes and movies are individual items.
 const erosAPI = "/api/v3"
 
-// ErosMovie represents content from Whisparr v3 (Eros).
+// ErosMovie represents a scene or movie from Whisparr v3 (Eros).
 type ErosMovie struct {
 	ID        int    `json:"id"`
 	Title     string `json:"title"`
 	Monitored bool   `json:"monitored"`
 	HasFile   bool   `json:"hasFile"`
+	ItemType  string `json:"itemType"` // "movie" or "scene"
 }
 
-// ErosGetMissing fetches items without files.
+// ErosGetMissing fetches scenes/movies without files.
+// Eros has no wanted/missing endpoint, so we fetch all and filter client-side.
 func (c *Client) ErosGetMissing(ctx context.Context) ([]ErosMovie, error) {
 	var movies []ErosMovie
 	if err := c.get(ctx, erosAPI+"/movie", &movies); err != nil {
@@ -33,19 +35,12 @@ func (c *Client) ErosGetMissing(ctx context.Context) ([]ErosMovie, error) {
 	return missing, nil
 }
 
-// ErosGetCutoffUnmet fetches items that haven't met quality cutoff.
-func (c *Client) ErosGetCutoffUnmet(ctx context.Context) ([]ErosMovie, error) {
-	var resp struct {
-		TotalRecords int         `json:"totalRecords"`
-		Records      []ErosMovie `json:"records"`
-	}
-	if err := c.get(ctx, erosAPI+"/wanted/cutoff?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("eros get cutoff unmet: %w", err)
-	}
-	return resp.Records, nil
+// ErosGetCutoffUnmet returns nil — Eros has no wanted/cutoff endpoint.
+func (c *Client) ErosGetCutoffUnmet(_ context.Context) ([]ErosMovie, error) {
+	return nil, nil
 }
 
-// ErosSearchMovie triggers a search for items.
+// ErosSearchMovie triggers a search for scenes/movies by ID.
 func (c *Client) ErosSearchMovie(ctx context.Context, movieIDs []int) (*CommandResponse, error) {
 	body, _ := json.Marshal(map[string]any{
 		"name":     "MoviesSearch",

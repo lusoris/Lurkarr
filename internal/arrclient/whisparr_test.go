@@ -11,25 +11,25 @@ import (
 
 func TestWhisparrGetMissing(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v3/movie" {
+		if r.URL.Path != "/api/v3/wanted/missing" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode([]WhisparrMovie{
-			{ID: 1, Title: "Has File", Monitored: true, HasFile: true},
-			{ID: 2, Title: "Missing", Monitored: true, HasFile: false},
-			{ID: 3, Title: "Unmonitored Missing", Monitored: false, HasFile: false},
+		json.NewEncoder(w).Encode(map[string]any{
+			"totalRecords": 1,
+			"records": []WhisparrEpisode{
+				{ID: 2, SeriesID: 1, Title: "Missing Scene", SeasonNumber: 1, Monitored: true, HasFile: false},
+			},
 		})
 	}))
 	defer server.Close()
 
 	c := NewClient(server.URL, "key", 5*time.Second, true)
-	movies, err := c.WhisparrGetMissing(context.Background())
+	episodes, err := c.WhisparrGetMissing(context.Background())
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	// Only monitored without file should be returned
-	if len(movies) != 1 || movies[0].Title != "Missing" {
-		t.Errorf("got %v, want 1 missing movie", movies)
+	if len(episodes) != 1 || episodes[0].Title != "Missing Scene" {
+		t.Errorf("got %v, want 1 missing episode", episodes)
 	}
 }
 
@@ -37,33 +37,33 @@ func TestWhisparrGetCutoffUnmet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
-			"records":      []WhisparrMovie{{ID: 5, Title: "Upgrade"}},
+			"records":      []WhisparrEpisode{{ID: 5, Title: "Upgrade"}},
 		})
 	}))
 	defer server.Close()
 
 	c := NewClient(server.URL, "key", 5*time.Second, true)
-	movies, err := c.WhisparrGetCutoffUnmet(context.Background())
+	episodes, err := c.WhisparrGetCutoffUnmet(context.Background())
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if len(movies) != 1 {
-		t.Fatalf("got %d, want 1", len(movies))
+	if len(episodes) != 1 {
+		t.Fatalf("got %d, want 1", len(episodes))
 	}
 }
 
-func TestWhisparrSearchMovie(t *testing.T) {
+func TestWhisparrSearchEpisode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(CommandResponse{ID: 1, Name: "MoviesSearch", Status: "queued"})
+		json.NewEncoder(w).Encode(CommandResponse{ID: 1, Name: "EpisodeSearch", Status: "queued"})
 	}))
 	defer server.Close()
 
 	c := NewClient(server.URL, "key", 5*time.Second, true)
-	resp, err := c.WhisparrSearchMovie(context.Background(), []int{2})
+	resp, err := c.WhisparrSearchEpisode(context.Background(), []int{2})
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if resp.Name != "MoviesSearch" {
+	if resp.Name != "EpisodeSearch" {
 		t.Errorf("Name = %q", resp.Name)
 	}
 }

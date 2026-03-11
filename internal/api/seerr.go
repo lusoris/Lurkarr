@@ -8,7 +8,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/seerr"
 )
 
-// SeerrHandler handles Seerr (Overseerr/Jellyseerr) API endpoints.
+// SeerrHandler handles Seerr API endpoints.
 type SeerrHandler struct {
 	DB Store
 }

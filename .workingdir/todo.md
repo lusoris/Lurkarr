@@ -93,7 +93,7 @@
 - [x] Async manager with per-provider event subscription
 - [x] Migration 006: notification_providers
 
-## ✅ COMPLETED — Seerr Integration (Overseerr/Jellyseerr)
+## ✅ COMPLETED — Seerr Integration
 
 - [x] Client (requests, media, users, counts)
 - [x] SyncEngine with auto-approval loop
@@ -184,14 +184,14 @@
 - [x] **🔴 Data race in logging Hub.Broadcast vs Hub.HandleWebSocket** — Fixed: added `sync.RWMutex` to `wsClient` for filter fields. All 22 tests pass with `-race`.
 
 ### 16.3 Dead Code / Unused Packages
-- [ ] **`internal/cache`** — entire package never imported by any production code. Settings are re-fetched from DB every call. Either integrate into hot paths or remove.
-- [ ] **`internal/downloadclients`** — unified Client interface + 5 adapters never imported. API/cleaner create native clients directly. Either integrate as the abstraction layer or remove.
-- [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called
+- [ ] **`internal/cache`** — otter-backed W-TinyLFU cache implemented + tested but never wired in. Integrate into lurking engine / hot paths to avoid redundant DB reads.
+- [ ] **`internal/downloadclients`** — unified Client interface + 5 adapters built for Phase 7 (Download Cleaner Advanced). Not dead — pending integration.
+- [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called (Phase 7 planned use)
 - [ ] `downloadclient/sabnzbd.RemoveItem` — returns "not implemented" error
 
 ### 16.4 Overlapping / Duplicate Code
-- [ ] **Whisparr/Eros ~95% identical** — same types, same endpoints, same methods. Consolidate with generics or shared helper.
-- [ ] **Prowlarr in AllAppTypes() wastes goroutines** — lurking, autoimport, and cleaner all start loops for Prowlarr that immediately no-op (no ArrLurker registered). Exclude from background service iterations.
+- [ ] **Whisparr/Eros are INCOMPLETE, not just duplicate** — current code only handles movies. Whisparr v2 has movies + scenes (dual content types). Eros (Whisparr v3) is a complete API rewrite. Need scene endpoints, proper type models for each version. Do NOT consolidate — they need separate, fuller implementations.
+- [x] **Prowlarr in AllAppTypes() wastes goroutines** — Fixed: lurking engine now skips app types with no registered lurker (matches cleaner/importer pattern).
 - [ ] SABnzbd triple implementation: native client, downloadclient adapter, and API handler all create clients independently.
 
 ### 16.5 Swallowed Errors in Background Services

@@ -170,31 +170,31 @@ func (readarrLurker) GetQueue(ctx context.Context, c *arrclient.Client) (*arrcli
 type whisparrLurker struct{}
 
 func (whisparrLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lurkableItem, error) {
-	movies, err := c.WhisparrGetMissing(ctx)
+	episodes, err := c.WhisparrGetMissing(ctx)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]lurkableItem, len(movies))
-	for i, m := range movies {
-		items[i] = lurkableItem{ID: m.ID, Title: m.Title}
+	items := make([]lurkableItem, len(episodes))
+	for i, ep := range episodes {
+		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title}
 	}
 	return items, nil
 }
 
 func (whisparrLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]lurkableItem, error) {
-	movies, err := c.WhisparrGetCutoffUnmet(ctx)
+	episodes, err := c.WhisparrGetCutoffUnmet(ctx)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]lurkableItem, len(movies))
-	for i, m := range movies {
-		items[i] = lurkableItem{ID: m.ID, Title: m.Title}
+	items := make([]lurkableItem, len(episodes))
+	for i, ep := range episodes {
+		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title}
 	}
 	return items, nil
 }
 
 func (whisparrLurker) Search(ctx context.Context, c *arrclient.Client, mediaID int) error {
-	_, err := c.WhisparrSearchMovie(ctx, []int{mediaID})
+	_, err := c.WhisparrSearchEpisode(ctx, []int{mediaID})
 	return err
 }
 

@@ -205,7 +205,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("DELETE /api/notifications/providers/{id}", notificationH.HandleDeleteProvider)
 	protected.HandleFunc("POST /api/notifications/providers/{id}/test", notificationH.HandleTestProvider)
 
-	// Seerr (Overseerr/Jellyseerr)
+	// Seerr
 	protected.HandleFunc("GET /api/seerr/settings", seerrH.HandleGetSettings)
 	protected.HandleFunc("PUT /api/seerr/settings", seerrH.HandleUpdateSettings)
 	protected.HandleFunc("POST /api/seerr/test", seerrH.HandleTestConnection)

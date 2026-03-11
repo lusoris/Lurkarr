@@ -1,4 +1,4 @@
-// Package seerr provides a client for the Overseerr / Jellyseerr (Seerr) API.
+// Package seerr provides a client for the Seerr API.
 package seerr
 
 import (
@@ -32,9 +32,7 @@ const (
 	MediaProcessing         MediaStatus = 3
 	MediaPartiallyAvailable MediaStatus = 4
 	MediaAvailable          MediaStatus = 5
-	MediaBlocklisted        MediaStatus = 6 // Jellyseerr/Seerr only
-	MediaDeletedOverseerr   MediaStatus = 6 // Overseerr only
-	MediaDeletedJellyseerr  MediaStatus = 7 // Jellyseerr/Seerr only
+	MediaDeleted            MediaStatus = 6
 )
 
 // PageInfo contains pagination metadata.
@@ -131,7 +129,7 @@ type AboutInfo struct {
 	TotalRequests   int    `json:"totalRequests"`
 }
 
-// Client is an HTTP client for the Overseerr/Jellyseerr API.
+// Client is an HTTP client for the Seerr API.
 type Client struct {
 	baseURL    string
 	apiKey     string

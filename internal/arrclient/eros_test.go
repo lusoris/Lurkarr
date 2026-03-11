@@ -32,21 +32,13 @@ func TestErosGetMissing(t *testing.T) {
 }
 
 func TestErosGetCutoffUnmet(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"totalRecords": 1,
-			"records":      []ErosMovie{{ID: 3, Title: "Upgrade Eros"}},
-		})
-	}))
-	defer server.Close()
-
-	c := NewClient(server.URL, "key", 5*time.Second, true)
+	c := NewClient("http://unused", "key", 5*time.Second, true)
 	movies, err := c.ErosGetCutoffUnmet(context.Background())
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if len(movies) != 1 {
-		t.Fatalf("got %d, want 1", len(movies))
+	if movies != nil {
+		t.Fatalf("got %v, want nil (Eros has no cutoff endpoint)", movies)
 	}
 }
 
