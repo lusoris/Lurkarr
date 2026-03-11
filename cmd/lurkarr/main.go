@@ -2,25 +2,35 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/lusoris/lurkarr/internal/autoimport"
 	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/queuecleaner"
 	"github.com/lusoris/lurkarr/internal/scheduler"
 	"github.com/lusoris/lurkarr/internal/server"
 )
 
 func main() {
+	if err := run(); err != nil {
+		slog.Error("fatal error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("failed to load config", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	var level slog.Level
@@ -38,11 +48,12 @@ func main() {
 
 	slog.Info("starting Lurkarr", "addr", cfg.ListenAddr)
 
-	ctx := context.Background()
-	db, err := database.New(ctx, cfg.DatabaseURL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := database.New(ctx, cfg.DatabaseURL, cfg.DBMaxConns)
 	if err != nil {
-		slog.Error("failed to connect to database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer db.Close()
 
@@ -56,20 +67,28 @@ func main() {
 
 	sched, err := scheduler.New(db, logger)
 	if err != nil {
-		slog.Error("failed to create scheduler", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("create scheduler: %w", err)
 	}
 	if err := sched.Start(ctx); err != nil {
-		slog.Error("failed to start scheduler", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("start scheduler: %w", err)
 	}
-	defer sched.Stop()
+	defer func() { _ = sched.Stop() }()
+
+	cleaner := queuecleaner.New(db, logger)
+	cleaner.Start(ctx)
+	defer cleaner.Stop()
+
+	importer := autoimport.New(db, logger)
+	importer.Start(ctx)
+	defer importer.Stop()
 
 	csrfKey := []byte(cfg.CSRFKey)
 	if len(csrfKey) < 32 {
-		padded := make([]byte, 32)
-		copy(padded, csrfKey)
-		csrfKey = padded
+		csrfKey = make([]byte, 32)
+		if _, err := rand.Read(csrfKey); err != nil {
+			return fmt.Errorf("generate CSRF key: %w", err)
+		}
+		slog.Warn("no CSRF_KEY set, generated random key (sessions will not survive restarts)")
 	}
 
 	srv := server.New(server.Config{
@@ -78,6 +97,7 @@ func main() {
 		AllowedOrigins: cfg.AllowedOrigins,
 		ProxyAuth:      cfg.ProxyAuth,
 		ProxyHeader:    cfg.ProxyHeader,
+		SecureCookie:   cfg.SecureCookie,
 	}, db, logger, hub, sched)
 
 	errCh := make(chan error, 1)
@@ -91,7 +111,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				mCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				mCtx, mCancel := context.WithTimeout(ctx, 30*time.Second)
 				cleaned, _ := db.CleanExpiredSessions(mCtx)
 				if cleaned > 0 {
 					slog.Info("cleaned expired sessions", "count", cleaned)
@@ -104,7 +124,14 @@ func main() {
 				if pruned > 0 {
 					slog.Info("pruned old logs", "count", pruned)
 				}
-				cancel()
+				caps, _ := db.CleanupOldHourlyCaps(mCtx)
+				if caps > 0 {
+					slog.Info("cleaned old hourly caps", "count", caps)
+				}
+				_ = db.PruneStrikes(mCtx, 7*24*time.Hour)
+				_ = db.PruneAutoImportLog(mCtx, 30*24*time.Hour)
+				_ = db.PruneBlocklistLog(mCtx, 30*24*time.Hour)
+				mCancel()
 			case <-ctx.Done():
 				return
 			}
@@ -121,12 +148,13 @@ func main() {
 		slog.Error("server error", "error", err)
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown error", "error", err)
 	}
 
 	slog.Info("Lurkarr stopped")
+	return nil
 }

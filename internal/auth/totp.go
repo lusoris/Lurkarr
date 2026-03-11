@@ -17,7 +17,7 @@ type nopCloser struct {
 func (nopCloser) Close() error { return nil }
 
 // GenerateTOTP creates a new TOTP secret and returns the secret string and a QR code as base64 PNG.
-func GenerateTOTP(username, issuer string) (secret string, qrBase64 string, err error) {
+func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) {
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      issuer,
 		AccountName: username,
@@ -29,15 +29,15 @@ func GenerateTOTP(username, issuer string) (secret string, qrBase64 string, err 
 	secret = key.Secret()
 	uri := key.URL()
 
-	qrc, err := qrcode.NewWith(uri)
-	if err != nil {
-		return secret, "", nil
+	qrc, qrErr := qrcode.NewWith(uri)
+	if qrErr != nil {
+		return secret, "", nil //nolint:nilerr // intentional fallback without QR
 	}
 
 	var buf bytes.Buffer
 	wr := standard.NewWithWriter(nopCloser{&buf})
-	if err := qrc.Save(wr); err != nil {
-		return secret, "", nil
+	if saveErr := qrc.Save(wr); saveErr != nil {
+		return secret, "", nil //nolint:nilerr // intentional fallback without QR
 	}
 
 	qrBase64 = base64.StdEncoding.EncodeToString(buf.Bytes())

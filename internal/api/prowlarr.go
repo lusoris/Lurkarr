@@ -46,6 +46,7 @@ func (h *ProwlarrHandler) HandleGetIndexerStats(w http.ResponseWriter, r *http.R
 
 // HandleTestConnection tests the Prowlarr connection.
 func (h *ProwlarrHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var body struct {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`
@@ -58,6 +59,18 @@ func (h *ProwlarrHandler) HandleTestConnection(w http.ResponseWriter, r *http.Re
 		writeJSON(w, http.StatusBadRequest, errorResponse("url and api_key required"))
 		return
 	}
+
+	// SSRF protection
+	isPrivate, err := arrclient.IsPrivateIP(body.URL)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid URL"))
+		return
+	}
+	if isPrivate {
+		writeJSON(w, http.StatusForbidden, errorResponse("private/internal URLs are not allowed"))
+		return
+	}
+
 	client := arrclient.NewClient(body.URL, body.APIKey, 15*time.Second, true)
 	status, err := client.ProwlarrTestConnection(r.Context())
 	if err != nil {

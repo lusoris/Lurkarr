@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/google/uuid"
 )
 
 // AppsHandler handles app instance CRUD endpoints.
@@ -44,6 +44,7 @@ func (h *AppsHandler) HandleCreateInstance(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Name   string `json:"name"`
 		APIURL string `json:"api_url"`
@@ -72,6 +73,7 @@ func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Name    string `json:"name"`
 		APIURL  string `json:"api_url"`
@@ -84,7 +86,7 @@ func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Reques
 	}
 
 	// If API key is masked, keep the existing one
-	if req.APIKey == "" || req.APIKey[:4] == "****" {
+	if req.APIKey == "" || (len(req.APIKey) >= 4 && req.APIKey[:4] == "****") {
 		existing, err := h.DB.GetInstance(r.Context(), id)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, errorResponse("instance not found"))
@@ -119,6 +121,7 @@ func (h *AppsHandler) HandleDeleteInstance(w http.ResponseWriter, r *http.Reques
 
 // HandleTestConnection handles POST /api/instances/test.
 func (h *AppsHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var req struct {
 		APIURL  string `json:"api_url"`
 		APIKey  string `json:"api_key"`

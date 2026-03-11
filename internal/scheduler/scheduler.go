@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-co-op/gocron/v2"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
-	"github.com/go-co-op/gocron/v2"
 )
 
 // Scheduler manages cron-based scheduling via gocron/v2.
@@ -41,6 +41,27 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	if err := s.Reload(ctx); err != nil {
 		return err
 	}
+
+	// Built-in daily cleanup of old hourly_caps entries
+	_, err := s.cron.NewJob(
+		gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(3, 0, 0))),
+		gocron.NewTask(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			deleted, err := s.db.CleanupOldHourlyCaps(ctx)
+			if err != nil {
+				slog.Error("hourly_caps cleanup failed", "error", err)
+				return
+			}
+			if deleted > 0 {
+				slog.Info("cleaned up old hourly_caps", "deleted", deleted)
+			}
+		}),
+	)
+	if err != nil {
+		slog.Warn("failed to schedule hourly_caps cleanup", "error", err)
+	}
+
 	s.cron.Start()
 	slog.Info("scheduler started")
 	return nil
@@ -126,9 +147,9 @@ func (s *Scheduler) performAction(ctx context.Context, sched database.Schedule) 
 		return s.setAppEnabled(ctx, sched.AppType, true)
 	default:
 		// api-{N} pattern — set hourly cap
-		var cap int
-		if _, err := fmt.Sscanf(sched.Action, "api-%d", &cap); err == nil {
-			return s.setHourlyCap(ctx, sched.AppType, cap)
+		var capVal int
+		if _, err := fmt.Sscanf(sched.Action, "api-%d", &capVal); err == nil {
+			return s.setHourlyCap(ctx, sched.AppType, capVal)
 		}
 		return fmt.Errorf("unknown action: %s", sched.Action)
 	}
@@ -156,7 +177,7 @@ func (s *Scheduler) setAppEnabled(ctx context.Context, appType string, enabled b
 	return nil
 }
 
-func (s *Scheduler) setHourlyCap(ctx context.Context, appType string, cap int) error {
+func (s *Scheduler) setHourlyCap(ctx context.Context, appType string, capVal int) error {
 	if !database.ValidAppType(appType) && appType != "global" {
 		return fmt.Errorf("invalid app type: %s", appType)
 	}
@@ -169,7 +190,7 @@ func (s *Scheduler) setHourlyCap(ctx context.Context, appType string, cap int) e
 		if err != nil {
 			return err
 		}
-		settings.HourlyCap = cap
+		settings.HourlyCap = capVal
 		if err := s.db.UpdateAppSettings(ctx, settings); err != nil {
 			return err
 		}

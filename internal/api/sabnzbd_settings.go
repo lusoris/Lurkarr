@@ -20,6 +20,7 @@ func (h *SABnzbdHandler) HandleGetSettings(w http.ResponseWriter, r *http.Reques
 
 // HandleUpdateSABnzbdSettings updates SABnzbd settings.
 func (h *SABnzbdHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var update database.SABnzbdSettings
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))

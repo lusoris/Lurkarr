@@ -39,7 +39,7 @@ func (c *Client) apiCall(ctx context.Context, mode string, extra url.Values) (js
 		params[k] = v
 	}
 	reqURL := c.BaseURL + "/api?" + params.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -47,7 +47,7 @@ func (c *Client) apiCall(ctx context.Context, mode string, extra url.Values) (js
 	if err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
@@ -60,25 +60,25 @@ func (c *Client) apiCall(ctx context.Context, mode string, extra url.Values) (js
 
 // QueueSlot represents an item in the SABnzbd download queue.
 type QueueSlot struct {
-	NzoID      string  `json:"nzo_id"`
-	Filename   string  `json:"filename"`
-	Status     string  `json:"status"`
-	MB         string  `json:"mb"`
-	MBLeft     string  `json:"mbleft"`
-	Percentage string  `json:"percentage"`
-	TimeLeft   string  `json:"timeleft"`
-	Category   string  `json:"cat"`
+	NzoID      string `json:"nzo_id"`
+	Filename   string `json:"filename"`
+	Status     string `json:"status"`
+	MB         string `json:"mb"`
+	MBLeft     string `json:"mbleft"`
+	Percentage string `json:"percentage"`
+	TimeLeft   string `json:"timeleft"`
+	Category   string `json:"cat"`
 }
 
 // Queue represents the SABnzbd download queue.
 type Queue struct {
-	Status      string      `json:"status"`
-	SpeedLimit  string      `json:"speedlimit"`
-	Speed       string      `json:"speed"`
-	SizeLeft    string      `json:"sizeleft"`
-	NoOfSlots   int         `json:"noofslots_total"`
-	Slots       []QueueSlot `json:"slots"`
-	Paused      bool        `json:"paused"`
+	Status     string      `json:"status"`
+	SpeedLimit string      `json:"speedlimit"`
+	Speed      string      `json:"speed"`
+	SizeLeft   string      `json:"sizeleft"`
+	NoOfSlots  int         `json:"noofslots_total"`
+	Slots      []QueueSlot `json:"slots"`
+	Paused     bool        `json:"paused"`
 }
 
 // HistorySlot represents a completed download.
@@ -94,17 +94,17 @@ type HistorySlot struct {
 
 // History represents the SABnzbd download history.
 type History struct {
-	TotalSize  string        `json:"total_size"`
-	NoOfSlots  int           `json:"noofslots"`
-	Slots      []HistorySlot `json:"slots"`
+	TotalSize string        `json:"total_size"`
+	NoOfSlots int           `json:"noofslots"`
+	Slots     []HistorySlot `json:"slots"`
 }
 
 // ServerStats represents SABnzbd server statistics.
 type ServerStats struct {
-	Total int64            `json:"total"`
-	Day   int64            `json:"day"`
-	Week  int64            `json:"week"`
-	Month int64            `json:"month"`
+	Total   int64 `json:"total"`
+	Day     int64 `json:"day"`
+	Week    int64 `json:"week"`
+	Month   int64 `json:"month"`
 	Servers map[string]struct {
 		Total int64 `json:"total"`
 		Day   int64 `json:"day"`

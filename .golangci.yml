@@ -1,10 +1,11 @@
+version: "2"
+
 run:
   timeout: 5m
 
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
@@ -12,26 +13,25 @@ linters:
     - bodyclose
     - durationcheck
     - errname
-    - exportloopref
     - gocritic
-    - gofmt
     - gosec
     - nilerr
-    - prealloc
+  settings:
+    gosec:
+      excludes:
+        - G104  # unhandled errors in deferred calls
+        - G304  # file path provided as taint input
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
 
-linters-settings:
-  gosec:
-    excludes:
-      - G104  # unhandled errors in deferred calls
-      - G304  # file path provided as taint input
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
+formatters:
+  enable:
+    - gofmt

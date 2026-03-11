@@ -7,6 +7,7 @@
 		disabled?: boolean;
 		loading?: boolean;
 		type?: 'button' | 'submit';
+		class?: string;
 		onclick?: () => void;
 		children: Snippet;
 	}
@@ -17,6 +18,7 @@
 		disabled = false,
 		loading = false,
 		type = 'button',
+		class: className = '',
 		onclick,
 		children
 	}: Props = $props();
@@ -42,7 +44,7 @@
 	class="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors
 		focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lurk-500
 		disabled:opacity-50 disabled:cursor-not-allowed
-		{variants[variant]} {sizes[size]}"
+		{variants[variant]} {sizes[size]} {className}"
 >
 	{#if loading}
 		<svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">

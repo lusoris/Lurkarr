@@ -48,7 +48,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		return nil, fmt.Errorf("do request: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(errBody))
 	}
@@ -60,7 +60,7 @@ func (c *Client) get(ctx context.Context, path string, result any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
@@ -69,11 +69,50 @@ func (c *Client) post(ctx context.Context, path string, body io.Reader, result a
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if result != nil {
 		return json.NewDecoder(resp.Body).Decode(result)
 	}
 	return nil
+}
+
+func (c *Client) del(ctx context.Context, path string) error {
+	resp, err := c.doRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return nil
+}
+
+// DeleteQueueItem removes an item from the arr queue.
+func (c *Client) DeleteQueueItem(ctx context.Context, apiVersion string, queueID int, removeFromClient, blocklist bool) error {
+	path := fmt.Sprintf("/api/%s/queue/%d?removeFromClient=%t&blocklist=%t",
+		apiVersion, queueID, removeFromClient, blocklist)
+	return c.del(ctx, path)
+}
+
+// ManualImportItem represents a file available for manual import.
+type ManualImportItem struct {
+	ID                int          `json:"id"`
+	Path              string       `json:"path"`
+	Name              string       `json:"name"`
+	Size              int64        `json:"size"`
+	Quality           *QualityInfo `json:"quality,omitempty"`
+	CustomFormatScore int          `json:"customFormatScore"`
+	Rejections        []struct {
+		Reason string `json:"reason"`
+	} `json:"rejections"`
+}
+
+// GetManualImport lists files available for manual import for a download ID.
+func (c *Client) GetManualImport(ctx context.Context, apiVersion, downloadID string) ([]ManualImportItem, error) {
+	var items []ManualImportItem
+	path := fmt.Sprintf("/api/%s/manualimport?downloadId=%s", apiVersion, downloadID)
+	if err := c.get(ctx, path, &items); err != nil {
+		return nil, fmt.Errorf("get manual import: %w", err)
+	}
+	return items, nil
 }
 
 // SystemStatus represents the status response from any *Arr app.
@@ -100,10 +139,68 @@ type CommandResponse struct {
 
 // QueueRecord represents an item in the download queue.
 type QueueRecord struct {
-	ID     int    `json:"id"`
-	Status string `json:"status"`
-	Title  string `json:"title"`
-	Size   int64  `json:"size"`
+	ID                    int             `json:"id"`
+	DownloadID            string          `json:"downloadId"`
+	Status                string          `json:"status"`
+	Title                 string          `json:"title"`
+	Size                  int64           `json:"size"`
+	Sizeleft              int64           `json:"sizeleft"`
+	TimeleftStr           string          `json:"timeleft"`
+	Protocol              string          `json:"protocol"`
+	Indexer               string          `json:"indexer"`
+	DownloadClient        string          `json:"downloadClient"`
+	TrackedDownloadStatus string          `json:"trackedDownloadStatus"`
+	TrackedDownloadState  string          `json:"trackedDownloadState"`
+	StatusMessages        []StatusMessage `json:"statusMessages"`
+	CustomFormatScore     int             `json:"customFormatScore"`
+	MovieID               int             `json:"movieId,omitempty"`
+	SeriesID              int             `json:"seriesId,omitempty"`
+	EpisodeID             int             `json:"episodeId,omitempty"`
+	AlbumID               int             `json:"albumId,omitempty"`
+	BookID                int             `json:"bookId,omitempty"`
+	Quality               *QualityInfo    `json:"quality,omitempty"`
+}
+
+// StatusMessage from arr queue items for detecting import issues.
+type StatusMessage struct {
+	Title    string   `json:"title"`
+	Messages []string `json:"messages"`
+}
+
+// QualityInfo holds quality profile data from the queue.
+type QualityInfo struct {
+	Quality struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"quality"`
+	Revision struct {
+		Version int `json:"version"`
+	} `json:"revision"`
+}
+
+// HasImportError checks if this queue item has an import problem.
+func (q *QueueRecord) HasImportError() bool {
+	return q.TrackedDownloadStatus == "warning" || q.TrackedDownloadState == "importPending"
+}
+
+// MediaID returns the media ID for this queue record based on which field is set.
+func (q *QueueRecord) MediaID() int {
+	if q.MovieID > 0 {
+		return q.MovieID
+	}
+	if q.EpisodeID > 0 {
+		return q.EpisodeID
+	}
+	if q.AlbumID > 0 {
+		return q.AlbumID
+	}
+	if q.BookID > 0 {
+		return q.BookID
+	}
+	if q.SeriesID > 0 {
+		return q.SeriesID
+	}
+	return 0
 }
 
 // QueueResponse wraps a paginated queue response.

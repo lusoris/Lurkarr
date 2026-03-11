@@ -3,33 +3,44 @@ package config
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 )
 
 // Config holds all application configuration from environment variables.
 type Config struct {
 	DatabaseURL    string
+	DBMaxConns     int32
 	ListenAddr     string
 	CSRFKey        string
 	AllowedOrigins []string
 	ProxyAuth      bool
 	ProxyHeader    string
+	SecureCookie   bool
 	LogLevel       string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
 	cfg := &Config{
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		ListenAddr:  getEnv("LISTEN_ADDR", ":8484"),
-		CSRFKey:     getEnv("CSRF_KEY", ""),
-		ProxyAuth:   getEnvBool("PROXY_AUTH", false),
-		ProxyHeader: getEnv("PROXY_HEADER", "Remote-User"),
-		LogLevel:    getEnv("LOG_LEVEL", "info"),
+		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		DBMaxConns:   defaultDBMaxConns(),
+		ListenAddr:   getEnv("LISTEN_ADDR", ":8484"),
+		CSRFKey:      getEnv("CSRF_KEY", ""),
+		ProxyAuth:    getEnvBool("PROXY_AUTH", false),
+		ProxyHeader:  getEnv("PROXY_HEADER", "Remote-User"),
+		SecureCookie: getEnvBool("SECURE_COOKIE", false),
+		LogLevel:     getEnv("LOG_LEVEL", "info"),
 	}
 
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+
+	if v := os.Getenv("DB_MAX_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 10000 {
+			cfg.DBMaxConns = int32(n) //nolint:gosec // G109: n is bounds-checked above
+		}
 	}
 
 	origins := getEnv("ALLOWED_ORIGINS", "")
@@ -42,6 +53,17 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func defaultDBMaxConns() int32 {
+	cpus := runtime.NumCPU()
+	if cpus < 4 {
+		cpus = 4
+	}
+	if cpus > 10000 {
+		cpus = 10000
+	}
+	return int32(cpus)
 }
 
 func getEnv(key, fallback string) string {

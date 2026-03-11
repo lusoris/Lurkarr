@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/google/uuid"
+	"github.com/lusoris/lurkarr/internal/database"
 )
 
 // StateHandler handles state reset endpoints.

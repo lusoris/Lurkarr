@@ -282,7 +282,7 @@ func (db *DB) ResetState(ctx context.Context, appType AppType, instanceID uuid.U
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(ctx,
 		`DELETE FROM processed_items WHERE app_type = $1 AND instance_id = $2`,
@@ -396,7 +396,7 @@ func (db *DB) DeleteHistory(ctx context.Context, appType AppType) error {
 
 func (db *DB) GetAllStats(ctx context.Context) ([]HuntStats, error) {
 	rows, err := db.Pool.Query(ctx,
-		`SELECT app_type, hunted, upgraded, updated_at FROM hunt_stats ORDER BY app_type`,
+		`SELECT app_type, instance_id, hunted, upgraded, updated_at FROM hunt_stats ORDER BY app_type, instance_id`,
 	)
 	if err != nil {
 		return nil, err
@@ -404,11 +404,15 @@ func (db *DB) GetAllStats(ctx context.Context) ([]HuntStats, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[HuntStats])
 }
 
-func (db *DB) IncrementStats(ctx context.Context, appType AppType, hunted, upgraded int64) error {
+func (db *DB) IncrementStats(ctx context.Context, appType AppType, instanceID uuid.UUID, hunted, upgraded int64) error {
 	_, err := db.Pool.Exec(ctx,
-		`UPDATE hunt_stats SET hunted = hunted + $1, upgraded = upgraded + $2, updated_at = now()
-		 WHERE app_type = $3`,
-		hunted, upgraded, string(appType),
+		`INSERT INTO hunt_stats (app_type, instance_id, hunted, upgraded, updated_at)
+		 VALUES ($1, $2, $3, $4, now())
+		 ON CONFLICT (app_type, instance_id) DO UPDATE SET
+		   hunted = hunt_stats.hunted + $3,
+		   upgraded = hunt_stats.upgraded + $4,
+		   updated_at = now()`,
+		string(appType), instanceID, hunted, upgraded,
 	)
 	return err
 }
@@ -422,12 +426,12 @@ func (db *DB) ResetStats(ctx context.Context) error {
 
 // --- Hourly Caps ---
 
-func (db *DB) GetCurrentHourHits(ctx context.Context, appType AppType) (int, error) {
+func (db *DB) GetCurrentHourHits(ctx context.Context, appType AppType, instanceID uuid.UUID) (int, error) {
 	var hits int
 	err := db.Pool.QueryRow(ctx,
 		`SELECT COALESCE(api_hits, 0) FROM hourly_caps
-		 WHERE app_type = $1 AND hour_bucket = date_trunc('hour', now())`,
-		string(appType),
+		 WHERE app_type = $1 AND instance_id = $2 AND hour_bucket = date_trunc('hour', now())`,
+		string(appType), instanceID,
 	).Scan(&hits)
 	if err == pgx.ErrNoRows {
 		return 0, nil
@@ -435,26 +439,37 @@ func (db *DB) GetCurrentHourHits(ctx context.Context, appType AppType) (int, err
 	return hits, err
 }
 
-func (db *DB) IncrementHourlyHits(ctx context.Context, appType AppType, count int) error {
+func (db *DB) IncrementHourlyHits(ctx context.Context, appType AppType, instanceID uuid.UUID, count int) error {
 	_, err := db.Pool.Exec(ctx,
-		`INSERT INTO hourly_caps (app_type, hour_bucket, api_hits)
-		 VALUES ($1, date_trunc('hour', now()), $2)
-		 ON CONFLICT (app_type, hour_bucket)
-		 DO UPDATE SET api_hits = hourly_caps.api_hits + $2`,
-		string(appType), count,
+		`INSERT INTO hourly_caps (app_type, instance_id, hour_bucket, api_hits)
+		 VALUES ($1, $2, date_trunc('hour', now()), $3)
+		 ON CONFLICT (app_type, instance_id, hour_bucket)
+		 DO UPDATE SET api_hits = hourly_caps.api_hits + $3`,
+		string(appType), instanceID, count,
 	)
 	return err
 }
 
 func (db *DB) GetAllHourlyCaps(ctx context.Context) ([]HourlyCap, error) {
 	rows, err := db.Pool.Query(ctx,
-		`SELECT app_type, hour_bucket, api_hits FROM hourly_caps
-		 WHERE hour_bucket = date_trunc('hour', now()) ORDER BY app_type`,
+		`SELECT app_type, instance_id, hour_bucket, api_hits FROM hourly_caps
+		 WHERE hour_bucket = date_trunc('hour', now()) ORDER BY app_type, instance_id`,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[HourlyCap])
+}
+
+// CleanupOldHourlyCaps removes hourly_caps entries older than 7 days.
+func (db *DB) CleanupOldHourlyCaps(ctx context.Context) (int64, error) {
+	tag, err := db.Pool.Exec(ctx,
+		`DELETE FROM hourly_caps WHERE hour_bucket < now() - interval '7 days'`,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 // --- Schedules ---
@@ -525,13 +540,6 @@ func (db *DB) ListScheduleExecutions(ctx context.Context, limit int) ([]struct {
 	}
 	defer rows.Close()
 
-	type ScheduleExec struct {
-		ID         int64     `json:"id"`
-		ScheduleID uuid.UUID `json:"schedule_id"`
-		ExecutedAt time.Time `json:"executed_at"`
-		Result     *string   `json:"result"`
-	}
-
 	var result []struct {
 		ID         int64     `json:"id"`
 		ScheduleID uuid.UUID `json:"schedule_id"`
@@ -569,7 +577,7 @@ func (db *DB) InsertLogs(ctx context.Context, entries []LogEntry) error {
 	}
 
 	br := db.Pool.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	for range entries {
 		if _, err := br.Exec(); err != nil {

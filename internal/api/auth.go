@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 	"github.com/lusoris/lurkarr/internal/auth"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/gorilla/csrf"
 )
 
 type loginRequest struct {
@@ -28,6 +29,7 @@ type AuthHandler struct {
 
 // HandleLogin handles POST /api/auth/login.
 func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -49,14 +51,21 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if user.TOTPSecret != nil && *user.TOTPSecret != "" {
 		if req.TOTPCode == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
-				"error":          "totp_required",
-				"totp_required":  true,
+				"error":         "totp_required",
+				"totp_required": true,
 			})
 			return
 		}
 		if !auth.ValidateTOTP(req.TOTPCode, *user.TOTPSecret) {
 			writeJSON(w, http.StatusUnauthorized, errorResponse("invalid TOTP code"))
 			return
+		}
+	}
+
+	// Session rotation: invalidate any existing session before creating a new one
+	if cookie, err := r.Cookie("lurkarr_session"); err == nil {
+		if oldID, err := uuid.Parse(cookie.Value); err == nil {
+			_ = h.DB.DeleteSession(r.Context(), oldID)
 		}
 	}
 
@@ -89,6 +98,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limitBody(r)
 	var req setupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -190,6 +200,7 @@ func (h *AuthHandler) Handle2FAVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limitBody(r)
 	var req struct {
 		Code string `json:"code"`
 	}

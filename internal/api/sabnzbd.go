@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/sabnzbd"
 )
@@ -89,6 +90,7 @@ func (h *SABnzbdHandler) HandleResume(w http.ResponseWriter, r *http.Request) {
 
 // HandleTestConnection tests the SABnzbd connection.
 func (h *SABnzbdHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
+	limitBody(r)
 	var body struct {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`
@@ -101,6 +103,18 @@ func (h *SABnzbdHandler) HandleTestConnection(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusBadRequest, errorResponse("url and api_key required"))
 		return
 	}
+
+	// SSRF protection
+	isPrivate, err := arrclient.IsPrivateIP(body.URL)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid URL"))
+		return
+	}
+	if isPrivate {
+		writeJSON(w, http.StatusForbidden, errorResponse("private/internal URLs are not allowed"))
+		return
+	}
+
 	client := sabnzbd.NewClient(body.URL, body.APIKey, 15*time.Second)
 	version, err := client.TestConnection(r.Context())
 	if err != nil {

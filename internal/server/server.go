@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/lusoris/lurkarr/internal/api"
 	"github.com/lusoris/lurkarr/internal/auth"
 	"github.com/lusoris/lurkarr/internal/database"
@@ -21,6 +23,7 @@ type Config struct {
 	AllowedOrigins []string
 	ProxyAuth      bool
 	ProxyHeader    string
+	SecureCookie   bool
 }
 
 // Server is the main HTTP server.
@@ -35,6 +38,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 		ProxyAuthBypass: cfg.ProxyAuth,
 		ProxyHeader:     cfg.ProxyHeader,
 		CSRFKey:         cfg.CSRFKey,
+		SecureCookie:    cfg.SecureCookie,
 	}
 
 	authH := &api.AuthHandler{DB: db, Auth: authMw}
@@ -48,11 +52,15 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	prowlarrH := &api.ProwlarrHandler{DB: db}
 	sabnzbdH := &api.SABnzbdHandler{DB: db}
 	userH := &api.UserHandler{DB: db}
+	queueH := &api.QueueHandler{DB: db}
 
 	mux := http.NewServeMux()
 
+	// Rate limiter for login: 5 attempts per minute per IP (burst 5).
+	loginRL := middleware.NewIPRateLimiter(rate.Limit(5.0/60.0), 5)
+
 	// --- Public routes (no auth) ---
-	mux.HandleFunc("POST /api/auth/login", authH.HandleLogin)
+	mux.Handle("POST /api/auth/login", middleware.RateLimit(loginRL)(http.HandlerFunc(authH.HandleLogin)))
 	mux.HandleFunc("POST /api/auth/setup", authH.HandleSetup)
 
 	// --- Health ---
@@ -62,7 +70,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"healthy"}`))
+		_, _ = w.Write([]byte(`{"status":"healthy"}`))
 	})
 
 	// --- Protected routes ---
@@ -131,6 +139,14 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("POST /api/sabnzbd/pause", sabnzbdH.HandlePause)
 	protected.HandleFunc("POST /api/sabnzbd/resume", sabnzbdH.HandleResume)
 	protected.HandleFunc("POST /api/sabnzbd/test", sabnzbdH.HandleTestConnection)
+
+	// Queue Management
+	protected.HandleFunc("GET /api/queue/settings/{app}", queueH.HandleGetQueueCleanerSettings)
+	protected.HandleFunc("PUT /api/queue/settings/{app}", queueH.HandleUpdateQueueCleanerSettings)
+	protected.HandleFunc("GET /api/queue/scoring/{app}", queueH.HandleGetScoringProfile)
+	protected.HandleFunc("PUT /api/queue/scoring/{app}", queueH.HandleUpdateScoringProfile)
+	protected.HandleFunc("GET /api/queue/blocklist/{app}", queueH.HandleGetBlocklistLog)
+	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
 
 	// WebSocket (no CSRF, but auth required)
 	mux.Handle("GET /ws/logs", authMw.RequireAuth(http.HandlerFunc(logsH.HandleWebSocketLogs)))

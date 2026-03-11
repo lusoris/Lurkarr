@@ -37,12 +37,27 @@ func (h *SettingsHandler) HandleUpdateAppSettings(w http.ResponseWriter, r *http
 		return
 	}
 
+	limitBody(r)
 	var settings database.AppSettings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
 		return
 	}
 	settings.AppType = database.AppType(appType)
+
+	// Input validation
+	if settings.HourlyCap < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("hourly_cap cannot be negative"))
+		return
+	}
+	if settings.HuntMissingCount < 0 || settings.HuntUpgradeCount < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("hunt counts cannot be negative"))
+		return
+	}
+	if settings.SleepDuration < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("sleep_duration cannot be negative"))
+		return
+	}
 
 	if err := h.DB.UpdateAppSettings(r.Context(), &settings); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save settings"))
@@ -73,6 +88,7 @@ func (h *SettingsHandler) HandleUpdateGeneralSettings(w http.ResponseWriter, r *
 		return
 	}
 
+	limitBody(r)
 	var update database.GeneralSettings
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -81,6 +97,24 @@ func (h *SettingsHandler) HandleUpdateGeneralSettings(w http.ResponseWriter, r *
 
 	// Preserve secret key — never from client
 	update.SecretKey = current.SecretKey
+
+	// Input validation
+	if update.APITimeout < 1 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("api_timeout must be at least 1"))
+		return
+	}
+	if update.StatefulResetHours < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("stateful_reset_hours cannot be negative"))
+		return
+	}
+	if update.CommandWaitDelay < 0 || update.CommandWaitAttempts < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("command_wait values cannot be negative"))
+		return
+	}
+	if update.MinDownloadQueueSize < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("min_download_queue_size cannot be negative"))
+		return
+	}
 
 	if err := h.DB.UpsertGeneralSettings(r.Context(), &update); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save settings"))

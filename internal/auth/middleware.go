@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
+	"github.com/lusoris/lurkarr/internal/database"
 )
 
 type contextKey string
@@ -30,6 +30,7 @@ type Middleware struct {
 	ProxyAuthBypass bool
 	ProxyHeader     string
 	CSRFKey         []byte
+	SecureCookie    bool
 }
 
 // RequireAuth is middleware that checks for a valid session cookie.
@@ -44,7 +45,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
-				slog.Warn("proxy auth bypass user not found", "username", username)
+				slog.Warn("proxy auth bypass user not found", "username", username) //nolint:gosec // G706: slog structured logging mitigates injection
 			}
 		}
 
@@ -103,6 +104,7 @@ func (m *Middleware) SetSessionCookie(ctx context.Context, w http.ResponseWriter
 		Value:    session.ID.String(),
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   m.SecureCookie,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(sessionDuration.Seconds()),
 	})

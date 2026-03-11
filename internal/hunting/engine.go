@@ -41,11 +41,13 @@ func (e *Engine) Stop() {
 
 func (e *Engine) huntLoop(ctx context.Context, appType database.AppType) {
 	log := e.logger.ForApp(string(appType))
+	consecutiveErrors := 0
 	for {
 		settings, err := e.db.GetAppSettings(ctx, appType)
 		if err != nil {
 			log.Error("failed to load settings", "error", err)
-			if !e.sleep(ctx, 60*time.Second) {
+			consecutiveErrors++
+			if !e.sleep(ctx, backoff(consecutiveErrors)) {
 				return
 			}
 			continue
@@ -54,30 +56,54 @@ func (e *Engine) huntLoop(ctx context.Context, appType database.AppType) {
 		instances, err := e.db.ListEnabledInstances(ctx, appType)
 		if err != nil {
 			log.Error("failed to list instances", "error", err)
-			if !e.sleep(ctx, time.Duration(settings.SleepDuration)*time.Second) {
+			consecutiveErrors++
+			if !e.sleep(ctx, backoff(consecutiveErrors)) {
 				return
 			}
 			continue
 		}
 
 		if len(instances) == 0 {
+			consecutiveErrors = 0
 			if !e.sleep(ctx, time.Duration(settings.SleepDuration)*time.Second) {
 				return
 			}
 			continue
 		}
 
+		hadError := false
 		for _, inst := range instances {
 			if ctx.Err() != nil {
 				return
 			}
-			e.huntInstance(ctx, log, appType, settings, inst)
+			if err := e.huntInstance(ctx, log, appType, settings, inst); err != nil {
+				hadError = true
+			}
 		}
 
-		if !e.sleep(ctx, time.Duration(settings.SleepDuration)*time.Second) {
+		if hadError {
+			consecutiveErrors++
+		} else {
+			consecutiveErrors = 0
+		}
+
+		sleepDur := time.Duration(settings.SleepDuration) * time.Second
+		if consecutiveErrors > 0 {
+			sleepDur = backoff(consecutiveErrors)
+		}
+		if !e.sleep(ctx, sleepDur) {
 			return
 		}
 	}
+}
+
+// backoff returns an exponential backoff duration capped at 5 minutes.
+func backoff(errors int) time.Duration {
+	d := time.Duration(1<<min(errors, 8)) * time.Second // 2s, 4s, 8s, ...
+	if d > 5*time.Minute {
+		d = 5 * time.Minute
+	}
+	return d
 }
 
 type huntableItem struct {
@@ -85,30 +111,30 @@ type huntableItem struct {
 	Title string
 }
 
-func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance) {
+func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance) error {
 	log = log.With("instance", inst.Name)
 
 	// Check hourly cap
-	hits, err := e.db.GetCurrentHourHits(ctx, appType)
+	hits, err := e.db.GetCurrentHourHits(ctx, appType, inst.ID)
 	if err != nil {
 		log.Error("failed to check hourly cap", "error", err)
-		return
+		return err
 	}
 	if hits >= settings.HourlyCap {
 		log.Info("hourly cap reached, skipping", "hits", hits, "cap", settings.HourlyCap)
-		return
+		return nil
 	}
 
 	// Check state reset
 	genSettings, err := e.db.GetGeneralSettings(ctx)
 	if err != nil {
 		log.Error("failed to load general settings", "error", err)
-		return
+		return err
 	}
 	lastReset, err := e.db.GetLastReset(ctx, appType, inst.ID)
 	if err != nil {
 		log.Error("failed to get last reset", "error", err)
-		return
+		return err
 	}
 	if lastReset != nil && time.Since(*lastReset) > time.Duration(genSettings.StatefulResetHours)*time.Hour {
 		if err := e.db.ResetState(ctx, appType, inst.ID); err != nil {
@@ -124,6 +150,21 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 		genSettings.SSLVerify,
 	)
 
+	// Check minimum download queue size — skip if queue is already large
+	if genSettings.MinDownloadQueueSize > 0 {
+		hunter := HunterFor(appType)
+		if hunter != nil {
+			queue, err := hunter.GetQueue(ctx, client)
+			if err != nil {
+				log.Warn("failed to check queue size", "error", err)
+			} else if queue != nil && queue.TotalRecords >= genSettings.MinDownloadQueueSize {
+				log.Info("download queue at capacity, skipping hunt",
+					"queue_size", queue.TotalRecords, "min_size", genSettings.MinDownloadQueueSize)
+				return nil
+			}
+		}
+	}
+
 	remaining := settings.HourlyCap - hits
 
 	// Hunt missing items
@@ -138,6 +179,7 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 		count := min(settings.HuntUpgradeCount, remaining)
 		e.huntUpgrades(ctx, log, appType, settings, inst, client, count)
 	}
+	return nil
 }
 
 func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance, client *arrclient.Client, maxCount int) int {
@@ -186,8 +228,8 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 	}
 
 	if hunted > 0 {
-		_ = e.db.IncrementStats(ctx, appType, int64(hunted), 0)
-		_ = e.db.IncrementHourlyHits(ctx, appType, hunted)
+		_ = e.db.IncrementStats(ctx, appType, inst.ID, int64(hunted), 0)
+		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, hunted)
 	}
 	return hunted
 }
@@ -229,169 +271,34 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 	}
 
 	if upgraded > 0 {
-		_ = e.db.IncrementStats(ctx, appType, 0, int64(upgraded))
-		_ = e.db.IncrementHourlyHits(ctx, appType, upgraded)
+		_ = e.db.IncrementStats(ctx, appType, inst.ID, 0, int64(upgraded))
+		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, upgraded)
 	}
 	return upgraded
 }
 
 func (e *Engine) getMissingItems(ctx context.Context, appType database.AppType, client *arrclient.Client) ([]huntableItem, error) {
-	switch appType {
-	case database.AppSonarr:
-		eps, err := client.SonarrGetMissing(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(eps))
-		for i, ep := range eps {
-			items[i] = huntableItem{ID: ep.ID, Title: ep.Title}
-		}
-		return items, nil
-	case database.AppRadarr:
-		movies, err := client.RadarrGetMissing(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(movies))
-		for i, m := range movies {
-			items[i] = huntableItem{ID: m.ID, Title: m.Title}
-		}
-		return items, nil
-	case database.AppLidarr:
-		albums, err := client.LidarrGetMissing(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(albums))
-		for i, a := range albums {
-			items[i] = huntableItem{ID: a.ID, Title: a.Title}
-		}
-		return items, nil
-	case database.AppReadarr:
-		books, err := client.ReadarrGetMissing(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(books))
-		for i, b := range books {
-			items[i] = huntableItem{ID: b.ID, Title: b.Title}
-		}
-		return items, nil
-	case database.AppWhisparr:
-		movies, err := client.WhisparrGetMissing(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(movies))
-		for i, m := range movies {
-			items[i] = huntableItem{ID: m.ID, Title: m.Title}
-		}
-		return items, nil
-	case database.AppEros:
-		movies, err := client.ErosGetMissing(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(movies))
-		for i, m := range movies {
-			items[i] = huntableItem{ID: m.ID, Title: m.Title}
-		}
-		return items, nil
-	default:
+	hunter := HunterFor(appType)
+	if hunter == nil {
 		return nil, nil
 	}
+	return hunter.GetMissing(ctx, client)
 }
 
 func (e *Engine) getUpgradeItems(ctx context.Context, appType database.AppType, client *arrclient.Client) ([]huntableItem, error) {
-	switch appType {
-	case database.AppSonarr:
-		eps, err := client.SonarrGetCutoffUnmet(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(eps))
-		for i, ep := range eps {
-			items[i] = huntableItem{ID: ep.ID, Title: ep.Title}
-		}
-		return items, nil
-	case database.AppRadarr:
-		movies, err := client.RadarrGetCutoffUnmet(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(movies))
-		for i, m := range movies {
-			items[i] = huntableItem{ID: m.ID, Title: m.Title}
-		}
-		return items, nil
-	case database.AppLidarr:
-		albums, err := client.LidarrGetCutoffUnmet(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(albums))
-		for i, a := range albums {
-			items[i] = huntableItem{ID: a.ID, Title: a.Title}
-		}
-		return items, nil
-	case database.AppReadarr:
-		books, err := client.ReadarrGetCutoffUnmet(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(books))
-		for i, b := range books {
-			items[i] = huntableItem{ID: b.ID, Title: b.Title}
-		}
-		return items, nil
-	case database.AppWhisparr:
-		movies, err := client.WhisparrGetCutoffUnmet(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(movies))
-		for i, m := range movies {
-			items[i] = huntableItem{ID: m.ID, Title: m.Title}
-		}
-		return items, nil
-	case database.AppEros:
-		movies, err := client.ErosGetCutoffUnmet(ctx)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]huntableItem, len(movies))
-		for i, m := range movies {
-			items[i] = huntableItem{ID: m.ID, Title: m.Title}
-		}
-		return items, nil
-	default:
+	hunter := HunterFor(appType)
+	if hunter == nil {
 		return nil, nil
 	}
+	return hunter.GetUpgrades(ctx, client)
 }
 
 func (e *Engine) triggerSearch(ctx context.Context, appType database.AppType, client *arrclient.Client, mediaID int) error {
-	switch appType {
-	case database.AppSonarr:
-		_, err := client.SonarrSearchEpisode(ctx, []int{mediaID})
-		return err
-	case database.AppRadarr:
-		_, err := client.RadarrSearchMovie(ctx, []int{mediaID})
-		return err
-	case database.AppLidarr:
-		_, err := client.LidarrSearchAlbum(ctx, []int{mediaID})
-		return err
-	case database.AppReadarr:
-		_, err := client.ReadarrSearchBook(ctx, []int{mediaID})
-		return err
-	case database.AppWhisparr:
-		_, err := client.WhisparrSearchMovie(ctx, []int{mediaID})
-		return err
-	case database.AppEros:
-		_, err := client.ErosSearchMovie(ctx, []int{mediaID})
-		return err
-	default:
+	hunter := HunterFor(appType)
+	if hunter == nil {
 		return nil
 	}
+	return hunter.Search(ctx, client, mediaID)
 }
 
 func selectItems(items []huntableItem, count int, random bool) []huntableItem {

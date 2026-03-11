@@ -47,7 +47,7 @@
 	{#if loading}
 		<div class="space-y-2">
 			{#each Array(5) as _}
-				<div class="h-14 rounded-lg bg-surface-800/50 animate-pulse" />
+				<div class="h-14 rounded-lg bg-surface-800/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if items.length === 0}
