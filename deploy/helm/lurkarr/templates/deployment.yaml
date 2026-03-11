@@ -13,6 +13,12 @@ spec:
     metadata:
       labels:
         {{- include "lurkarr.selectorLabels" . | nindent 8 }}
+      {{- if .Values.metrics.enabled }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9705"
+        prometheus.io/path: "/metrics"
+      {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

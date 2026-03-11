@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 // Store defines the database methods used by the scheduler.
@@ -142,12 +143,20 @@ func (s *Scheduler) executeSchedule(sched database.Schedule) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	start := time.Now()
+	taskType := sched.Action
 	log.Info("executing schedule", "action", sched.Action, "app_type", sched.AppType)
+
 	result := "ok"
 	if err := s.performAction(ctx, sched); err != nil {
 		result = fmt.Sprintf("error: %v", err)
 		log.Error("schedule execution failed", "action", sched.Action, "error", err)
+		metrics.SchedulerErrors.WithLabelValues(taskType).Inc()
 	}
+
+	metrics.SchedulerExecutionsTotal.WithLabelValues(taskType).Inc()
+	metrics.SchedulerDuration.WithLabelValues(taskType).Observe(time.Since(start).Seconds())
+
 	if err := s.db.AddScheduleExecution(ctx, sched.ID, result); err != nil {
 		log.Error("failed to record schedule execution", "error", err)
 	}

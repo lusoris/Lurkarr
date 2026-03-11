@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
 
 	"github.com/lusoris/lurkarr/internal/api"
@@ -72,6 +73,9 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"healthy"}`))
 	})
+
+	// --- Metrics (Prometheus) ---
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	// --- Protected routes ---
 	protected := http.NewServeMux()

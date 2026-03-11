@@ -12,6 +12,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 // Store abstracts the database operations needed by the hunting Engine.
@@ -94,9 +95,12 @@ func (e *Engine) huntLoop(ctx context.Context, appType database.AppType) {
 			if ctx.Err() != nil {
 				return
 			}
+			start := time.Now()
 			if err := e.huntInstance(ctx, log, appType, settings, inst); err != nil {
 				hadError = true
+				metrics.HuntErrors.WithLabelValues(string(appType), inst.Name).Inc()
 			}
+			metrics.HuntDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
 		}
 
 		if hadError {
@@ -235,6 +239,7 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 			log.Error("search command failed", "media_id", item.ID, "error", err)
 			continue
 		}
+		metrics.HuntSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
 		if err := e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "missing"); err != nil {
 			log.Error("failed to mark processed", "error", err)
 		}
@@ -248,6 +253,7 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 	if hunted > 0 {
 		_ = e.db.IncrementStats(ctx, appType, inst.ID, int64(hunted), 0)
 		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, hunted)
+		metrics.HuntMissingFound.WithLabelValues(string(appType), inst.Name).Add(float64(hunted))
 	}
 	return hunted
 }
@@ -282,6 +288,7 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 			log.Error("upgrade search failed", "media_id", item.ID, "error", err)
 			continue
 		}
+		metrics.HuntSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
 		_ = e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "upgrade")
 		_ = e.db.AddHuntHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "upgrade")
 		upgraded++
@@ -291,6 +298,7 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 	if upgraded > 0 {
 		_ = e.db.IncrementStats(ctx, appType, inst.ID, 0, int64(upgraded))
 		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, upgraded)
+		metrics.HuntUpgradesFound.WithLabelValues(string(appType), inst.Name).Add(float64(upgraded))
 	}
 	return upgraded
 }

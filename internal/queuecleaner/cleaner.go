@@ -15,6 +15,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/sabnzbd"
 )
 
@@ -99,7 +100,9 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 			if ctx.Err() != nil {
 				return
 			}
+			start := time.Now()
 			c.cleanInstance(ctx, log, appType, settings, inst)
+			metrics.QueueCleanerRunDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
 		}
 
 		if !sleep(ctx, time.Duration(settings.CheckIntervalSeconds)*time.Second) {
@@ -158,6 +161,8 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				continue
 			}
 			_ = c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score")
+			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 		}
 	}
 
@@ -186,6 +191,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			log.Error("failed to add strike", "error", err)
 			continue
 		}
+		metrics.QueueCleanerStrikes.WithLabelValues(string(appType), inst.Name).Inc()
 
 		count, err := c.db.CountStrikes(ctx, appType, inst.ID, record.DownloadID, settings.StrikeWindowHours)
 		if err != nil {
@@ -202,6 +208,8 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				continue
 			}
 			_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes")
+			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 		}
 	}
 
@@ -297,6 +305,8 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 			continue
 		}
 		_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "failed_import: "+reason)
+		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+		metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 	}
 }
 

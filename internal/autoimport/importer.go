@@ -14,6 +14,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 // Store abstracts the database operations needed by the Importer.
@@ -86,6 +87,7 @@ func (imp *Importer) importLoop(ctx context.Context, appType database.AppType) {
 
 func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appType database.AppType, inst database.AppInstance) {
 	log = log.With("instance", inst.Name)
+	metrics.AutoimportRunsTotal.WithLabelValues(string(appType), inst.Name).Inc()
 
 	hunter := hunting.HunterFor(appType)
 	if hunter == nil {
@@ -107,6 +109,7 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 	queue, err := hunter.GetQueue(ctx, client)
 	if err != nil {
 		log.Error("failed to get queue", "error", err)
+		metrics.AutoimportErrors.WithLabelValues(string(appType), inst.Name).Inc()
 		return
 	}
 

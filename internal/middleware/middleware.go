@@ -5,9 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 type contextKey string
@@ -50,6 +52,7 @@ func RequestID(next http.Handler) http.Handler {
 type statusWriter struct {
 	http.ResponseWriter
 	status int
+	bytes  int
 }
 
 func (w *statusWriter) WriteHeader(code int) {
@@ -57,19 +60,36 @@ func (w *statusWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
-// Logging logs each request.
+func (w *statusWriter) Write(b []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(b)
+	w.bytes += n
+	return n, err
+}
+
+// Logging logs each request and records Prometheus metrics.
 func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		slog.Info("request", //nolint:gosec // G706: slog structured logging
+		duration := time.Since(start)
+
+		// Normalize path to avoid high cardinality (strip IDs).
+		path := normalizePath(r.URL.Path)
+
+		slog.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", sw.status,
-			"duration", time.Since(start).String(),
+			"duration", duration.String(),
 			"remote", r.RemoteAddr,
+			"bytes", sw.bytes,
 		)
+
+		status := strconv.Itoa(sw.status)
+		metrics.HTTPRequestsTotal.WithLabelValues(r.Method, path, status).Inc()
+		metrics.HTTPRequestDuration.WithLabelValues(r.Method, path).Observe(duration.Seconds())
+		metrics.HTTPResponseSize.WithLabelValues(r.Method, path).Observe(float64(sw.bytes))
 	})
 }
 
@@ -110,4 +130,69 @@ func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.
 		h = middlewares[i](h)
 	}
 	return h
+}
+
+// normalizePath collapses UUID/numeric path segments to reduce metric cardinality.
+func normalizePath(path string) string {
+	// Common API patterns: /api/instances/{id}, /api/schedules/{id}, etc.
+	// Replace segments that look like UUIDs or numeric IDs with a placeholder.
+	parts := splitPath(path)
+	for i, p := range parts {
+		if isID(p) {
+			parts[i] = ":id"
+		}
+	}
+	return joinPath(parts)
+}
+
+func splitPath(path string) []string {
+	var parts []string
+	current := ""
+	for _, c := range path {
+		if c == '/' {
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+		} else {
+			current += string(c)
+		}
+	}
+	if current != "" {
+		parts = append(parts, current)
+	}
+	return parts
+}
+
+func joinPath(parts []string) string {
+	if len(parts) == 0 {
+		return "/"
+	}
+	result := ""
+	for _, p := range parts {
+		result += "/" + p
+	}
+	return result
+}
+
+func isID(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	// Numeric ID
+	allDigits := true
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			allDigits = false
+			break
+		}
+	}
+	if allDigits {
+		return true
+	}
+	// UUID (8-4-4-4-12 hex)
+	if len(s) == 36 && s[8] == '-' && s[13] == '-' && s[18] == '-' && s[23] == '-' {
+		return true
+	}
+	return false
 }

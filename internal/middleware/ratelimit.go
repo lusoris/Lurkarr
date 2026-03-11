@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lusoris/lurkarr/internal/metrics"
 	"golang.org/x/time/rate"
 )
 
@@ -70,6 +71,7 @@ func RateLimit(limiter *IPRateLimiter) func(http.Handler) http.Handler {
 			ip := extractIP(r)
 			if !limiter.Allow(ip) {
 				slog.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path) //nolint:gosec // G706: slog structured logging
+				metrics.HTTPRateLimitHits.WithLabelValues(normalizePath(r.URL.Path)).Inc()
 				w.Header().Set("Retry-After", "60")
 				http.Error(w, `{"error":"too many requests"}`, http.StatusTooManyRequests)
 				return
