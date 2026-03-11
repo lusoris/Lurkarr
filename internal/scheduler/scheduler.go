@@ -15,6 +15,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
+	"github.com/lusoris/lurkarr/internal/notifications"
 )
 
 // Store defines the database methods used by the scheduler.
@@ -30,10 +31,11 @@ type Store interface {
 
 // Scheduler manages cron-based scheduling via gocron/v2.
 type Scheduler struct {
-	db     Store
-	logger *logging.Logger
-	cron   gocron.Scheduler
-	mu     sync.Mutex
+	db       Store
+	logger   *logging.Logger
+	notifier notifications.Notifier
+	cron     gocron.Scheduler
+	mu       sync.Mutex
 }
 
 // New creates a new scheduler.
@@ -49,6 +51,11 @@ func New(db Store, logger *logging.Logger) (*Scheduler, error) {
 		logger: logger,
 		cron:   cron,
 	}, nil
+}
+
+// SetNotifier sets an optional notification manager.
+func (s *Scheduler) SetNotifier(n notifications.Notifier) {
+	s.notifier = n
 }
 
 // Start loads schedules from DB and starts the cron scheduler.
@@ -152,10 +159,29 @@ func (s *Scheduler) executeSchedule(sched database.Schedule) {
 		result = fmt.Sprintf("error: %v", err)
 		log.Error("schedule execution failed", "action", sched.Action, "error", err)
 		metrics.SchedulerErrors.WithLabelValues(taskType).Inc()
+		if s.notifier != nil {
+			s.notifier.Notify(ctx, notifications.Event{
+				Type:     notifications.EventError,
+				Title:    "Schedule Failed",
+				Message:  fmt.Sprintf("Action %q failed: %v", sched.Action, err),
+				AppType:  sched.AppType,
+				Instance: sched.Action,
+			})
+		}
 	}
 
 	metrics.SchedulerExecutionsTotal.WithLabelValues(taskType).Inc()
 	metrics.SchedulerDuration.WithLabelValues(taskType).Observe(time.Since(start).Seconds())
+
+	if s.notifier != nil && result == "ok" {
+		s.notifier.Notify(ctx, notifications.Event{
+			Type:     notifications.EventSchedulerAction,
+			Title:    "Schedule Executed",
+			Message:  fmt.Sprintf("Action %q completed", sched.Action),
+			AppType:  sched.AppType,
+			Instance: sched.Action,
+		})
+	}
 
 	if err := s.db.AddScheduleExecution(ctx, sched.ID, result); err != nil {
 		log.Error("failed to record schedule execution", "error", err)

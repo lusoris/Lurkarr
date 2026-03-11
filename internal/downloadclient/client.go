@@ -11,7 +11,7 @@ type DownloadItem struct {
 	Status        string  `json:"status"`
 	TotalSize     int64   `json:"total_size"`
 	RemainingSize int64   `json:"remaining_size"`
-	Progress      float64 `json:"progress"`    // 0.0 to 1.0
+	Progress      float64 `json:"progress"`       // 0.0 to 1.0
 	DownloadSpeed int64   `json:"download_speed"` // bytes/sec
 	UploadSpeed   int64   `json:"upload_speed"`   // bytes/sec (torrent only)
 	ETA           int64   `json:"eta"`            // seconds

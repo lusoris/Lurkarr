@@ -58,6 +58,20 @@ func (mr *MockStoreMockRecorder) CreateInstance(ctx, appType, name, apiURL, apiK
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateInstance", reflect.TypeOf((*MockStore)(nil).CreateInstance), ctx, appType, name, apiURL, apiKey)
 }
 
+// CreateNotificationProvider mocks base method.
+func (m *MockStore) CreateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateNotificationProvider", ctx, p)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateNotificationProvider indicates an expected call of CreateNotificationProvider.
+func (mr *MockStoreMockRecorder) CreateNotificationProvider(ctx, p any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotificationProvider", reflect.TypeOf((*MockStore)(nil).CreateNotificationProvider), ctx, p)
+}
+
 // CreateSchedule mocks base method.
 func (m *MockStore) CreateSchedule(ctx context.Context, s *database.Schedule) error {
 	m.ctrl.T.Helper()
@@ -113,6 +127,20 @@ func (m *MockStore) DeleteInstance(ctx context.Context, id uuid.UUID) error {
 func (mr *MockStoreMockRecorder) DeleteInstance(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstance", reflect.TypeOf((*MockStore)(nil).DeleteInstance), ctx, id)
+}
+
+// DeleteNotificationProvider mocks base method.
+func (m *MockStore) DeleteNotificationProvider(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNotificationProvider", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNotificationProvider indicates an expected call of DeleteNotificationProvider.
+func (mr *MockStoreMockRecorder) DeleteNotificationProvider(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNotificationProvider", reflect.TypeOf((*MockStore)(nil).DeleteNotificationProvider), ctx, id)
 }
 
 // DeleteSchedule mocks base method.
@@ -263,6 +291,21 @@ func (mr *MockStoreMockRecorder) GetLastReset(ctx, appType, instanceID any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastReset", reflect.TypeOf((*MockStore)(nil).GetLastReset), ctx, appType, instanceID)
 }
 
+// GetNotificationProvider mocks base method.
+func (m *MockStore) GetNotificationProvider(ctx context.Context, id uuid.UUID) (*database.NotificationProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotificationProvider", ctx, id)
+	ret0, _ := ret[0].(*database.NotificationProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotificationProvider indicates an expected call of GetNotificationProvider.
+func (mr *MockStoreMockRecorder) GetNotificationProvider(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotificationProvider", reflect.TypeOf((*MockStore)(nil).GetNotificationProvider), ctx, id)
+}
+
 // GetProwlarrSettings mocks base method.
 func (m *MockStore) GetProwlarrSettings(ctx context.Context) (*database.ProwlarrSettings, error) {
 	m.ctrl.T.Helper()
@@ -367,6 +410,21 @@ func (m *MockStore) ListInstances(ctx context.Context, appType database.AppType)
 func (mr *MockStoreMockRecorder) ListInstances(ctx, appType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstances", reflect.TypeOf((*MockStore)(nil).ListInstances), ctx, appType)
+}
+
+// ListNotificationProviders mocks base method.
+func (m *MockStore) ListNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNotificationProviders", ctx)
+	ret0, _ := ret[0].([]database.NotificationProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNotificationProviders indicates an expected call of ListNotificationProviders.
+func (mr *MockStoreMockRecorder) ListNotificationProviders(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNotificationProviders", reflect.TypeOf((*MockStore)(nil).ListNotificationProviders), ctx)
 }
 
 // ListScheduleExecutions mocks base method.
@@ -482,6 +540,20 @@ func (m *MockStore) UpdateInstance(ctx context.Context, id uuid.UUID, name, apiU
 func (mr *MockStoreMockRecorder) UpdateInstance(ctx, id, name, apiURL, apiKey, enabled any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstance", reflect.TypeOf((*MockStore)(nil).UpdateInstance), ctx, id, name, apiURL, apiKey, enabled)
+}
+
+// UpdateNotificationProvider mocks base method.
+func (m *MockStore) UpdateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNotificationProvider", ctx, p)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateNotificationProvider indicates an expected call of UpdateNotificationProvider.
+func (mr *MockStoreMockRecorder) UpdateNotificationProvider(ctx, p any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNotificationProvider", reflect.TypeOf((*MockStore)(nil).UpdateNotificationProvider), ctx, p)
 }
 
 // UpdatePassword mocks base method.

@@ -16,6 +16,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
+	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/sabnzbd"
 )
 
@@ -34,15 +35,21 @@ type Store interface {
 
 // Cleaner monitors download queues and removes stalled/slow/duplicate items.
 type Cleaner struct {
-	db     Store
-	logger *logging.Logger
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	db       Store
+	logger   *logging.Logger
+	notifier notifications.Notifier
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 // New creates a new queue cleaner.
 func New(db Store, logger *logging.Logger) *Cleaner {
 	return &Cleaner{db: db, logger: logger}
+}
+
+// SetNotifier sets an optional notification manager.
+func (c *Cleaner) SetNotifier(n notifications.Notifier) {
+	c.notifier = n
 }
 
 // Start launches cleaner goroutines for each app type.
@@ -163,6 +170,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			_ = c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score")
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
+			c.notifyRemoval(ctx, appType, inst.Name, d.RemoveTitle, "duplicate_lower_score")
 		}
 	}
 
@@ -210,6 +218,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes")
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
+			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
 		}
 	}
 
@@ -307,6 +316,7 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "failed_import: "+reason)
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 		metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
+		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)
 	}
 }
 
@@ -386,6 +396,20 @@ func parseTimeleft(s string) time.Duration {
 	}
 
 	return time.Duration(hours)*time.Hour + time.Duration(mins)*time.Minute + time.Duration(secs)*time.Second
+}
+
+func (c *Cleaner) notifyRemoval(ctx context.Context, appType database.AppType, instName, title, reason string) {
+	if c.notifier == nil {
+		return
+	}
+	c.notifier.Notify(ctx, notifications.Event{
+		Type:     notifications.EventQueueItemRemoved,
+		Title:    "Queue Item Removed",
+		Message:  title,
+		AppType:  string(appType),
+		Instance: instName,
+		Fields:   map[string]string{"Reason": reason},
+	})
 }
 
 // getSABnzbdStatuses fetches the SABnzbd queue and returns a map of downloadID -> status.

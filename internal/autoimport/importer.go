@@ -15,6 +15,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
+	"github.com/lusoris/lurkarr/internal/notifications"
 )
 
 // Store abstracts the database operations needed by the Importer.
@@ -28,15 +29,21 @@ type Store interface {
 // and attempts to resolve them by triggering a manual import if the content
 // matches the expected media by ID and the custom format score is acceptable.
 type Importer struct {
-	db     Store
-	logger *logging.Logger
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	db       Store
+	logger   *logging.Logger
+	notifier notifications.Notifier
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 // New creates a new auto-importer.
 func New(db Store, logger *logging.Logger) *Importer {
 	return &Importer{db: db, logger: logger}
+}
+
+// SetNotifier sets an optional notification manager.
+func (imp *Importer) SetNotifier(n notifications.Notifier) {
+	imp.notifier = n
 }
 
 // Start launches importer goroutines for each app type.
@@ -130,6 +137,19 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 			"media_id", mediaID,
 			"status", record.TrackedDownloadStatus,
 			"messages", formatStatusMessages(record.StatusMessages))
+
+		if imp.notifier != nil {
+			imp.notifier.Notify(ctx, notifications.Event{
+				Type:     notifications.EventDownloadStuck,
+				Title:    "Download Stuck",
+				Message:  record.Title,
+				AppType:  string(appType),
+				Instance: inst.Name,
+				Fields: map[string]string{
+					"Status": record.TrackedDownloadStatus,
+				},
+			})
+		}
 
 		// Try manual import: check if files are available and have acceptable quality
 		if record.DownloadID != "" && apiVersion != "" {

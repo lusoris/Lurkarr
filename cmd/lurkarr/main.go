@@ -15,6 +15,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/queuecleaner"
 	"github.com/lusoris/lurkarr/internal/scheduler"
 	"github.com/lusoris/lurkarr/internal/server"
@@ -61,7 +62,10 @@ func run() error {
 	logger := logging.New(db, hub)
 	defer logger.Close()
 
+	notifMgr := notifications.NewManager()
+
 	engine := hunting.New(db, logger)
+	engine.SetNotifier(notifMgr)
 	engine.Start(ctx)
 	defer engine.Stop()
 
@@ -69,16 +73,19 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("create scheduler: %w", err)
 	}
+	sched.SetNotifier(notifMgr)
 	if err := sched.Start(ctx); err != nil {
 		return fmt.Errorf("start scheduler: %w", err)
 	}
 	defer func() { _ = sched.Stop() }()
 
 	cleaner := queuecleaner.New(db, logger)
+	cleaner.SetNotifier(notifMgr)
 	cleaner.Start(ctx)
 	defer cleaner.Stop()
 
 	importer := autoimport.New(db, logger)
+	importer.SetNotifier(notifMgr)
 	importer.Start(ctx)
 	defer importer.Stop()
 
@@ -98,7 +105,7 @@ func run() error {
 		ProxyAuth:      cfg.ProxyAuth,
 		ProxyHeader:    cfg.ProxyHeader,
 		SecureCookie:   cfg.SecureCookie,
-	}, db, logger, hub, sched)
+	}, db, logger, hub, sched, notifMgr)
 
 	errCh := make(chan error, 1)
 	go func() {

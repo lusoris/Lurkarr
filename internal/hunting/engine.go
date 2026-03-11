@@ -4,6 +4,7 @@ package hunting
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
+	"github.com/lusoris/lurkarr/internal/notifications"
 )
 
 // Store abstracts the database operations needed by the hunting Engine.
@@ -32,14 +34,20 @@ type Store interface {
 
 // Engine manages hunting goroutines for all app types.
 type Engine struct {
-	db     Store
-	logger *logging.Logger
-	cancel context.CancelFunc
+	db       Store
+	logger   *logging.Logger
+	notifier notifications.Notifier
+	cancel   context.CancelFunc
 }
 
 // New creates a new hunting engine.
 func New(db Store, logger *logging.Logger) *Engine {
 	return &Engine{db: db, logger: logger}
+}
+
+// SetNotifier sets an optional notification manager.
+func (e *Engine) SetNotifier(n notifications.Notifier) {
+	e.notifier = n
 }
 
 // Start launches a hunting goroutine for each app type.
@@ -190,16 +198,31 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 	remaining := settings.HourlyCap - hits
 
 	// Hunt missing items
+	var missingCount, upgradeCount int
 	if settings.HuntMissingCount > 0 {
 		count := min(settings.HuntMissingCount, remaining)
-		hunted := e.huntMissing(ctx, log, appType, settings, inst, client, count)
-		remaining -= hunted
+		missingCount = e.huntMissing(ctx, log, appType, settings, inst, client, count)
+		remaining -= missingCount
 	}
 
 	// Hunt upgrades
 	if settings.HuntUpgradeCount > 0 && remaining > 0 {
 		count := min(settings.HuntUpgradeCount, remaining)
-		e.huntUpgrades(ctx, log, appType, settings, inst, client, count)
+		upgradeCount = e.huntUpgrades(ctx, log, appType, settings, inst, client, count)
+	}
+
+	if e.notifier != nil && (missingCount > 0 || upgradeCount > 0) {
+		e.notifier.Notify(ctx, notifications.Event{
+			Type:     notifications.EventHuntCompleted,
+			Title:    "Hunt Completed",
+			Message:  fmt.Sprintf("Found %d missing, %d upgrades", missingCount, upgradeCount),
+			AppType:  string(appType),
+			Instance: inst.Name,
+			Fields: map[string]string{
+				"Missing":  fmt.Sprintf("%d", missingCount),
+				"Upgrades": fmt.Sprintf("%d", upgradeCount),
+			},
+		})
 	}
 	return nil
 }

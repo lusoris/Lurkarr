@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -266,4 +267,16 @@ type BlocklistLog struct {
 	Title         string    `json:"title"`
 	Reason        string    `json:"reason"`
 	BlocklistedAt time.Time `json:"blocklisted_at"`
+}
+
+// NotificationProvider stores configuration for a notification provider.
+type NotificationProvider struct {
+	ID        uuid.UUID       `json:"id"`
+	Type      string          `json:"type"` // discord, telegram, pushover, etc.
+	Name      string          `json:"name"` // user-friendly label
+	Enabled   bool            `json:"enabled"`
+	Config    json.RawMessage `json:"config"` // provider-specific JSON config
+	Events    []string        `json:"events"` // event types to subscribe to
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
 }

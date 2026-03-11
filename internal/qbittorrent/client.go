@@ -20,7 +20,7 @@ type Client struct {
 	Password   string
 	HTTPClient *http.Client
 
-	mu        sync.Mutex
+	mu            sync.Mutex
 	authenticated bool
 }
 
@@ -190,36 +190,36 @@ func (c *Client) apiPost(ctx context.Context, path string, form url.Values) ([]b
 
 // Torrent represents a torrent in qBittorrent.
 type Torrent struct {
-	Hash           string  `json:"hash"`
-	Name           string  `json:"name"`
-	Size           int64   `json:"size"`
-	Progress       float64 `json:"progress"`
-	DownloadSpeed  int64   `json:"dlspeed"`
-	UploadSpeed    int64   `json:"upspeed"`
-	Priority       int     `json:"priority"`
-	NumSeeds       int     `json:"num_seeds"`
-	NumLeechers    int     `json:"num_leechs"`
-	Ratio          float64 `json:"ratio"`
-	State          string  `json:"state"`
-	Category       string  `json:"category"`
-	AddedOn        int64   `json:"added_on"`
-	CompletionOn   int64   `json:"completion_on"`
-	SavePath       string  `json:"save_path"`
-	ContentPath    string  `json:"content_path"`
-	AmountLeft     int64   `json:"amount_left"`
-	TimeActive     int64   `json:"time_active"`
-	Tracker        string  `json:"tracker"`
-	TotalSize      int64   `json:"total_size"`
-	ETA            int64   `json:"eta"`
+	Hash          string  `json:"hash"`
+	Name          string  `json:"name"`
+	Size          int64   `json:"size"`
+	Progress      float64 `json:"progress"`
+	DownloadSpeed int64   `json:"dlspeed"`
+	UploadSpeed   int64   `json:"upspeed"`
+	Priority      int     `json:"priority"`
+	NumSeeds      int     `json:"num_seeds"`
+	NumLeechers   int     `json:"num_leechs"`
+	Ratio         float64 `json:"ratio"`
+	State         string  `json:"state"`
+	Category      string  `json:"category"`
+	AddedOn       int64   `json:"added_on"`
+	CompletionOn  int64   `json:"completion_on"`
+	SavePath      string  `json:"save_path"`
+	ContentPath   string  `json:"content_path"`
+	AmountLeft    int64   `json:"amount_left"`
+	TimeActive    int64   `json:"time_active"`
+	Tracker       string  `json:"tracker"`
+	TotalSize     int64   `json:"total_size"`
+	ETA           int64   `json:"eta"`
 }
 
 // TransferInfo represents global transfer information.
 type TransferInfo struct {
-	DownloadSpeed   int64  `json:"dl_info_speed"`
-	UploadSpeed     int64  `json:"up_info_speed"`
-	DownloadTotal   int64  `json:"dl_info_data"`
-	UploadTotal     int64  `json:"up_info_data"`
-	DHT             int    `json:"dht_nodes"`
+	DownloadSpeed    int64  `json:"dl_info_speed"`
+	UploadSpeed      int64  `json:"up_info_speed"`
+	DownloadTotal    int64  `json:"dl_info_data"`
+	UploadTotal      int64  `json:"up_info_data"`
+	DHT              int    `json:"dht_nodes"`
 	ConnectionStatus string `json:"connection_status"`
 }
 

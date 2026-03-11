@@ -21,7 +21,7 @@ type Client struct {
 	Password   string
 	HTTPClient *http.Client
 
-	mu      sync.Mutex
+	mu        sync.Mutex
 	csrfToken string
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/middleware"
+	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/scheduler"
 )
 
@@ -33,7 +34,7 @@ type Server struct {
 }
 
 // New creates a new Server with all routes registered.
-func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, sched *scheduler.Scheduler) *Server {
+func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, sched *scheduler.Scheduler, notifMgr *notifications.Manager) *Server {
 	authMw := &auth.Middleware{
 		DB:              db,
 		ProxyAuthBypass: cfg.ProxyAuth,
@@ -54,6 +55,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	sabnzbdH := &api.SABnzbdHandler{DB: db}
 	userH := &api.UserHandler{DB: db}
 	queueH := &api.QueueHandler{DB: db}
+	notificationH := &api.NotificationHandler{DB: db, Manager: notifMgr}
 
 	mux := http.NewServeMux()
 
@@ -151,6 +153,14 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("PUT /api/queue/scoring/{app}", queueH.HandleUpdateScoringProfile)
 	protected.HandleFunc("GET /api/queue/blocklist/{app}", queueH.HandleGetBlocklistLog)
 	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
+
+	// Notifications
+	protected.HandleFunc("GET /api/notifications/providers", notificationH.HandleListProviders)
+	protected.HandleFunc("POST /api/notifications/providers", notificationH.HandleCreateProvider)
+	protected.HandleFunc("GET /api/notifications/providers/{id}", notificationH.HandleGetProvider)
+	protected.HandleFunc("PUT /api/notifications/providers/{id}", notificationH.HandleUpdateProvider)
+	protected.HandleFunc("DELETE /api/notifications/providers/{id}", notificationH.HandleDeleteProvider)
+	protected.HandleFunc("POST /api/notifications/providers/{id}/test", notificationH.HandleTestProvider)
 
 	// WebSocket (no CSRF, but auth required)
 	mux.Handle("GET /ws/logs", authMw.RequireAuth(http.HandlerFunc(logsH.HandleWebSocketLogs)))

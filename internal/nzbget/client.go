@@ -107,43 +107,43 @@ func (c *Client) call(ctx context.Context, method string, params ...interface{})
 
 // QueueItem represents an item in the NZBGet download queue.
 type QueueItem struct {
-	NZBID         int    `json:"NZBID"`
-	NZBName       string `json:"NZBName"`
-	NZBFilename   string `json:"NZBFilename"`
-	Category      string `json:"Category"`
-	FileSizeLo    int64  `json:"FileSizeLo"`
-	FileSizeHi    int64  `json:"FileSizeHi"`
-	RemainingSizeLo int64 `json:"RemainingSizeLo"`
-	RemainingSizeHi int64 `json:"RemainingSizeHi"`
-	Status        string `json:"Status"`
-	TotalArticles int    `json:"TotalArticles"`
-	Health        int    `json:"Health"`
+	NZBID           int    `json:"NZBID"`
+	NZBName         string `json:"NZBName"`
+	NZBFilename     string `json:"NZBFilename"`
+	Category        string `json:"Category"`
+	FileSizeLo      int64  `json:"FileSizeLo"`
+	FileSizeHi      int64  `json:"FileSizeHi"`
+	RemainingSizeLo int64  `json:"RemainingSizeLo"`
+	RemainingSizeHi int64  `json:"RemainingSizeHi"`
+	Status          string `json:"Status"`
+	TotalArticles   int    `json:"TotalArticles"`
+	Health          int    `json:"Health"`
 }
 
 // HistoryItem represents a completed download in NZBGet.
 type HistoryItem struct {
-	NZBID       int    `json:"NZBID"`
-	NZBName     string `json:"NZBName"`
-	NZBFilename string `json:"NZBFilename"`
-	Category    string `json:"Category"`
-	FileSizeLo  int64  `json:"FileSizeLo"`
-	FileSizeHi  int64  `json:"FileSizeHi"`
-	Status      string `json:"Status"`
-	DestDir     string `json:"DestDir"`
+	NZBID        int    `json:"NZBID"`
+	NZBName      string `json:"NZBName"`
+	NZBFilename  string `json:"NZBFilename"`
+	Category     string `json:"Category"`
+	FileSizeLo   int64  `json:"FileSizeLo"`
+	FileSizeHi   int64  `json:"FileSizeHi"`
+	Status       string `json:"Status"`
+	DestDir      string `json:"DestDir"`
 	HealthStatus string `json:"HealthStatus,omitempty"`
 }
 
 // StatusInfo represents NZBGet server status.
 type StatusInfo struct {
-	RemainingSizeLo int64  `json:"RemainingSizeLo"`
-	RemainingSizeHi int64  `json:"RemainingSizeHi"`
-	DownloadRate    int64  `json:"DownloadRate"`
-	DownloadPaused  bool   `json:"DownloadPaused"`
-	ThreadCount     int    `json:"ThreadCount"`
-	ServerStandBy   bool   `json:"ServerStandBy"`
-	FreeDiskSpaceLo int64  `json:"FreeDiskSpaceLo"`
-	FreeDiskSpaceHi int64  `json:"FreeDiskSpaceHi"`
-	UpTimeSec       int64  `json:"UpTimeSec"`
+	RemainingSizeLo int64 `json:"RemainingSizeLo"`
+	RemainingSizeHi int64 `json:"RemainingSizeHi"`
+	DownloadRate    int64 `json:"DownloadRate"`
+	DownloadPaused  bool  `json:"DownloadPaused"`
+	ThreadCount     int   `json:"ThreadCount"`
+	ServerStandBy   bool  `json:"ServerStandBy"`
+	FreeDiskSpaceLo int64 `json:"FreeDiskSpaceLo"`
+	FreeDiskSpaceHi int64 `json:"FreeDiskSpaceHi"`
+	UpTimeSec       int64 `json:"UpTimeSec"`
 }
 
 // GetQueue returns the current download queue.
