@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-11
-> State: Phases 0–6 complete, partial Phase 7. Phase 15 (docs/research) ~90% done. Phase 16 (code audit) complete. Refactors: hunting→lurking rename, download client restructure, migration consolidation.
-> Priority order: Phase 9a (Auth/Proxy) → Phase 9b (Uber FX) → feature work
+> State: Phases 0–6 complete, Phase 9a/9b complete, partial Phase 7. Phase 15 (docs/research) ~90% done. Phase 16 (code audit) ~95% done. Refactors: hunting→lurking rename, download client restructure, migration consolidation, Whisparr/Eros API rewrite, Seerr naming unification.
+> Priority order: Remaining Phase 16 cleanup → Phase 7 (Download Cleaner) → feature work
 
 ---
 
@@ -184,15 +184,15 @@
 - [x] **🔴 Data race in logging Hub.Broadcast vs Hub.HandleWebSocket** — Fixed: added `sync.RWMutex` to `wsClient` for filter fields. All 22 tests pass with `-race`.
 
 ### 16.3 Dead Code / Unused Packages
-- [ ] **`internal/cache`** — otter-backed W-TinyLFU cache implemented + tested but never wired in. Integrate into lurking engine / hot paths to avoid redundant DB reads.
+- [x] **`internal/cache`** — Removed. Was otter-backed W-TinyLFU cache implemented + tested but never wired in. Deleted since otter/v2 is used directly where needed.
 - [ ] **`internal/downloadclients`** — unified Client interface + 5 adapters built for Phase 7 (Download Cleaner Advanced). Not dead — pending integration.
 - [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called (Phase 7 planned use)
-- [ ] `downloadclient/sabnzbd.RemoveItem` — returns "not implemented" error
+- [x] `downloadclient/sabnzbd.RemoveItem` — Fixed: uses native `DeleteQueueItem` (mode=queue&name=delete)
 
 ### 16.4 Overlapping / Duplicate Code
-- [ ] **Whisparr/Eros are INCOMPLETE, not just duplicate** — current code only handles movies. Whisparr v2 has movies + scenes (dual content types). Eros (Whisparr v3) is a complete API rewrite. Need scene endpoints, proper type models for each version. Do NOT consolidate — they need separate, fuller implementations.
+- [x] **Whisparr v2 rewritten, Eros v3 fixed** — Whisparr v2: movie-based→Sonarr-based series/episode model (WhisparrEpisode, wanted/missing, EpisodeSearch). Eros v3: removed non-existent cutoff endpoint, added ItemType field ("movie"|"scene"), documented client-side filtering. Full API reference in docs/research/api-reference-arr-stack.md.
 - [x] **Prowlarr in AllAppTypes() wastes goroutines** — Fixed: lurking engine now skips app types with no registered lurker (matches cleaner/importer pattern).
-- [ ] SABnzbd triple implementation: native client, downloadclient adapter, and API handler all create clients independently.
+- [x] SABnzbd: Added `DeleteQueueItem` to native client, fixed adapter `RemoveItem` stub. API handler + cleaner pattern (load settings → create client) is correct for settings that can change at runtime — no further consolidation needed.
 
 ### 16.5 Swallowed Errors in Background Services
 - [x] `lurking/engine.go`: Fixed 6 swallowed errors → `slog.Warn` on failure

@@ -173,6 +173,15 @@ func (c *Client) Resume(ctx context.Context) error {
 	return err
 }
 
+// DeleteQueueItem removes an item from the SABnzbd download queue.
+func (c *Client) DeleteQueueItem(ctx context.Context, nzoID string) error {
+	_, err := c.apiCall(ctx, "queue", url.Values{
+		"name":  {"delete"},
+		"value": {nzoID},
+	})
+	return err
+}
+
 // GetVersion returns the SABnzbd version.
 func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	raw, err := c.apiCall(ctx, "version", nil)

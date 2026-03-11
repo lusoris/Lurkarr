@@ -2,7 +2,6 @@ package downloadclient
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
@@ -45,8 +44,8 @@ func (a *SABnzbdAdapter) ResumeAll(ctx context.Context) error {
 	return a.client.Resume(ctx)
 }
 
-func (a *SABnzbdAdapter) RemoveItem(_ context.Context, _ string, _ bool) error {
-	return fmt.Errorf("SABnzbd RemoveItem not implemented via this adapter")
+func (a *SABnzbdAdapter) RemoveItem(ctx context.Context, id string, _ bool) error {
+	return a.client.DeleteQueueItem(ctx, id)
 }
 
 func (a *SABnzbdAdapter) GetStatus(ctx context.Context) (*ClientStatus, error) {

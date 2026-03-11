@@ -166,3 +166,23 @@ func TestAPICallServerError(t *testing.T) {
 		t.Fatal("expected error for 500 response")
 	}
 }
+
+func TestDeleteQueueItem(t *testing.T) {
+	server, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("mode") != "queue" {
+			t.Errorf("mode = %s, want queue", r.URL.Query().Get("mode"))
+		}
+		if r.URL.Query().Get("name") != "delete" {
+			t.Errorf("name = %s, want delete", r.URL.Query().Get("name"))
+		}
+		if r.URL.Query().Get("value") != "SABnzbd_nzo_abc123" {
+			t.Errorf("value = %s, want SABnzbd_nzo_abc123", r.URL.Query().Get("value"))
+		}
+		json.NewEncoder(w).Encode(map[string]bool{"status": true})
+	})
+	defer server.Close()
+
+	if err := client.DeleteQueueItem(context.Background(), "SABnzbd_nzo_abc123"); err != nil {
+		t.Fatalf("DeleteQueueItem error: %v", err)
+	}
+}
