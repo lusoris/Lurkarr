@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-11
-> State: Phases 0–6 complete, partial Phase 7. Phase 15 (docs/research) ~90% done. Phase 16 (code audit) complete.
-> Priority order: Phase 16.1 (critical fixes) → Phase 9 (Uber FX) → feature work
+> State: Phases 0–6 complete, partial Phase 7. Phase 15 (docs/research) ~90% done. Phase 16 (code audit) complete. Refactors: hunting→lurking rename, download client restructure, migration consolidation.
+> Priority order: Phase 9 (Uber FX) → feature work
 
 ---
 
@@ -73,12 +73,12 @@
 
 ## ✅ COMPLETED — Download Clients (6 integrated)
 
-- [x] SABnzbd (internal/sabnzbd/) — full queue/history/settings
-- [x] qBittorrent (internal/qbittorrent/) — pause/resume/delete with rules
-- [x] Transmission (internal/transmission/) — RPC protocol
-- [x] Deluge (internal/deluge/) — web UI client
-- [x] NZBGet (internal/nzbget/) — XML-RPC
-- [x] Generic abstraction (internal/downloadclient/) — common interface
+- [x] SABnzbd (downloadclients/usenet/sabnzbd/) — full queue/history/settings
+- [x] NZBGet (downloadclients/usenet/nzbget/) — XML-RPC
+- [x] qBittorrent (downloadclients/torrent/qbittorrent/) — pause/resume/delete with rules
+- [x] Transmission (downloadclients/torrent/transmission/) — RPC protocol
+- [x] Deluge (downloadclients/torrent/deluge/) — web UI client
+- [x] Generic abstraction (downloadclients/) — common Client interface + adapters
 
 ## ✅ COMPLETED — Notifications (8 providers)
 
@@ -144,15 +144,18 @@
 - [x] Race detection + coverage in CI
 - [x] Test files for every client (qbit, transmission, deluge, nzbget, seerr)
 
-## ✅ COMPLETED — DB Migrations (7 total, goose)
+## ✅ COMPLETED — DB Migrations (goose, single consolidated)
 
-- [x] 001: initial (users, sessions, app_instances, settings, lurk_history/stats)
-- [x] 002: prowlarr/sabnzbd (indexer sync, history tracking)
-- [x] 003: instance-aware stats + hourly_caps
-- [x] 004: queue management (strikes, cleaner settings, scoring profiles, import/blocklist log)
-- [x] 005: cleaner enhancements (privacy type strikes, slow ignore size, failed import settings)
-- [x] 006: notification_providers
-- [x] 007: seerr_settings
+- [x] 001_initial.sql — all tables in one clean migration:
+  - Users, sessions, app_instances, app_settings, general_settings
+  - Lurking engine: processed_items, state_resets, lurk_history, lurk_stats, hourly_caps
+  - Scheduling: schedules, schedule_executions
+  - Logging: logs
+  - Prowlarr & SABnzbd settings
+  - Queue cleaner: settings, strikes, auto_import_log, scoring_profiles, blocklist_log
+  - Notifications: notification_providers
+  - Seerr: seerr_settings
+  - Seed data for all app types
 
 ---
 
@@ -182,7 +185,7 @@
 
 ### 16.3 Dead Code / Unused Packages
 - [ ] **`internal/cache`** — entire package never imported by any production code. Settings are re-fetched from DB every call. Either integrate into hot paths or remove.
-- [ ] **`internal/downloadclient`** — unified Client interface + 5 adapters never imported. API/cleaner create native clients directly. Either integrate as the abstraction layer or remove.
+- [ ] **`internal/downloadclients`** — unified Client interface + 5 adapters never imported. API/cleaner create native clients directly. Either integrate as the abstraction layer or remove.
 - [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called
 - [ ] `downloadclient/sabnzbd.RemoveItem` — returns "not implemented" error
 
