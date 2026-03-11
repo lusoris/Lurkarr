@@ -76,19 +76,19 @@ fx.Provide(fx.Annotate(NewReadDB, fx.ResultTags(`name:"ro"`)))
 fx.Provide(fx.Annotate(NewWriteDB, fx.ResultTags(`name:"rw"`)))
 ```
 
-### Value Groups (for handlers, hunters, etc.)
+### Value Groups (for handlers, lurkers, etc.)
 
 ```go
 // Provider
-type HunterResult struct {
+type LurkerResult struct {
     fx.Out
-    Hunter ArrHunter `group:"hunters"`
+    Lurker ArrLurker `group:"lurkers"`
 }
 
 // Consumer
 type EngineParams struct {
     fx.In
-    Hunters []ArrHunter `group:"hunters"`
+    Lurkers []ArrLurker `group:"lurkers"`
 }
 ```
 
@@ -120,7 +120,7 @@ Current main.go manually wires:
 2. database.New()
 3. logging.NewHub() + logging.New()
 4. notifications.NewManager()
-5. hunting.New() + Start()
+5. lurking.New() + Start()
 6. scheduler.New() + Start()
 7. queuecleaner.New() + Start()
 8. autoimport.New() + Start()
@@ -137,15 +137,15 @@ var DatabaseModule = fx.Module("database",
     fx.Provide(database.New),
 )
 
-var HuntingModule = fx.Module("hunting",
+var LurkingModule = fx.Module("lurking",
     fx.Provide(
         fx.Annotate(
-            hunting.New,
-            fx.OnStart(func(ctx context.Context, e *hunting.Engine) error {
+            lurking.New,
+            fx.OnStart(func(ctx context.Context, e *lurking.Engine) error {
                 e.Start(ctx)
                 return nil
             }),
-            fx.OnStop(func(ctx context.Context, e *hunting.Engine) error {
+            fx.OnStop(func(ctx context.Context, e *lurking.Engine) error {
                 e.Stop()
                 return nil
             }),
@@ -158,6 +158,6 @@ var HuntingModule = fx.Module("hunting",
 
 - Use `fx.Module` per package for logical grouping
 - Use `fx.Lifecycle` hooks instead of manual defer chains
-- Use value groups for arr hunters (ArrHunter interface)
+- Use value groups for arr lurkers (ArrLurker interface)
 - WithLogger to integrate slog with fx event logging
 - RecoverFromPanics() for production safety

@@ -28,7 +28,7 @@
 	}
 
 	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
-	const actions = ['hunt_missing', 'hunt_upgrade', 'hunt_all', 'clean_queue'] as const;
+	const actions = ['lurk_missing', 'lurk_upgrade', 'lurk_all', 'clean_queue'] as const;
 	const dayOptions = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
 	let schedules = $state<Schedule[]>([]);
@@ -39,7 +39,7 @@
 	// Modal state
 	let showModal = $state(false);
 	let editing = $state<Schedule | null>(null);
-	let form = $state({ app_type: 'sonarr', action: 'hunt_missing', days: [] as string[], hour: 0, minute: 0, enabled: true });
+	let form = $state({ app_type: 'sonarr', action: 'lurk_missing', days: [] as string[], hour: 0, minute: 0, enabled: true });
 	let saving = $state(false);
 	let deleteConfirm = $state<string | null>(null);
 
@@ -64,7 +64,7 @@
 
 	function openAdd() {
 		editing = null;
-		form = { app_type: 'sonarr', action: 'hunt_missing', days: [], hour: 0, minute: 0, enabled: true };
+		form = { app_type: 'sonarr', action: 'lurk_missing', days: [], hour: 0, minute: 0, enabled: true };
 		showModal = true;
 	}
 

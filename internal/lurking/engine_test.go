@@ -1,4 +1,4 @@
-package hunting
+package lurking
 
 import (
 	"testing"
@@ -29,7 +29,7 @@ func TestBackoff(t *testing.T) {
 }
 
 func TestSelectItemsAll(t *testing.T) {
-	items := []huntableItem{
+	items := []lurkableItem{
 		{ID: 1, Title: "a"},
 		{ID: 2, Title: "b"},
 		{ID: 3, Title: "c"},
@@ -42,7 +42,7 @@ func TestSelectItemsAll(t *testing.T) {
 }
 
 func TestSelectItemsLimited(t *testing.T) {
-	items := []huntableItem{
+	items := []lurkableItem{
 		{ID: 1, Title: "a"},
 		{ID: 2, Title: "b"},
 		{ID: 3, Title: "c"},
@@ -58,9 +58,9 @@ func TestSelectItemsLimited(t *testing.T) {
 }
 
 func TestSelectItemsRandom(t *testing.T) {
-	items := make([]huntableItem, 100)
+	items := make([]lurkableItem, 100)
 	for i := range items {
-		items[i] = huntableItem{ID: i, Title: "item"}
+		items[i] = lurkableItem{ID: i, Title: "item"}
 	}
 	selected := selectItems(items, 5, true)
 	if len(selected) != 5 {
@@ -70,24 +70,24 @@ func TestSelectItemsRandom(t *testing.T) {
 	// (probabilistically — but we just check count and type)
 }
 
-func TestHunterForKnownTypes(t *testing.T) {
+func TestLurkerForKnownTypes(t *testing.T) {
 	for _, appType := range database.AllAppTypes() {
 		if appType == database.AppProwlarr {
-			// Prowlarr doesn't have a hunter (it's an indexer manager, not an arr)
-			if HunterFor(appType) != nil {
-				t.Errorf("expected nil hunter for Prowlarr, got %v", HunterFor(appType))
+			// Prowlarr doesn't have a lurker (it's an indexer manager, not an arr)
+			if LurkerFor(appType) != nil {
+				t.Errorf("expected nil lurker for Prowlarr, got %v", LurkerFor(appType))
 			}
 			continue
 		}
-		h := HunterFor(appType)
+		h := LurkerFor(appType)
 		if h == nil {
-			t.Errorf("expected hunter for %s, got nil", appType)
+			t.Errorf("expected lurker for %s, got nil", appType)
 		}
 	}
 }
 
-func TestHunterForUnknown(t *testing.T) {
-	h := HunterFor(database.AppType("nonexistent"))
+func TestLurkerForUnknown(t *testing.T) {
+	h := LurkerFor(database.AppType("nonexistent"))
 	if h != nil {
 		t.Errorf("expected nil for unknown type, got %v", h)
 	}

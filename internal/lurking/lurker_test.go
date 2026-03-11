@@ -1,4 +1,4 @@
-package hunting
+package lurking
 
 import (
 	"context"
@@ -19,7 +19,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *arrclient.Client {
 	return arrclient.NewClient(server.URL, "key", 5*time.Second, true)
 }
 
-func TestSonarrHunterGetMissing(t *testing.T) {
+func TestSonarrLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 2,
@@ -30,7 +30,7 @@ func TestSonarrHunterGetMissing(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppSonarr)
+	h := LurkerFor(database.AppSonarr)
 	items, err := h.GetMissing(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -43,7 +43,7 @@ func TestSonarrHunterGetMissing(t *testing.T) {
 	}
 }
 
-func TestSonarrHunterGetUpgrades(t *testing.T) {
+func TestSonarrLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -51,7 +51,7 @@ func TestSonarrHunterGetUpgrades(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppSonarr)
+	h := LurkerFor(database.AppSonarr)
 	items, err := h.GetUpgrades(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -61,24 +61,24 @@ func TestSonarrHunterGetUpgrades(t *testing.T) {
 	}
 }
 
-func TestSonarrHunterSearch(t *testing.T) {
+func TestSonarrLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "EpisodeSearch"})
 	})
 
-	h := HunterFor(database.AppSonarr)
+	h := LurkerFor(database.AppSonarr)
 	err := h.Search(context.Background(), client, 42)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 }
 
-func TestSonarrHunterGetQueue(t *testing.T) {
+func TestSonarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 3})
 	})
 
-	h := HunterFor(database.AppSonarr)
+	h := LurkerFor(database.AppSonarr)
 	queue, err := h.GetQueue(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -88,7 +88,7 @@ func TestSonarrHunterGetQueue(t *testing.T) {
 	}
 }
 
-func TestRadarrHunterGetMissing(t *testing.T) {
+func TestRadarrLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -96,7 +96,7 @@ func TestRadarrHunterGetMissing(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppRadarr)
+	h := LurkerFor(database.AppRadarr)
 	items, err := h.GetMissing(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -106,7 +106,7 @@ func TestRadarrHunterGetMissing(t *testing.T) {
 	}
 }
 
-func TestRadarrHunterGetUpgrades(t *testing.T) {
+func TestRadarrLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -114,7 +114,7 @@ func TestRadarrHunterGetUpgrades(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppRadarr)
+	h := LurkerFor(database.AppRadarr)
 	items, err := h.GetUpgrades(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -124,23 +124,23 @@ func TestRadarrHunterGetUpgrades(t *testing.T) {
 	}
 }
 
-func TestRadarrHunterSearch(t *testing.T) {
+func TestRadarrLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "MoviesSearch"})
 	})
 
-	h := HunterFor(database.AppRadarr)
+	h := LurkerFor(database.AppRadarr)
 	if err := h.Search(context.Background(), client, 10); err != nil {
 		t.Fatalf("error: %v", err)
 	}
 }
 
-func TestRadarrHunterGetQueue(t *testing.T) {
+func TestRadarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 5})
 	})
 
-	h := HunterFor(database.AppRadarr)
+	h := LurkerFor(database.AppRadarr)
 	queue, err := h.GetQueue(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -150,7 +150,7 @@ func TestRadarrHunterGetQueue(t *testing.T) {
 	}
 }
 
-func TestLidarrHunterGetMissing(t *testing.T) {
+func TestLidarrLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -158,7 +158,7 @@ func TestLidarrHunterGetMissing(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppLidarr)
+	h := LurkerFor(database.AppLidarr)
 	items, err := h.GetMissing(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -168,7 +168,7 @@ func TestLidarrHunterGetMissing(t *testing.T) {
 	}
 }
 
-func TestLidarrHunterGetUpgrades(t *testing.T) {
+func TestLidarrLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -176,7 +176,7 @@ func TestLidarrHunterGetUpgrades(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppLidarr)
+	h := LurkerFor(database.AppLidarr)
 	items, err := h.GetUpgrades(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -186,23 +186,23 @@ func TestLidarrHunterGetUpgrades(t *testing.T) {
 	}
 }
 
-func TestLidarrHunterSearch(t *testing.T) {
+func TestLidarrLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "AlbumSearch"})
 	})
 
-	h := HunterFor(database.AppLidarr)
+	h := LurkerFor(database.AppLidarr)
 	if err := h.Search(context.Background(), client, 30); err != nil {
 		t.Fatalf("error: %v", err)
 	}
 }
 
-func TestLidarrHunterGetQueue(t *testing.T) {
+func TestLidarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 1})
 	})
 
-	h := HunterFor(database.AppLidarr)
+	h := LurkerFor(database.AppLidarr)
 	queue, err := h.GetQueue(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -212,7 +212,7 @@ func TestLidarrHunterGetQueue(t *testing.T) {
 	}
 }
 
-func TestReadarrHunterGetMissing(t *testing.T) {
+func TestReadarrLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -220,7 +220,7 @@ func TestReadarrHunterGetMissing(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppReadarr)
+	h := LurkerFor(database.AppReadarr)
 	items, err := h.GetMissing(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -230,7 +230,7 @@ func TestReadarrHunterGetMissing(t *testing.T) {
 	}
 }
 
-func TestReadarrHunterGetUpgrades(t *testing.T) {
+func TestReadarrLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -238,7 +238,7 @@ func TestReadarrHunterGetUpgrades(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppReadarr)
+	h := LurkerFor(database.AppReadarr)
 	items, err := h.GetUpgrades(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -248,23 +248,23 @@ func TestReadarrHunterGetUpgrades(t *testing.T) {
 	}
 }
 
-func TestReadarrHunterSearch(t *testing.T) {
+func TestReadarrLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "BookSearch"})
 	})
 
-	h := HunterFor(database.AppReadarr)
+	h := LurkerFor(database.AppReadarr)
 	if err := h.Search(context.Background(), client, 40); err != nil {
 		t.Fatalf("error: %v", err)
 	}
 }
 
-func TestReadarrHunterGetQueue(t *testing.T) {
+func TestReadarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 0})
 	})
 
-	h := HunterFor(database.AppReadarr)
+	h := LurkerFor(database.AppReadarr)
 	queue, err := h.GetQueue(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -274,7 +274,7 @@ func TestReadarrHunterGetQueue(t *testing.T) {
 	}
 }
 
-func TestWhisparrHunterGetMissing(t *testing.T) {
+func TestWhisparrLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]arrclient.WhisparrMovie{
 			{ID: 50, Title: "Has File", Monitored: true, HasFile: true},
@@ -282,7 +282,7 @@ func TestWhisparrHunterGetMissing(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppWhisparr)
+	h := LurkerFor(database.AppWhisparr)
 	items, err := h.GetMissing(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -292,7 +292,7 @@ func TestWhisparrHunterGetMissing(t *testing.T) {
 	}
 }
 
-func TestWhisparrHunterGetUpgrades(t *testing.T) {
+func TestWhisparrLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -300,7 +300,7 @@ func TestWhisparrHunterGetUpgrades(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppWhisparr)
+	h := LurkerFor(database.AppWhisparr)
 	items, err := h.GetUpgrades(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -310,23 +310,23 @@ func TestWhisparrHunterGetUpgrades(t *testing.T) {
 	}
 }
 
-func TestWhisparrHunterSearch(t *testing.T) {
+func TestWhisparrLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "MoviesSearch"})
 	})
 
-	h := HunterFor(database.AppWhisparr)
+	h := LurkerFor(database.AppWhisparr)
 	if err := h.Search(context.Background(), client, 50); err != nil {
 		t.Fatalf("error: %v", err)
 	}
 }
 
-func TestWhisparrHunterGetQueue(t *testing.T) {
+func TestWhisparrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 2})
 	})
 
-	h := HunterFor(database.AppWhisparr)
+	h := LurkerFor(database.AppWhisparr)
 	queue, err := h.GetQueue(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -336,7 +336,7 @@ func TestWhisparrHunterGetQueue(t *testing.T) {
 	}
 }
 
-func TestErosHunterGetMissing(t *testing.T) {
+func TestErosLurkerGetMissing(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]arrclient.ErosMovie{
 			{ID: 60, Title: "Has File", Monitored: true, HasFile: true},
@@ -345,7 +345,7 @@ func TestErosHunterGetMissing(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppEros)
+	h := LurkerFor(database.AppEros)
 	items, err := h.GetMissing(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -355,7 +355,7 @@ func TestErosHunterGetMissing(t *testing.T) {
 	}
 }
 
-func TestErosHunterGetUpgrades(t *testing.T) {
+func TestErosLurkerGetUpgrades(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"totalRecords": 1,
@@ -363,7 +363,7 @@ func TestErosHunterGetUpgrades(t *testing.T) {
 		})
 	})
 
-	h := HunterFor(database.AppEros)
+	h := LurkerFor(database.AppEros)
 	items, err := h.GetUpgrades(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -373,23 +373,23 @@ func TestErosHunterGetUpgrades(t *testing.T) {
 	}
 }
 
-func TestErosHunterSearch(t *testing.T) {
+func TestErosLurkerSearch(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1, Name: "MoviesSearch"})
 	})
 
-	h := HunterFor(database.AppEros)
+	h := LurkerFor(database.AppEros)
 	if err := h.Search(context.Background(), client, 60); err != nil {
 		t.Fatalf("error: %v", err)
 	}
 }
 
-func TestErosHunterGetQueue(t *testing.T) {
+func TestErosLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 4})
 	})
 
-	h := HunterFor(database.AppEros)
+	h := LurkerFor(database.AppEros)
 	queue, err := h.GetQueue(context.Background(), client)
 	if err != nil {
 		t.Fatalf("error: %v", err)

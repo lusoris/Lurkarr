@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/lusoris/lurkarr/internal/hunting"
+	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
@@ -50,7 +50,7 @@ func (imp *Importer) SetNotifier(n notifications.Notifier) {
 func (imp *Importer) Start(ctx context.Context) {
 	ctx, imp.cancel = context.WithCancel(ctx)
 	for _, appType := range database.AllAppTypes() {
-		if hunting.HunterFor(appType) == nil {
+		if lurking.LurkerFor(appType) == nil {
 			continue
 		}
 		imp.wg.Add(1)
@@ -96,8 +96,8 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 	log = log.With("instance", inst.Name)
 	metrics.AutoimportRunsTotal.WithLabelValues(string(appType), inst.Name).Inc()
 
-	hunter := hunting.HunterFor(appType)
-	if hunter == nil {
+	lurker := lurking.LurkerFor(appType)
+	if lurker == nil {
 		return
 	}
 
@@ -113,7 +113,7 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 		genSettings.SSLVerify,
 	)
 
-	queue, err := hunter.GetQueue(ctx, client)
+	queue, err := lurker.GetQueue(ctx, client)
 	if err != nil {
 		log.Error("failed to get queue", "error", err)
 		metrics.AutoimportErrors.WithLabelValues(string(appType), inst.Name).Inc()

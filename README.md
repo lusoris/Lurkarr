@@ -4,7 +4,7 @@ Lurkarr is a self-hosted media library companion for the \*Arr ecosystem. It aut
 
 ## Features
 
-- **Multi-App Hunting** — Automatically searches for missing and upgradeable media across Sonarr, Radarr, Lidarr, Readarr, Whisparr (v2), and Eros (Whisparr v3)
+- **Multi-App Lurking** — Automatically searches for missing and upgradeable media across Sonarr, Radarr, Lidarr, Readarr, Whisparr (v2), and Eros (Whisparr v3)
 - **Smart Search** — Configurable missing/upgrade counts, random or sequential selection, stateful tracking to avoid duplicate searches
 - **API Rate Limiting** — Hourly caps per app to prevent indexer overload
 - **Scheduling** — Time-based rules to enable/disable apps and adjust caps

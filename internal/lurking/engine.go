@@ -1,6 +1,6 @@
-package hunting
+package lurking
 
-//go:generate mockgen -destination=mock_store_test.go -package=hunting github.com/lusoris/lurkarr/internal/hunting Store
+//go:generate mockgen -destination=mock_store_test.go -package=lurking github.com/lusoris/lurkarr/internal/lurking Store
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/notifications"
 )
 
-// Store abstracts the database operations needed by the hunting Engine.
+// Store abstracts the database operations needed by the lurking Engine.
 type Store interface {
 	GetAppSettings(ctx context.Context, appType database.AppType) (*database.AppSettings, error)
 	ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)
@@ -25,14 +25,14 @@ type Store interface {
 	GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error)
 	GetLastReset(ctx context.Context, appType database.AppType, instanceID uuid.UUID) (*time.Time, error)
 	ResetState(ctx context.Context, appType database.AppType, instanceID uuid.UUID) error
-	IsProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, huntType string) (bool, error)
-	MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, huntType string) error
-	AddHuntHistory(ctx context.Context, appType database.AppType, instanceID uuid.UUID, instanceName string, mediaID int, title, huntType string) error
+	IsProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, lurkType string) (bool, error)
+	MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, lurkType string) error
+	AddLurkHistory(ctx context.Context, appType database.AppType, instanceID uuid.UUID, instanceName string, mediaID int, title, lurkType string) error
 	IncrementStats(ctx context.Context, appType database.AppType, instanceID uuid.UUID, missing, upgrades int64) error
 	IncrementHourlyHits(ctx context.Context, appType database.AppType, instanceID uuid.UUID, count int) error
 }
 
-// Engine manages hunting goroutines for all app types.
+// Engine manages lurking goroutines for all app types.
 type Engine struct {
 	db       Store
 	logger   *logging.Logger
@@ -40,7 +40,7 @@ type Engine struct {
 	cancel   context.CancelFunc
 }
 
-// New creates a new hunting engine.
+// New creates a new lurking engine.
 func New(db Store, logger *logging.Logger) *Engine {
 	return &Engine{db: db, logger: logger}
 }
@@ -50,23 +50,23 @@ func (e *Engine) SetNotifier(n notifications.Notifier) {
 	e.notifier = n
 }
 
-// Start launches a hunting goroutine for each app type.
+// Start launches a lurking goroutine for each app type.
 func (e *Engine) Start(ctx context.Context) {
 	ctx, e.cancel = context.WithCancel(ctx)
 	for _, appType := range database.AllAppTypes() {
-		go e.huntLoop(ctx, appType)
+		go e.lurkLoop(ctx, appType)
 	}
-	slog.Info("hunting engine started", "app_types", len(database.AllAppTypes()))
+	slog.Info("lurking engine started", "app_types", len(database.AllAppTypes()))
 }
 
-// Stop cancels all hunting goroutines.
+// Stop cancels all lurking goroutines.
 func (e *Engine) Stop() {
 	if e.cancel != nil {
 		e.cancel()
 	}
 }
 
-func (e *Engine) huntLoop(ctx context.Context, appType database.AppType) {
+func (e *Engine) lurkLoop(ctx context.Context, appType database.AppType) {
 	log := e.logger.ForApp(string(appType))
 	consecutiveErrors := 0
 	for {
@@ -104,11 +104,11 @@ func (e *Engine) huntLoop(ctx context.Context, appType database.AppType) {
 				return
 			}
 			start := time.Now()
-			if err := e.huntInstance(ctx, log, appType, settings, inst); err != nil {
+			if err := e.lurkInstance(ctx, log, appType, settings, inst); err != nil {
 				hadError = true
-				metrics.HuntErrors.WithLabelValues(string(appType), inst.Name).Inc()
+				metrics.LurkErrors.WithLabelValues(string(appType), inst.Name).Inc()
 			}
-			metrics.HuntDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
+			metrics.LurkDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
 		}
 
 		if hadError {
@@ -136,12 +136,12 @@ func backoff(errors int) time.Duration {
 	return d
 }
 
-type huntableItem struct {
+type lurkableItem struct {
 	ID    int
 	Title string
 }
 
-func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance) error {
+func (e *Engine) lurkInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance) error {
 	log = log.With("instance", inst.Name)
 
 	// Check hourly cap
@@ -182,13 +182,13 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 
 	// Check minimum download queue size — skip if queue is already large
 	if genSettings.MinDownloadQueueSize > 0 {
-		hunter := HunterFor(appType)
-		if hunter != nil {
-			queue, err := hunter.GetQueue(ctx, client)
+		lurker := LurkerFor(appType)
+		if lurker != nil {
+			queue, err := lurker.GetQueue(ctx, client)
 			if err != nil {
 				log.Warn("failed to check queue size", "error", err)
 			} else if queue != nil && queue.TotalRecords >= genSettings.MinDownloadQueueSize {
-				log.Info("download queue at capacity, skipping hunt",
+				log.Info("download queue at capacity, skipping lurk",
 					"queue_size", queue.TotalRecords, "min_size", genSettings.MinDownloadQueueSize)
 				return nil
 			}
@@ -197,24 +197,24 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 
 	remaining := settings.HourlyCap - hits
 
-	// Hunt missing items
+	// Lurk missing items
 	var missingCount, upgradeCount int
-	if settings.HuntMissingCount > 0 {
-		count := min(settings.HuntMissingCount, remaining)
-		missingCount = e.huntMissing(ctx, log, appType, settings, inst, client, count)
+	if settings.LurkMissingCount > 0 {
+		count := min(settings.LurkMissingCount, remaining)
+		missingCount = e.lurkMissing(ctx, log, appType, settings, inst, client, count)
 		remaining -= missingCount
 	}
 
-	// Hunt upgrades
-	if settings.HuntUpgradeCount > 0 && remaining > 0 {
-		count := min(settings.HuntUpgradeCount, remaining)
-		upgradeCount = e.huntUpgrades(ctx, log, appType, settings, inst, client, count)
+	// Lurk upgrades
+	if settings.LurkUpgradeCount > 0 && remaining > 0 {
+		count := min(settings.LurkUpgradeCount, remaining)
+		upgradeCount = e.lurkUpgrades(ctx, log, appType, settings, inst, client, count)
 	}
 
 	if e.notifier != nil && (missingCount > 0 || upgradeCount > 0) {
 		e.notifier.Notify(ctx, notifications.Event{
-			Type:     notifications.EventHuntCompleted,
-			Title:    "Hunt Completed",
+			Type:     notifications.EventLurkCompleted,
+			Title:    "Lurk Completed",
 			Message:  fmt.Sprintf("Found %d missing, %d upgrades", missingCount, upgradeCount),
 			AppType:  string(appType),
 			Instance: inst.Name,
@@ -227,7 +227,7 @@ func (e *Engine) huntInstance(ctx context.Context, log *slog.Logger, appType dat
 	return nil
 }
 
-func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance, client *arrclient.Client, maxCount int) int {
+func (e *Engine) lurkMissing(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance, client *arrclient.Client, maxCount int) int {
 	items, err := e.getMissingItems(ctx, appType, client)
 	if err != nil {
 		log.Error("failed to get missing items", "error", err)
@@ -235,7 +235,7 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 	}
 
 	// Filter already processed
-	var unprocessed []huntableItem
+	var unprocessed []lurkableItem
 	for _, item := range items {
 		processed, err := e.db.IsProcessed(ctx, appType, inst.ID, item.ID, "missing")
 		if err != nil {
@@ -256,43 +256,43 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 	selected := selectItems(unprocessed, maxCount, settings.RandomSelection)
 
 	// Trigger searches
-	hunted := 0
+	lurked := 0
 	for _, item := range selected {
 		if err := e.triggerSearch(ctx, appType, client, item.ID); err != nil {
 			log.Error("search command failed", "media_id", item.ID, "error", err)
 			continue
 		}
-		metrics.HuntSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
+		metrics.LurkSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
 		if err := e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "missing"); err != nil {
 			log.Error("failed to mark processed", "error", err)
 		}
-		if err := e.db.AddHuntHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "missing"); err != nil {
+		if err := e.db.AddLurkHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "missing"); err != nil {
 			log.Error("failed to add history", "error", err)
 		}
-		hunted++
-		log.Info("hunted missing item", "title", item.Title, "media_id", item.ID)
+		lurked++
+		log.Info("lurked missing item", "title", item.Title, "media_id", item.ID)
 	}
 
-	if hunted > 0 {
-		if err := e.db.IncrementStats(ctx, appType, inst.ID, int64(hunted), 0); err != nil {
+	if lurked > 0 {
+		if err := e.db.IncrementStats(ctx, appType, inst.ID, int64(lurked), 0); err != nil {
 			log.Warn("failed to increment stats", "error", err)
 		}
-		if err := e.db.IncrementHourlyHits(ctx, appType, inst.ID, hunted); err != nil {
+		if err := e.db.IncrementHourlyHits(ctx, appType, inst.ID, lurked); err != nil {
 			log.Warn("failed to increment hourly hits", "error", err)
 		}
-		metrics.HuntMissingFound.WithLabelValues(string(appType), inst.Name).Add(float64(hunted))
+		metrics.LurkMissingFound.WithLabelValues(string(appType), inst.Name).Add(float64(lurked))
 	}
-	return hunted
+	return lurked
 }
 
-func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance, client *arrclient.Client, maxCount int) int {
+func (e *Engine) lurkUpgrades(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance, client *arrclient.Client, maxCount int) int {
 	items, err := e.getUpgradeItems(ctx, appType, client)
 	if err != nil {
 		log.Error("failed to get upgrade items", "error", err)
 		return 0
 	}
 
-	var unprocessed []huntableItem
+	var unprocessed []lurkableItem
 	for _, item := range items {
 		processed, err := e.db.IsProcessed(ctx, appType, inst.ID, item.ID, "upgrade")
 		if err != nil {
@@ -315,15 +315,15 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 			log.Error("upgrade search failed", "media_id", item.ID, "error", err)
 			continue
 		}
-		metrics.HuntSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
+		metrics.LurkSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
 		if err := e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "upgrade"); err != nil {
 			log.Warn("failed to mark processed", "media_id", item.ID, "error", err)
 		}
-		if err := e.db.AddHuntHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "upgrade"); err != nil {
-			log.Warn("failed to add hunt history", "media_id", item.ID, "error", err)
+		if err := e.db.AddLurkHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "upgrade"); err != nil {
+			log.Warn("failed to add lurk history", "media_id", item.ID, "error", err)
 		}
 		upgraded++
-		log.Info("hunted upgrade", "title", item.Title, "media_id", item.ID)
+		log.Info("lurked upgrade", "title", item.Title, "media_id", item.ID)
 	}
 
 	if upgraded > 0 {
@@ -333,36 +333,36 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 		if err := e.db.IncrementHourlyHits(ctx, appType, inst.ID, upgraded); err != nil {
 			log.Warn("failed to increment hourly hits", "error", err)
 		}
-		metrics.HuntUpgradesFound.WithLabelValues(string(appType), inst.Name).Add(float64(upgraded))
+		metrics.LurkUpgradesFound.WithLabelValues(string(appType), inst.Name).Add(float64(upgraded))
 	}
 	return upgraded
 }
 
-func (e *Engine) getMissingItems(ctx context.Context, appType database.AppType, client *arrclient.Client) ([]huntableItem, error) {
-	hunter := HunterFor(appType)
-	if hunter == nil {
+func (e *Engine) getMissingItems(ctx context.Context, appType database.AppType, client *arrclient.Client) ([]lurkableItem, error) {
+	lurker := LurkerFor(appType)
+	if lurker == nil {
 		return nil, nil
 	}
-	return hunter.GetMissing(ctx, client)
+	return lurker.GetMissing(ctx, client)
 }
 
-func (e *Engine) getUpgradeItems(ctx context.Context, appType database.AppType, client *arrclient.Client) ([]huntableItem, error) {
-	hunter := HunterFor(appType)
-	if hunter == nil {
+func (e *Engine) getUpgradeItems(ctx context.Context, appType database.AppType, client *arrclient.Client) ([]lurkableItem, error) {
+	lurker := LurkerFor(appType)
+	if lurker == nil {
 		return nil, nil
 	}
-	return hunter.GetUpgrades(ctx, client)
+	return lurker.GetUpgrades(ctx, client)
 }
 
 func (e *Engine) triggerSearch(ctx context.Context, appType database.AppType, client *arrclient.Client, mediaID int) error {
-	hunter := HunterFor(appType)
-	if hunter == nil {
+	lurker := LurkerFor(appType)
+	if lurker == nil {
 		return nil
 	}
-	return hunter.Search(ctx, client, mediaID)
+	return lurker.Search(ctx, client, mediaID)
 }
 
-func selectItems(items []huntableItem, count int, random bool) []huntableItem {
+func selectItems(items []lurkableItem, count int, random bool) []lurkableItem {
 	if count >= len(items) {
 		return items
 	}

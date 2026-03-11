@@ -71,9 +71,9 @@ func (a *AppInstance) MaskedAPIKey() string {
 
 type AppSettings struct {
 	AppType          AppType `json:"app_type"`
-	HuntMissingCount int     `json:"hunt_missing_count"`
-	HuntUpgradeCount int     `json:"hunt_upgrade_count"`
-	HuntMissingMode  string  `json:"hunt_missing_mode"`
+	LurkMissingCount int     `json:"lurk_missing_count"`
+	LurkUpgradeCount int     `json:"lurk_upgrade_count"`
+	LurkMissingMode  string  `json:"lurk_missing_mode"`
 	UpgradeMode      string  `json:"upgrade_mode"`
 	SleepDuration    int     `json:"sleep_duration"`
 	MonitoredOnly    bool    `json:"monitored_only"`
@@ -103,7 +103,7 @@ type ProcessedItem struct {
 	ProcessedAt time.Time `json:"processed_at"`
 }
 
-type HuntHistory struct {
+type LurkHistory struct {
 	ID           int64      `json:"id"`
 	AppType      AppType    `json:"app_type"`
 	InstanceID   *uuid.UUID `json:"instance_id"`
@@ -114,10 +114,10 @@ type HuntHistory struct {
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
-type HuntStats struct {
+type LurkStats struct {
 	AppType    AppType   `json:"app_type"`
 	InstanceID uuid.UUID `json:"instance_id"`
-	Hunted     int64     `json:"hunted"`
+	Lurked     int64     `json:"lurked"`
 	Upgraded   int64     `json:"upgraded"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

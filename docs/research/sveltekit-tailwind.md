@@ -150,7 +150,7 @@ export const settings = $state<Settings | null>(null);
 | / | Dashboard | ✅ |
 | /apps | Arr instance management | ✅ |
 | /downloads | Active downloads | ✅ |
-| /history | Hunt history | ✅ |
+| /history | Lurk history | ✅ |
 | /login | Authentication | ✅ |
 | /logs | Log viewer | ⚠️ Remove (use Grafana) |
 | /queue | Queue management | ✅ |

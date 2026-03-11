@@ -50,8 +50,8 @@ func (h *SettingsHandler) HandleUpdateAppSettings(w http.ResponseWriter, r *http
 		writeJSON(w, http.StatusBadRequest, errorResponse("hourly_cap cannot be negative"))
 		return
 	}
-	if settings.HuntMissingCount < 0 || settings.HuntUpgradeCount < 0 {
-		writeJSON(w, http.StatusBadRequest, errorResponse("hunt counts cannot be negative"))
+	if settings.LurkMissingCount < 0 || settings.LurkUpgradeCount < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("lurk counts cannot be negative"))
 		return
 	}
 	if settings.SleepDuration < 0 {

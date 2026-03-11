@@ -40,7 +40,7 @@
 <svelte:head><title>History - Lurkarr</title></svelte:head>
 
 <div class="space-y-4">
-	<h1 class="text-2xl font-bold text-surface-50">Hunt History</h1>
+	<h1 class="text-2xl font-bold text-surface-50">Lurk History</h1>
 
 	<Input bind:value={search} placeholder="Search media titles..." oninput={onSearch} />
 

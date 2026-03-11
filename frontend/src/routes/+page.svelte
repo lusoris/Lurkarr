@@ -10,7 +10,7 @@
 	interface Stats {
 		app_type: string;
 		instance_id: string;
-		hunted: number;
+		lurked: number;
 		upgraded: number;
 	}
 
@@ -106,10 +106,10 @@
 
 	// Aggregate per-app totals
 	const appTotals = $derived(() => {
-		const totals: Record<string, { hunted: number; upgraded: number }> = {};
+		const totals: Record<string, { lurked: number; upgraded: number }> = {};
 		for (const s of stats) {
-			if (!totals[s.app_type]) totals[s.app_type] = { hunted: 0, upgraded: 0 };
-			totals[s.app_type].hunted += s.hunted;
+			if (!totals[s.app_type]) totals[s.app_type] = { lurked: 0, upgraded: 0 };
+			totals[s.app_type].lurked += s.lurked;
 			totals[s.app_type].upgraded += s.upgraded;
 		}
 		return totals;
@@ -146,8 +146,8 @@
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<p class="text-2xl font-bold text-surface-50">{totals.hunted.toLocaleString()}</p>
-							<p class="text-xs text-surface-500 mt-0.5">Hunted</p>
+							<p class="text-2xl font-bold text-surface-50">{totals.lurked.toLocaleString()}</p>
+							<p class="text-xs text-surface-500 mt-0.5">Lurked</p>
 						</div>
 						<div>
 							<p class="text-2xl font-bold text-surface-50">{totals.upgraded.toLocaleString()}</p>
@@ -160,7 +160,7 @@
 							{#each groupedStats()[appType] as s}
 								<div class="flex items-center justify-between text-xs">
 									<span class="text-surface-400 truncate">{instanceName(appType, s.instance_id)}</span>
-									<span class="text-surface-300 font-mono">{s.hunted} / {s.upgraded}</span>
+									<span class="text-surface-300 font-mono">{s.lurked} / {s.upgraded}</span>
 								</div>
 							{/each}
 						</div>

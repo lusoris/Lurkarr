@@ -1,4 +1,4 @@
-package hunting
+package lurking
 
 import (
 	"context"
@@ -50,9 +50,9 @@ func TestEngineStartStop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
-	// huntLoop calls GetAppSettings for each app type; return defaults
+	// lurkLoop calls GetAppSettings for each app type; return defaults
 	store.EXPECT().GetAppSettings(gomock.Any(), gomock.Any()).Return(
-		&database.AppSettings{SleepDuration: 1, HourlyCap: 10, HuntMissingCount: 5, HuntUpgradeCount: 5}, nil,
+		&database.AppSettings{SleepDuration: 1, HourlyCap: 10, LurkMissingCount: 5, LurkUpgradeCount: 5}, nil,
 	).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
@@ -111,7 +111,7 @@ func arrServer(t *testing.T, missingItems, cutoffItems []arrclient.SonarrEpisode
 	return httptest.NewServer(mux)
 }
 
-func TestHuntInstance_Success(t *testing.T) {
+func TestLurkInstance_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -130,7 +130,7 @@ func TestHuntInstance_Success(t *testing.T) {
 	store.EXPECT().GetLastReset(gomock.Any(), database.AppSonarr, instID).Return(nil, nil)
 	store.EXPECT().IsProcessed(gomock.Any(), database.AppSonarr, instID, gomock.Any(), "missing").Return(false, nil).Times(2)
 	store.EXPECT().MarkProcessed(gomock.Any(), database.AppSonarr, instID, gomock.Any(), "missing").Return(nil).Times(2)
-	store.EXPECT().AddHuntHistory(gomock.Any(), database.AppSonarr, instID, "test", gomock.Any(), gomock.Any(), "missing").Return(nil).Times(2)
+	store.EXPECT().AddLurkHistory(gomock.Any(), database.AppSonarr, instID, "test", gomock.Any(), gomock.Any(), "missing").Return(nil).Times(2)
 	store.EXPECT().IncrementStats(gomock.Any(), database.AppSonarr, instID, int64(2), int64(0)).Return(nil)
 	store.EXPECT().IncrementHourlyHits(gomock.Any(), database.AppSonarr, instID, 2).Return(nil)
 
@@ -141,17 +141,17 @@ func TestHuntInstance_Success(t *testing.T) {
 	settings := &database.AppSettings{
 		SleepDuration:    1,
 		HourlyCap:        10,
-		HuntMissingCount: 5,
-		HuntUpgradeCount: 5,
+		LurkMissingCount: 5,
+		LurkUpgradeCount: 5,
 	}
 
-	err := e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	err := e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	if err != nil {
-		t.Fatalf("huntInstance error: %v", err)
+		t.Fatalf("lurkInstance error: %v", err)
 	}
 }
 
-func TestHuntInstance_HourlyCapReached(t *testing.T) {
+func TestLurkInstance_HourlyCapReached(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -165,13 +165,13 @@ func TestHuntInstance_HourlyCapReached(t *testing.T) {
 	settings := &database.AppSettings{HourlyCap: 10}
 	inst := database.AppInstance{ID: instID, Name: "test", APIURL: "http://cant-reach", APIKey: "k"}
 
-	err := e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	err := e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	if err != nil {
 		t.Fatalf("expected nil error when cap reached, got: %v", err)
 	}
 }
 
-func TestHuntInstance_HourHitsError(t *testing.T) {
+func TestLurkInstance_HourHitsError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -185,13 +185,13 @@ func TestHuntInstance_HourHitsError(t *testing.T) {
 	settings := &database.AppSettings{HourlyCap: 10}
 	inst := database.AppInstance{ID: instID, Name: "test"}
 
-	err := e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	err := e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	if err == nil {
 		t.Error("expected error")
 	}
 }
 
-func TestHuntInstance_GeneralSettingsError(t *testing.T) {
+func TestLurkInstance_GeneralSettingsError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -206,13 +206,13 @@ func TestHuntInstance_GeneralSettingsError(t *testing.T) {
 	settings := &database.AppSettings{HourlyCap: 10}
 	inst := database.AppInstance{ID: instID, Name: "test"}
 
-	err := e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	err := e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	if err == nil {
 		t.Error("expected error")
 	}
 }
 
-func TestHuntInstance_LastResetError(t *testing.T) {
+func TestLurkInstance_LastResetError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -228,13 +228,13 @@ func TestHuntInstance_LastResetError(t *testing.T) {
 	settings := &database.AppSettings{HourlyCap: 10}
 	inst := database.AppInstance{ID: instID, Name: "test"}
 
-	err := e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	err := e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	if err == nil {
 		t.Error("expected error")
 	}
 }
 
-func TestHuntInstance_StateReset(t *testing.T) {
+func TestLurkInstance_StateReset(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -253,7 +253,7 @@ func TestHuntInstance_StateReset(t *testing.T) {
 	store.EXPECT().ResetState(gomock.Any(), database.AppSonarr, instID).Return(nil)
 	store.EXPECT().IsProcessed(gomock.Any(), database.AppSonarr, instID, gomock.Any(), "missing").Return(false, nil).AnyTimes()
 	store.EXPECT().MarkProcessed(gomock.Any(), database.AppSonarr, instID, gomock.Any(), "missing").Return(nil).AnyTimes()
-	store.EXPECT().AddHuntHistory(gomock.Any(), database.AppSonarr, instID, gomock.Any(), gomock.Any(), gomock.Any(), "missing").Return(nil).AnyTimes()
+	store.EXPECT().AddLurkHistory(gomock.Any(), database.AppSonarr, instID, gomock.Any(), gomock.Any(), gomock.Any(), "missing").Return(nil).AnyTimes()
 	store.EXPECT().IncrementStats(gomock.Any(), database.AppSonarr, instID, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	store.EXPECT().IncrementHourlyHits(gomock.Any(), database.AppSonarr, instID, gomock.Any()).Return(nil).AnyTimes()
 
@@ -261,14 +261,14 @@ func TestHuntInstance_StateReset(t *testing.T) {
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
-	settings := &database.AppSettings{HourlyCap: 10, HuntMissingCount: 5}
+	settings := &database.AppSettings{HourlyCap: 10, LurkMissingCount: 5}
 	inst := database.AppInstance{ID: instID, Name: "test", APIURL: srv.URL, APIKey: "k"}
 
-	_ = e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	_ = e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	// ResetState expectation with Times(1) (implicit) verifies it was called
 }
 
-func TestHuntInstance_MinDownloadQueueSize(t *testing.T) {
+func TestLurkInstance_MinDownloadQueueSize(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -290,22 +290,22 @@ func TestHuntInstance_MinDownloadQueueSize(t *testing.T) {
 		APITimeout: 30, SSLVerify: true, StatefulResetHours: 24, MinDownloadQueueSize: 5,
 	}, nil)
 	store.EXPECT().GetLastReset(gomock.Any(), database.AppSonarr, instID).Return(nil, nil)
-	// No IncrementStats or AddHuntHistory expected — queue at capacity
+	// No IncrementStats or AddLurkHistory expected — queue at capacity
 
 	logger := newTestLogger(ctrl)
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
-	settings := &database.AppSettings{HourlyCap: 10, HuntMissingCount: 5}
+	settings := &database.AppSettings{HourlyCap: 10, LurkMissingCount: 5}
 	inst := database.AppInstance{ID: instID, Name: "test", APIURL: srv.URL, APIKey: "k"}
 
-	err := e.huntInstance(context.Background(), log, database.AppSonarr, settings, inst)
+	err := e.lurkInstance(context.Background(), log, database.AppSonarr, settings, inst)
 	if err != nil {
-		t.Fatalf("huntInstance error: %v", err)
+		t.Fatalf("lurkInstance error: %v", err)
 	}
 }
 
-func TestHuntMissing_FetchError(t *testing.T) {
+func TestLurkMissing_FetchError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -319,17 +319,17 @@ func TestHuntMissing_FetchError(t *testing.T) {
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
-	settings := &database.AppSettings{HourlyCap: 10, HuntMissingCount: 5}
+	settings := &database.AppSettings{HourlyCap: 10, LurkMissingCount: 5}
 	inst := database.AppInstance{ID: uuid.New(), Name: "test", APIURL: srv.URL, APIKey: "k"}
 	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
 
-	count := e.huntMissing(context.Background(), log, database.AppSonarr, settings, inst, client, 5)
+	count := e.lurkMissing(context.Background(), log, database.AppSonarr, settings, inst, client, 5)
 	if count != 0 {
-		t.Errorf("expected 0 hunted on error, got %d", count)
+		t.Errorf("expected 0 lurked on error, got %d", count)
 	}
 }
 
-func TestHuntUpgrades_NoUpgrades(t *testing.T) {
+func TestLurkUpgrades_NoUpgrades(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -340,17 +340,17 @@ func TestHuntUpgrades_NoUpgrades(t *testing.T) {
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
-	settings := &database.AppSettings{HourlyCap: 10, HuntUpgradeCount: 5}
+	settings := &database.AppSettings{HourlyCap: 10, LurkUpgradeCount: 5}
 	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
 	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
 
-	count := e.huntUpgrades(context.Background(), log, database.AppSonarr, settings, inst, client, 5)
+	count := e.lurkUpgrades(context.Background(), log, database.AppSonarr, settings, inst, client, 5)
 	if count != 0 {
 		t.Errorf("expected 0, got %d", count)
 	}
 }
 
-func TestHuntUpgrades_WithItems(t *testing.T) {
+func TestLurkUpgrades_WithItems(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
@@ -364,7 +364,7 @@ func TestHuntUpgrades_WithItems(t *testing.T) {
 	instID := uuid.New()
 	store.EXPECT().IsProcessed(gomock.Any(), database.AppSonarr, instID, gomock.Any(), "upgrade").Return(false, nil).Times(2)
 	store.EXPECT().MarkProcessed(gomock.Any(), database.AppSonarr, instID, gomock.Any(), "upgrade").Return(nil).Times(2)
-	store.EXPECT().AddHuntHistory(gomock.Any(), database.AppSonarr, instID, "test", gomock.Any(), gomock.Any(), "upgrade").Return(nil).Times(2)
+	store.EXPECT().AddLurkHistory(gomock.Any(), database.AppSonarr, instID, "test", gomock.Any(), gomock.Any(), "upgrade").Return(nil).Times(2)
 	store.EXPECT().IncrementStats(gomock.Any(), database.AppSonarr, instID, int64(0), int64(2)).Return(nil)
 	store.EXPECT().IncrementHourlyHits(gomock.Any(), database.AppSonarr, instID, 2).Return(nil)
 
@@ -372,17 +372,17 @@ func TestHuntUpgrades_WithItems(t *testing.T) {
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
-	settings := &database.AppSettings{HourlyCap: 10, HuntUpgradeCount: 5}
+	settings := &database.AppSettings{HourlyCap: 10, LurkUpgradeCount: 5}
 	inst := database.AppInstance{ID: instID, Name: "test"}
 	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
 
-	count := e.huntUpgrades(context.Background(), log, database.AppSonarr, settings, inst, client, 5)
+	count := e.lurkUpgrades(context.Background(), log, database.AppSonarr, settings, inst, client, 5)
 	if count != 2 {
 		t.Errorf("expected 2, got %d", count)
 	}
 }
 
-func TestGetMissingItems_NilHunter(t *testing.T) {
+func TestGetMissingItems_NilLurker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	logger := newTestLogger(ctrl)
@@ -398,7 +398,7 @@ func TestGetMissingItems_NilHunter(t *testing.T) {
 	}
 }
 
-func TestGetUpgradeItems_NilHunter(t *testing.T) {
+func TestGetUpgradeItems_NilLurker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	logger := newTestLogger(ctrl)
@@ -414,7 +414,7 @@ func TestGetUpgradeItems_NilHunter(t *testing.T) {
 	}
 }
 
-func TestTriggerSearch_NilHunter(t *testing.T) {
+func TestTriggerSearch_NilLurker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	logger := newTestLogger(ctrl)
@@ -427,7 +427,7 @@ func TestTriggerSearch_NilHunter(t *testing.T) {
 	}
 }
 
-func TestHuntLoopSettingsError(t *testing.T) {
+func TestLurkLoopSettingsError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetAppSettings(gomock.Any(), database.AppSonarr).Return(nil, context.DeadlineExceeded).AnyTimes()
@@ -442,10 +442,10 @@ func TestHuntLoopSettingsError(t *testing.T) {
 		cancel()
 	}()
 
-	e.huntLoop(ctx, database.AppSonarr) // should exit via cancel
+	e.lurkLoop(ctx, database.AppSonarr) // should exit via cancel
 }
 
-func TestHuntLoopInstancesError(t *testing.T) {
+func TestLurkLoopInstancesError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetAppSettings(gomock.Any(), database.AppSonarr).Return(
@@ -463,10 +463,10 @@ func TestHuntLoopInstancesError(t *testing.T) {
 		cancel()
 	}()
 
-	e.huntLoop(ctx, database.AppSonarr)
+	e.lurkLoop(ctx, database.AppSonarr)
 }
 
-func TestHuntLoopNoInstances(t *testing.T) {
+func TestLurkLoopNoInstances(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetAppSettings(gomock.Any(), database.AppSonarr).Return(
@@ -484,5 +484,5 @@ func TestHuntLoopNoInstances(t *testing.T) {
 		cancel()
 	}()
 
-	e.huntLoop(ctx, database.AppSonarr) // zero instances → sleep → cancel
+	e.lurkLoop(ctx, database.AppSonarr) // zero instances → sleep → cancel
 }

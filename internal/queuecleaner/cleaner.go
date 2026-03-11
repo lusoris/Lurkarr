@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/lusoris/lurkarr/internal/hunting"
+	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
@@ -56,7 +56,7 @@ func (c *Cleaner) SetNotifier(n notifications.Notifier) {
 func (c *Cleaner) Start(ctx context.Context) {
 	ctx, c.cancel = context.WithCancel(ctx)
 	for _, appType := range database.AllAppTypes() {
-		if hunting.HunterFor(appType) == nil {
+		if lurking.LurkerFor(appType) == nil {
 			continue
 		}
 		c.wg.Add(1)
@@ -121,8 +121,8 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance) {
 	log = log.With("instance", inst.Name)
 
-	hunter := hunting.HunterFor(appType)
-	if hunter == nil {
+	lurker := lurking.LurkerFor(appType)
+	if lurker == nil {
 		return
 	}
 
@@ -138,7 +138,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		genSettings.SSLVerify,
 	)
 
-	queue, err := hunter.GetQueue(ctx, client)
+	queue, err := lurker.GetQueue(ctx, client)
 	if err != nil {
 		log.Error("failed to get queue", "error", err)
 		return

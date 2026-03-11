@@ -324,7 +324,7 @@ func TestCheckInstance_UnsupportedAppType(t *testing.T) {
 
 	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
 	log := logger.ForApp("prowlarr")
-	// HunterFor returns nil for prowlarr → should return early
+	// LurkerFor returns nil for prowlarr → should return early
 	imp.checkInstance(ctx, log, database.AppProwlarr, inst)
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/database"
 )
 
-// HistoryHandler handles hunt history endpoints.
+// HistoryHandler handles lurk history endpoints.
 type HistoryHandler struct {
 	DB Store
 }
@@ -32,7 +32,7 @@ func (h *HistoryHandler) HandleListHistory(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	items, total, err := h.DB.ListHuntHistory(r.Context(), q)
+	items, total, err := h.DB.ListLurkHistory(r.Context(), q)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load history"))
 		return

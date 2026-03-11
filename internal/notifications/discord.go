@@ -101,7 +101,7 @@ func (d *Discord) post(ctx context.Context, payload any) error {
 
 func discordColor(et EventType) int {
 	switch et {
-	case EventHuntCompleted:
+	case EventLurkCompleted:
 		return 0x2ECC71 // green
 	case EventQueueItemRemoved:
 		return 0xE67E22 // orange

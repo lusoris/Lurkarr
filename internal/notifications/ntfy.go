@@ -70,7 +70,7 @@ func (n *Ntfy) Test(ctx context.Context) error {
 
 func ntfyTag(et EventType) string {
 	switch et {
-	case EventHuntCompleted:
+	case EventLurkCompleted:
 		return "white_check_mark"
 	case EventQueueItemRemoved:
 		return "wastebasket"

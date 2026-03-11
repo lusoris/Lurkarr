@@ -37,9 +37,9 @@
 
 	interface AppSettings {
 		app_type: string;
-		hunt_missing_count: number;
-		hunt_upgrade_count: number;
-		hunt_missing_mode: string;
+		lurk_missing_count: number;
+		lurk_upgrade_count: number;
+		lurk_missing_mode: string;
 		upgrade_mode: string;
 		sleep_duration: number;
 		monitored_only: boolean;
@@ -150,7 +150,7 @@
 
 	const tabs: { id: Tab; label: string }[] = [
 		{ id: 'general', label: 'General' },
-		{ id: 'apps', label: 'Hunt Settings' },
+		{ id: 'apps', label: 'Lurk Settings' },
 		{ id: 'prowlarr', label: 'Prowlarr' },
 		{ id: 'sabnzbd', label: 'SABnzbd' }
 	];
@@ -189,10 +189,10 @@
 		</Card>
 	{/if}
 
-	<!-- Per-App Hunt Settings -->
+	<!-- Per-App Lurk Settings -->
 	{#if activeTab === 'apps'}
 		<Card>
-			<h2 class="text-lg font-semibold text-surface-200 mb-4">Hunt Settings</h2>
+			<h2 class="text-lg font-semibold text-surface-200 mb-4">Lurk Settings</h2>
 			<div class="flex gap-1 mb-4 rounded-lg bg-surface-800/50 p-1">
 				{#each appTypes as app}
 					<button
@@ -207,13 +207,13 @@
 			{#if settings}
 				<div class="space-y-4">
 					<div class="grid grid-cols-2 gap-4">
-						<Input bind:value={settings.hunt_missing_count} type="number" label="Hunt Missing Count" />
-						<Input bind:value={settings.hunt_upgrade_count} type="number" label="Hunt Upgrade Count" />
+						<Input bind:value={settings.lurk_missing_count} type="number" label="Lurk Missing Count" />
+						<Input bind:value={settings.lurk_upgrade_count} type="number" label="Lurk Upgrade Count" />
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<label class="block">
 							<span class="block text-sm font-medium text-surface-300 mb-1.5">Missing Mode</span>
-							<select bind:value={settings.hunt_missing_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+							<select bind:value={settings.lurk_missing_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
 								<option value="oldest">Oldest First</option>
 								<option value="newest">Newest First</option>
 								<option value="random">Random</option>

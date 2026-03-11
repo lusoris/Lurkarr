@@ -189,12 +189,12 @@ func (db *DB) ListEnabledInstances(ctx context.Context, appType AppType) ([]AppI
 func (db *DB) GetAppSettings(ctx context.Context, appType AppType) (*AppSettings, error) {
 	var s AppSettings
 	err := db.Pool.QueryRow(ctx,
-		`SELECT app_type, hunt_missing_count, hunt_upgrade_count, hunt_missing_mode,
+		`SELECT app_type, lurk_missing_count, lurk_upgrade_count, lurk_missing_mode,
 		        upgrade_mode, sleep_duration, monitored_only, skip_future,
 		        hourly_cap, random_selection, debug_mode
 		 FROM app_settings WHERE app_type = $1`,
 		string(appType),
-	).Scan(&s.AppType, &s.HuntMissingCount, &s.HuntUpgradeCount, &s.HuntMissingMode,
+	).Scan(&s.AppType, &s.LurkMissingCount, &s.LurkUpgradeCount, &s.LurkMissingMode,
 		&s.UpgradeMode, &s.SleepDuration, &s.MonitoredOnly, &s.SkipFuture,
 		&s.HourlyCap, &s.RandomSelection, &s.DebugMode)
 	if err != nil {
@@ -206,11 +206,11 @@ func (db *DB) GetAppSettings(ctx context.Context, appType AppType) (*AppSettings
 func (db *DB) UpdateAppSettings(ctx context.Context, s *AppSettings) error {
 	_, err := db.Pool.Exec(ctx,
 		`UPDATE app_settings SET
-		    hunt_missing_count = $1, hunt_upgrade_count = $2, hunt_missing_mode = $3,
+		    lurk_missing_count = $1, lurk_upgrade_count = $2, lurk_missing_mode = $3,
 		    upgrade_mode = $4, sleep_duration = $5, monitored_only = $6, skip_future = $7,
 		    hourly_cap = $8, random_selection = $9, debug_mode = $10
 		 WHERE app_type = $11`,
-		s.HuntMissingCount, s.HuntUpgradeCount, s.HuntMissingMode,
+		s.LurkMissingCount, s.LurkUpgradeCount, s.LurkMissingMode,
 		s.UpgradeMode, s.SleepDuration, s.MonitoredOnly, s.SkipFuture,
 		s.HourlyCap, s.RandomSelection, s.DebugMode, string(s.AppType),
 	)
@@ -320,11 +320,11 @@ func (db *DB) GetLastReset(ctx context.Context, appType AppType, instanceID uuid
 	return &t, nil
 }
 
-// --- Hunt History ---
+// --- Lurk History ---
 
-func (db *DB) AddHuntHistory(ctx context.Context, appType AppType, instanceID uuid.UUID, instanceName string, mediaID int, mediaTitle, operation string) error {
+func (db *DB) AddLurkHistory(ctx context.Context, appType AppType, instanceID uuid.UUID, instanceName string, mediaID int, mediaTitle, operation string) error {
 	_, err := db.Pool.Exec(ctx,
-		`INSERT INTO hunt_history (app_type, instance_id, instance_name, media_id, media_title, operation)
+		`INSERT INTO lurk_history (app_type, instance_id, instance_name, media_id, media_title, operation)
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
 		string(appType), instanceID, instanceName, mediaID, mediaTitle, operation,
 	)
@@ -338,7 +338,7 @@ type HistoryQuery struct {
 	Offset  int
 }
 
-func (db *DB) ListHuntHistory(ctx context.Context, q HistoryQuery) ([]HuntHistory, int, error) {
+func (db *DB) ListLurkHistory(ctx context.Context, q HistoryQuery) ([]LurkHistory, int, error) {
 	args := []any{}
 	where := "WHERE 1=1"
 	argN := 1
@@ -357,14 +357,14 @@ func (db *DB) ListHuntHistory(ctx context.Context, q HistoryQuery) ([]HuntHistor
 	var total int
 	countArgs := make([]any, len(args))
 	copy(countArgs, args)
-	err := db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM hunt_history "+where, countArgs...).Scan(&total)
+	err := db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM lurk_history "+where, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	query := fmt.Sprintf(
 		`SELECT id, app_type, instance_id, instance_name, media_id, media_title, operation, created_at
-		 FROM hunt_history %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
+		 FROM lurk_history %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
 		where, argN, argN+1,
 	)
 	args = append(args, q.Limit, q.Offset)
@@ -375,9 +375,9 @@ func (db *DB) ListHuntHistory(ctx context.Context, q HistoryQuery) ([]HuntHistor
 	}
 	defer rows.Close()
 
-	var results []HuntHistory
+	var results []LurkHistory
 	for rows.Next() {
-		var h HuntHistory
+		var h LurkHistory
 		if err := rows.Scan(&h.ID, &h.AppType, &h.InstanceID, &h.InstanceName, &h.MediaID, &h.MediaTitle, &h.Operation, &h.CreatedAt); err != nil {
 			return nil, 0, err
 		}
@@ -388,38 +388,38 @@ func (db *DB) ListHuntHistory(ctx context.Context, q HistoryQuery) ([]HuntHistor
 }
 
 func (db *DB) DeleteHistory(ctx context.Context, appType AppType) error {
-	_, err := db.Pool.Exec(ctx, `DELETE FROM hunt_history WHERE app_type = $1`, string(appType))
+	_, err := db.Pool.Exec(ctx, `DELETE FROM lurk_history WHERE app_type = $1`, string(appType))
 	return err
 }
 
-// --- Hunt Stats ---
+// --- Lurk Stats ---
 
-func (db *DB) GetAllStats(ctx context.Context) ([]HuntStats, error) {
+func (db *DB) GetAllStats(ctx context.Context) ([]LurkStats, error) {
 	rows, err := db.Pool.Query(ctx,
-		`SELECT app_type, instance_id, hunted, upgraded, updated_at FROM hunt_stats ORDER BY app_type, instance_id`,
+		`SELECT app_type, instance_id, lurked, upgraded, updated_at FROM lurk_stats ORDER BY app_type, instance_id`,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByPos[HuntStats])
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[LurkStats])
 }
 
-func (db *DB) IncrementStats(ctx context.Context, appType AppType, instanceID uuid.UUID, hunted, upgraded int64) error {
+func (db *DB) IncrementStats(ctx context.Context, appType AppType, instanceID uuid.UUID, lurked, upgraded int64) error {
 	_, err := db.Pool.Exec(ctx,
-		`INSERT INTO hunt_stats (app_type, instance_id, hunted, upgraded, updated_at)
+		`INSERT INTO lurk_stats (app_type, instance_id, lurked, upgraded, updated_at)
 		 VALUES ($1, $2, $3, $4, now())
 		 ON CONFLICT (app_type, instance_id) DO UPDATE SET
-		   hunted = hunt_stats.hunted + $3,
-		   upgraded = hunt_stats.upgraded + $4,
+		   lurked = lurk_stats.lurked + $3,
+		   upgraded = lurk_stats.upgraded + $4,
 		   updated_at = now()`,
-		string(appType), instanceID, hunted, upgraded,
+		string(appType), instanceID, lurked, upgraded,
 	)
 	return err
 }
 
 func (db *DB) ResetStats(ctx context.Context) error {
 	_, err := db.Pool.Exec(ctx,
-		`UPDATE hunt_stats SET hunted = 0, upgraded = 0, updated_at = now()`,
+		`UPDATE lurk_stats SET lurked = 0, upgraded = 0, updated_at = now()`,
 	)
 	return err
 }

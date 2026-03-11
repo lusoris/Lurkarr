@@ -86,7 +86,7 @@ func TestBuildProviderAllTypes(t *testing.T) {
 			p, pt, _, err := BuildProvider(ProviderConfig{
 				Type:   tt.provType,
 				Config: cfgBytes,
-				Events: []string{"hunt_completed", "error"},
+				Events: []string{"lurk_completed", "error"},
 			})
 
 			if tt.wantErr {
@@ -114,7 +114,7 @@ func TestBuildProviderEvents(t *testing.T) {
 	_, _, events, err := BuildProvider(ProviderConfig{
 		Type:   "discord",
 		Config: cfg,
-		Events: []string{"hunt_completed", "error", "download_stuck"},
+		Events: []string{"lurk_completed", "error", "download_stuck"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestLoadProviders(t *testing.T) {
 		{
 			Type:   "discord",
 			Config: mustJSON(map[string]any{"webhook_url": "https://discord.com/wh"}),
-			Events: []string{"hunt_completed"},
+			Events: []string{"lurk_completed"},
 		},
 		{
 			Type:   "telegram",
@@ -203,7 +203,7 @@ func TestLoadProvidersSendsNotifications(t *testing.T) {
 		{
 			Type:   "discord",
 			Config: mustJSON(map[string]any{"webhook_url": "https://discord.com/wh"}),
-			Events: []string{"hunt_completed"},
+			Events: []string{"lurk_completed"},
 		},
 	}
 	if err := m.LoadProviders(configs); err != nil {
@@ -241,7 +241,7 @@ func TestSyncManagerIntegration(t *testing.T) {
 		{
 			Type:   "discord",
 			Config: mustJSON(map[string]any{"webhook_url": "https://discord.com/wh"}),
-			Events: []string{"hunt_completed"},
+			Events: []string{"lurk_completed"},
 		},
 	}
 	if err := m.LoadProviders(configs); err != nil {
@@ -250,7 +250,7 @@ func TestSyncManagerIntegration(t *testing.T) {
 
 	// Notify should not panic even though discord webhook is fake.
 	m.Notify(context.Background(), Event{
-		Type:    EventHuntCompleted,
+		Type:    EventLurkCompleted,
 		Title:   "Test",
 		Message: "test",
 	})

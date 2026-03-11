@@ -62,7 +62,7 @@ func newTestSchedulerHandler(t *testing.T, ctrl *gomock.Controller) (*SchedulerH
 func TestHandleGetStats(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	store.EXPECT().GetAllStats(gomock.Any()).Return([]database.HuntStats{{AppType: "sonarr"}}, nil)
+	store.EXPECT().GetAllStats(gomock.Any()).Return([]database.LurkStats{{AppType: "sonarr"}}, nil)
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
 	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/stats", nil))
@@ -138,7 +138,7 @@ func TestHandleGetHourlyCaps_Error(t *testing.T) {
 func TestHandleListHistory(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	store.EXPECT().ListHuntHistory(gomock.Any(), gomock.Any()).Return([]database.HuntHistory{{MediaTitle: "Test"}}, 1, nil)
+	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return([]database.LurkHistory{{MediaTitle: "Test"}}, 1, nil)
 	h := &HistoryHandler{DB: store}
 	w := httptest.NewRecorder()
 	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history", nil))
@@ -150,8 +150,8 @@ func TestHandleListHistory(t *testing.T) {
 func TestHandleListHistory_WithParams(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	store.EXPECT().ListHuntHistory(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ interface{}, q database.HistoryQuery) ([]database.HuntHistory, int, error) {
+	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ interface{}, q database.HistoryQuery) ([]database.LurkHistory, int, error) {
 			if q.Limit != 100 {
 				t.Errorf("expected limit 100, got %d", q.Limit)
 			}
@@ -174,7 +174,7 @@ func TestHandleListHistory_WithParams(t *testing.T) {
 func TestHandleListHistory_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	store.EXPECT().ListHuntHistory(gomock.Any(), gomock.Any()).Return(nil, 0, errors.New("fail"))
+	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return(nil, 0, errors.New("fail"))
 	h := &HistoryHandler{DB: store}
 	w := httptest.NewRecorder()
 	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history", nil))
@@ -262,7 +262,7 @@ func TestHandleUpdateAppSettings(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().UpdateAppSettings(gomock.Any(), gomock.Any()).Return(nil)
 	h := &SettingsHandler{DB: store}
-	body, _ := json.Marshal(database.AppSettings{HuntMissingCount: 10, HuntUpgradeCount: 5, SleepDuration: 15})
+	body, _ := json.Marshal(database.AppSettings{LurkMissingCount: 10, LurkUpgradeCount: 5, SleepDuration: 15})
 	w := httptest.NewRecorder()
 	h.HandleUpdateAppSettings(w, reqWithPathValue("PUT", "/api/settings/sonarr", body, "app", "sonarr"))
 	if w.Code != 200 {
@@ -304,11 +304,11 @@ func TestHandleUpdateAppSettings_NegativeHourlyCap(t *testing.T) {
 	}
 }
 
-func TestHandleUpdateAppSettings_NegativeHuntCounts(t *testing.T) {
+func TestHandleUpdateAppSettings_NegativeLurkCounts(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	h := &SettingsHandler{DB: store}
-	body, _ := json.Marshal(database.AppSettings{HuntMissingCount: -1})
+	body, _ := json.Marshal(database.AppSettings{LurkMissingCount: -1})
 	w := httptest.NewRecorder()
 	h.HandleUpdateAppSettings(w, reqWithPathValue("PUT", "/api/settings/sonarr", body, "app", "sonarr"))
 	if w.Code != 400 {
@@ -333,7 +333,7 @@ func TestHandleUpdateAppSettings_DBError(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().UpdateAppSettings(gomock.Any(), gomock.Any()).Return(errors.New("fail"))
 	h := &SettingsHandler{DB: store}
-	body, _ := json.Marshal(database.AppSettings{HuntMissingCount: 10, HuntUpgradeCount: 5, SleepDuration: 15})
+	body, _ := json.Marshal(database.AppSettings{LurkMissingCount: 10, LurkUpgradeCount: 5, SleepDuration: 15})
 	w := httptest.NewRecorder()
 	h.HandleUpdateAppSettings(w, reqWithPathValue("PUT", "/api/settings/sonarr", body, "app", "sonarr"))
 	if w.Code != 500 {

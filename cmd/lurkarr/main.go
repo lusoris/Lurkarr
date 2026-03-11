@@ -13,7 +13,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/autoimport"
 	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/lusoris/lurkarr/internal/hunting"
+	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/queuecleaner"
@@ -83,7 +83,7 @@ func run() error {
 		}
 	}
 
-	engine := hunting.New(db, logger)
+	engine := lurking.New(db, logger)
 	engine.SetNotifier(notifMgr)
 	engine.Start(ctx)
 	defer engine.Stop()

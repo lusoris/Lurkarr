@@ -314,7 +314,7 @@ func TestCleanInstance_UnsupportedAppType(t *testing.T) {
 	log := logger.ForApp("prowlarr")
 	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
 
-	// HunterFor returns nil for prowlarr
+	// LurkerFor returns nil for prowlarr
 	c.cleanInstance(context.Background(), log, database.AppProwlarr, defaultQCSettings(), inst)
 }
 

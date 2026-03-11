@@ -17,7 +17,7 @@ go install go.uber.org/mock/mockgen@latest
 ## Mock Generation (//go:generate)
 
 ```go
-//go:generate mockgen -destination=mocks/mock_store.go -package=mocks github.com/lusoris/lurkarr/internal/hunting Store
+//go:generate mockgen -destination=mocks/mock_store.go -package=mocks github.com/lusoris/lurkarr/internal/lurking Store
 ```
 
 Or with source mode:
@@ -41,7 +41,7 @@ func TestEngine(t *testing.T) {
         Times(1)
 
     // Create SUT with mock
-    engine := hunting.New(mockStore, logger)
+    engine := lurking.New(mockStore, logger)
     engine.Run(ctx)
 }
 ```
@@ -104,8 +104,8 @@ gomock.InOrder(
 | Package | Interface | File |
 |---------|-----------|------|
 | queuecleaner | Store | cleaner.go |
-| hunting | ArrHunter | hunter.go |
-| hunting | Store | engine.go |
+| lurking | ArrLurker | lurker.go |
+| lurking | Store | engine.go |
 | autoimport | Store | importer.go |
 | logging | LogStore | logger.go |
 | api | Store | store.go |

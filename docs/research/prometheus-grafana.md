@@ -10,25 +10,25 @@
 
 | Type | Use Case | Lurkarr Example |
 |------|----------|-----------------|
-| Counter | Monotonically increasing | `hunt_searches_total`, `errors_total` |
+| Counter | Monotonically increasing | `lurk_searches_total`, `errors_total` |
 | Gauge | Can go up/down | `download_client_queue_size`, `paused` |
-| Histogram | Distributions/latencies | `hunt_duration_seconds`, `http_request_duration_seconds` |
+| Histogram | Distributions/latencies | `lurk_duration_seconds`, `http_request_duration_seconds` |
 | Summary | Pre-calculated quantiles | (not used — histograms preferred) |
 
 ### Registration with promauto
 
 ```go
-var HuntSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+var LurkSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
     Namespace: "lurkarr",
-    Subsystem: "hunt",
+    Subsystem: "lurk",
     Name:      "searches_total",
-    Help:      "Total number of hunt searches triggered.",
+    Help:      "Total number of lurk searches triggered.",
 }, []string{"app_type", "instance"})
 ```
 
 ### Current Lurkarr Metrics
 
-**Hunting:** searches_total, missing_found_total, upgrades_found_total, duration_seconds, errors_total
+**Lurking:** searches_total, missing_found_total, upgrades_found_total, duration_seconds, errors_total
 **Queue Cleaner:** items_removed_total, strikes_total, blocklist_additions_total, run_duration_seconds
 **Download Client:** queue_size (gauge), speed_bytes_per_second (gauge), paused (gauge)
 **Scheduler:** executions_total, duration_seconds, errors_total
@@ -37,7 +37,7 @@ var HuntSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 
 ### Naming Conventions (Prometheus best practices)
 
-- `namespace_subsystem_name_unit` (e.g. `lurkarr_hunt_duration_seconds`)
+- `namespace_subsystem_name_unit` (e.g. `lurkarr_lurk_duration_seconds`)
 - Use `_total` suffix for counters
 - Use `_seconds` for durations
 - Use `_bytes` for sizes
@@ -67,7 +67,7 @@ var HuntSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
       {
         "name": "app_type",
         "type": "query",
-        "query": "label_values(lurkarr_hunt_searches_total, app_type)"
+        "query": "label_values(lurkarr_lurk_searches_total, app_type)"
       }
     ]
   },
@@ -78,7 +78,7 @@ var HuntSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 
 ### Planned Dashboards (10)
 
-1. **Hunting** — search rates, missing/upgrade trends, errors, duration histograms per app/instance
+1. **Lurking** — search rates, missing/upgrade trends, errors, duration histograms per app/instance
 2. **Queue Cleaner** — strikes, removals, blocklist, stalled/slow/failed breakdown
 3. **Download Clients** — queue sizes, speeds, paused states per client
 4. **Auto-Import** — runs, success/error, score distributions
@@ -92,14 +92,14 @@ var HuntSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 ### PromQL Examples
 
 ```promql
-# Hunt searches per hour
-sum(rate(lurkarr_hunt_searches_total[1h])) by (app_type)
+# Lurk searches per hour
+sum(rate(lurkarr_lurk_searches_total[1h])) by (app_type)
 
-# P95 hunt duration
-histogram_quantile(0.95, rate(lurkarr_hunt_duration_seconds_bucket[5m]))
+# P95 lurk duration
+histogram_quantile(0.95, rate(lurkarr_lurk_duration_seconds_bucket[5m]))
 
 # Error rate percentage
-sum(rate(lurkarr_hunt_errors_total[5m])) / sum(rate(lurkarr_hunt_searches_total[5m])) * 100
+sum(rate(lurkarr_lurk_errors_total[5m])) / sum(rate(lurkarr_lurk_searches_total[5m])) * 100
 
 # Current download speed
 lurkarr_download_client_speed_bytes_per_second{direction="download"}

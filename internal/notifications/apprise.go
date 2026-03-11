@@ -79,7 +79,7 @@ func appriseType(et EventType) string {
 	switch et {
 	case EventError, EventDownloadStuck:
 		return "failure"
-	case EventHuntCompleted:
+	case EventLurkCompleted:
 		return "success"
 	default:
 		return "info"

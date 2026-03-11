@@ -187,10 +187,10 @@ func (mr *MockStoreMockRecorder) GetAllHourlyCaps(ctx any) *gomock.Call {
 }
 
 // GetAllStats mocks base method.
-func (m *MockStore) GetAllStats(ctx context.Context) ([]database.HuntStats, error) {
+func (m *MockStore) GetAllStats(ctx context.Context) ([]database.LurkStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllStats", ctx)
-	ret0, _ := ret[0].([]database.HuntStats)
+	ret0, _ := ret[0].([]database.LurkStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -411,22 +411,6 @@ func (mr *MockStoreMockRecorder) ListEnabledNotificationProviders(ctx any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledNotificationProviders", reflect.TypeOf((*MockStore)(nil).ListEnabledNotificationProviders), ctx)
 }
 
-// ListHuntHistory mocks base method.
-func (m *MockStore) ListHuntHistory(ctx context.Context, q database.HistoryQuery) ([]database.HuntHistory, int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListHuntHistory", ctx, q)
-	ret0, _ := ret[0].([]database.HuntHistory)
-	ret1, _ := ret[1].(int)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// ListHuntHistory indicates an expected call of ListHuntHistory.
-func (mr *MockStoreMockRecorder) ListHuntHistory(ctx, q any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListHuntHistory", reflect.TypeOf((*MockStore)(nil).ListHuntHistory), ctx, q)
-}
-
 // ListInstances mocks base method.
 func (m *MockStore) ListInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error) {
 	m.ctrl.T.Helper()
@@ -440,6 +424,22 @@ func (m *MockStore) ListInstances(ctx context.Context, appType database.AppType)
 func (mr *MockStoreMockRecorder) ListInstances(ctx, appType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstances", reflect.TypeOf((*MockStore)(nil).ListInstances), ctx, appType)
+}
+
+// ListLurkHistory mocks base method.
+func (m *MockStore) ListLurkHistory(ctx context.Context, q database.HistoryQuery) ([]database.LurkHistory, int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListLurkHistory", ctx, q)
+	ret0, _ := ret[0].([]database.LurkHistory)
+	ret1, _ := ret[1].(int)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListLurkHistory indicates an expected call of ListLurkHistory.
+func (mr *MockStoreMockRecorder) ListLurkHistory(ctx, q any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLurkHistory", reflect.TypeOf((*MockStore)(nil).ListLurkHistory), ctx, q)
 }
 
 // ListNotificationProviders mocks base method.

@@ -27,7 +27,7 @@
       "title": "Total Searches (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_hunt_searches_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_searches_total[24h]))",
         "legendFormat": "searches"
       }]
     },
@@ -45,7 +45,7 @@
       "title": "Missing Found (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_hunt_missing_found_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_missing_found_total[24h]))",
         "legendFormat": "missing"
       }]
     },
@@ -63,7 +63,7 @@
       "title": "Upgrades Found (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_hunt_upgrades_found_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_upgrades_found_total[24h]))",
         "legendFormat": "upgrades"
       }]
     },
@@ -78,10 +78,10 @@
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "id": 4,
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Hunt Errors (24h)",
+      "title": "Lurk Errors (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_hunt_errors_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_errors_total[24h]))",
         "legendFormat": "errors"
       }]
     },
@@ -126,7 +126,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
       "id": 101,
-      "title": "Hunting",
+      "title": "Lurking",
       "type": "row"
     },
     {
@@ -135,10 +135,10 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "id": 10,
       "options": { "tooltip": { "mode": "multi" } },
-      "title": "Hunt Searches per App Type",
+      "title": "Lurk Searches per App Type",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type) (rate(lurkarr_hunt_searches_total[$__rate_interval]))",
+        "expr": "sum by (app_type) (rate(lurkarr_lurk_searches_total[$__rate_interval]))",
         "legendFormat": "{{app_type}}"
       }]
     },
@@ -152,11 +152,11 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(lurkarr_hunt_missing_found_total[$__rate_interval]))",
+          "expr": "sum(rate(lurkarr_lurk_missing_found_total[$__rate_interval]))",
           "legendFormat": "missing"
         },
         {
-          "expr": "sum(rate(lurkarr_hunt_upgrades_found_total[$__rate_interval]))",
+          "expr": "sum(rate(lurkarr_lurk_upgrades_found_total[$__rate_interval]))",
           "legendFormat": "upgrades"
         }
       ]
@@ -166,10 +166,10 @@
       "fieldConfig": { "defaults": { "unit": "s" } },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
       "id": 12,
-      "title": "Hunt Duration (p95)",
+      "title": "Lurk Duration (p95)",
       "type": "timeseries",
       "targets": [{
-        "expr": "histogram_quantile(0.95, sum by (le, app_type) (rate(lurkarr_hunt_duration_seconds_bucket[$__rate_interval])))",
+        "expr": "histogram_quantile(0.95, sum by (le, app_type) (rate(lurkarr_lurk_duration_seconds_bucket[$__rate_interval])))",
         "legendFormat": "{{app_type}} p95"
       }]
     },
@@ -178,10 +178,10 @@
       "fieldConfig": { "defaults": { "unit": "short" } },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
       "id": 13,
-      "title": "Hunt Errors by App Type",
+      "title": "Lurk Errors by App Type",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type) (rate(lurkarr_hunt_errors_total[$__rate_interval]))",
+        "expr": "sum by (app_type) (rate(lurkarr_lurk_errors_total[$__rate_interval]))",
         "legendFormat": "{{app_type}}"
       }]
     },

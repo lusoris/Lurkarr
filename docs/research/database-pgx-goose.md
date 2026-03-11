@@ -160,8 +160,8 @@ goose -dir migrations postgres "postgres://user:pass@localhost/db" create add_fe
 
 ```sql
 -- Composite index for common query patterns
-CREATE INDEX idx_hunt_history_app_instance
-ON hunt_history (app_type, instance_id, created_at DESC);
+CREATE INDEX idx_lurk_history_app_instance
+ON lurk_history (app_type, instance_id, created_at DESC);
 
 -- Partial index for active items
 CREATE INDEX idx_queue_items_active

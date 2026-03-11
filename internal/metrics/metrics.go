@@ -6,43 +6,43 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// ── Hunting metrics ──────────────────────────────────────────────────────────
+// ── Lurking metrics ──────────────────────────────────────────────────────────
 
 var (
-	HuntSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	LurkSearchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "lurkarr",
-		Subsystem: "hunt",
+		Subsystem: "lurk",
 		Name:      "searches_total",
-		Help:      "Total number of hunt searches triggered.",
+		Help:      "Total number of lurk searches triggered.",
 	}, []string{"app_type", "instance"})
 
-	HuntMissingFound = promauto.NewCounterVec(prometheus.CounterOpts{
+	LurkMissingFound = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "lurkarr",
-		Subsystem: "hunt",
+		Subsystem: "lurk",
 		Name:      "missing_found_total",
-		Help:      "Total missing items found during hunts.",
+		Help:      "Total missing items found during lurks.",
 	}, []string{"app_type", "instance"})
 
-	HuntUpgradesFound = promauto.NewCounterVec(prometheus.CounterOpts{
+	LurkUpgradesFound = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "lurkarr",
-		Subsystem: "hunt",
+		Subsystem: "lurk",
 		Name:      "upgrades_found_total",
-		Help:      "Total upgrade candidates found during hunts.",
+		Help:      "Total upgrade candidates found during lurks.",
 	}, []string{"app_type", "instance"})
 
-	HuntDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	LurkDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "lurkarr",
-		Subsystem: "hunt",
+		Subsystem: "lurk",
 		Name:      "duration_seconds",
-		Help:      "Duration of hunt operations in seconds.",
+		Help:      "Duration of lurk operations in seconds.",
 		Buckets:   prometheus.DefBuckets,
 	}, []string{"app_type", "instance"})
 
-	HuntErrors = promauto.NewCounterVec(prometheus.CounterOpts{
+	LurkErrors = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "lurkarr",
-		Subsystem: "hunt",
+		Subsystem: "lurk",
 		Name:      "errors_total",
-		Help:      "Total hunt errors.",
+		Help:      "Total lurk errors.",
 	}, []string{"app_type", "instance"})
 )
 

@@ -11,7 +11,7 @@ internal/             # Private packages (not importable externally)
   cache/              # In-memory caching (otter)
   config/             # Configuration loading
   database/           # DB layer (pgx, goose migrations)
-  hunting/            # Business logic: hunting engine
+  lurking/            # Business logic: lurking engine
   logging/            # Structured logging
   metrics/            # Prometheus metrics
   middleware/         # HTTP middleware
@@ -54,7 +54,7 @@ type APIError struct {
 
 ```go
 // Small, focused interfaces
-type ArrHunter interface {
+type ArrLurker interface {
     GetMissing(ctx context.Context, url, apiKey string) ([]Item, error)
     GetUpgrades(ctx context.Context, url, apiKey string) ([]Item, error)
     Search(ctx context.Context, url, apiKey string, ids []int) error
@@ -127,7 +127,7 @@ func (s *State) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 ## Logging (slog)
 
 ```go
-slog.Info("hunt completed",
+slog.Info("lurk completed",
     "app_type", appType,
     "instance", instanceID,
     "missing_found", count,

@@ -13,7 +13,7 @@
 - [x] Import paths fixed (lusoris/lurkarr)
 - [x] Goroutine leak fixed (context.WithCancel)
 - [x] CSRF key via crypto/rand
-- [x] Settings cache eliminates DB reads per hunt cycle
+- [x] Settings cache eliminates DB reads per lurk cycle
 
 ## ✅ COMPLETED — Phase 1: Security Hardening
 
@@ -30,11 +30,11 @@
 - [x] Secure cookie flag configurable
 - [x] InsecureSkipVerify conditional on sslVerify setting
 
-## ✅ COMPLETED — Phase 2: Interface-Based Hunting Engine
+## ✅ COMPLETED — Phase 2: Interface-Based Lurking Engine
 
-- [x] ArrHunter interface (GetMissing, GetUpgrades, Search, GetQueue)
-- [x] 6 hunters: sonarr, radarr, lidarr, readarr, whisparr, eros
-- [x] HunterFor(appType) registry
+- [x] ArrLurker interface (GetMissing, GetUpgrades, Search, GetQueue)
+- [x] 6 lurkers: sonarr, radarr, lidarr, readarr, whisparr, eros
+- [x] LurkerFor(appType) registry
 - [x] Exponential backoff on arr API errors
 - [x] MinDownloadQueueSize enforcement
 - [x] Radarr /api/v3/wanted/missing paginated
@@ -44,7 +44,7 @@
 - [x] DB multi-instance support (app_instances table)
 - [x] Per-instance stats tracking
 - [x] Instance-level hourly caps
-- [x] Migration 003: instance-aware hunt_stats + hourly_caps
+- [x] Migration 003: instance-aware lurk_stats + hourly_caps
 
 ## ✅ COMPLETED — Phase 4: Queue Score Deduplication
 
@@ -104,7 +104,7 @@
 
 - [x] Prometheus metrics package (internal/metrics/)
 - [x] /metrics endpoint via promhttp.Handler
-- [x] Metrics: hunt (searches, missing, upgrades, duration, errors)
+- [x] Metrics: lurk (searches, missing, upgrades, duration, errors)
 - [x] Metrics: queue_cleaner (items_removed, strikes, blocklist, duration)
 - [x] Metrics: download_client (queue_size, speed, paused)
 - [x] Metrics: scheduler (executions, duration, errors)
@@ -146,7 +146,7 @@
 
 ## ✅ COMPLETED — DB Migrations (7 total, goose)
 
-- [x] 001: initial (users, sessions, app_instances, settings, hunt_history/stats)
+- [x] 001: initial (users, sessions, app_instances, settings, lurk_history/stats)
 - [x] 002: prowlarr/sabnzbd (indexer sync, history tracking)
 - [x] 003: instance-aware stats + hourly_caps
 - [x] 004: queue management (strikes, cleaner settings, scoring profiles, import/blocklist log)
@@ -188,11 +188,11 @@
 
 ### 16.4 Overlapping / Duplicate Code
 - [ ] **Whisparr/Eros ~95% identical** — same types, same endpoints, same methods. Consolidate with generics or shared helper.
-- [ ] **Prowlarr in AllAppTypes() wastes goroutines** — hunting, autoimport, and cleaner all start loops for Prowlarr that immediately no-op (no ArrHunter registered). Exclude from background service iterations.
+- [ ] **Prowlarr in AllAppTypes() wastes goroutines** — lurking, autoimport, and cleaner all start loops for Prowlarr that immediately no-op (no ArrLurker registered). Exclude from background service iterations.
 - [ ] SABnzbd triple implementation: native client, downloadclient adapter, and API handler all create clients independently.
 
 ### 16.5 Swallowed Errors in Background Services
-- [x] `hunting/engine.go`: Fixed 6 swallowed errors → `slog.Warn` on failure
+- [x] `lurking/engine.go`: Fixed 6 swallowed errors → `slog.Warn` on failure
 - [x] `queuecleaner/cleaner.go`: Fixed 4 swallowed errors → `slog.Warn` on failure
 - [x] `autoimport/importer.go`: Fixed 2 swallowed errors → `slog.Warn` on failure
 - [x] `cmd/lurkarr/main.go`: Fixed 7 swallowed errors (prune + maintenance) → `slog.Warn` on failure
@@ -225,7 +225,7 @@
 > **STATUS: NOT STARTED** — Currently manual wiring in main.go
 
 - [ ] Add go.uber.org/fx dependency
-- [ ] Define fx.Module per package (database, logging, hunting, scheduler, cleaner, etc.)
+- [ ] Define fx.Module per package (database, logging, lurking, scheduler, cleaner, etc.)
 - [ ] Refactor main.go from manual wiring to fx.New() app lifecycle
 - [ ] Use fx.Provide / fx.Invoke for service startup
 - [ ] Add fx.Lifecycle hooks for graceful shutdown (replaces manual defer chains)
@@ -235,7 +235,7 @@
 
 > **STATUS: PARTIAL** — 1 overview dashboard exists (460 lines), metrics endpoint + full monitoring stack deployed
 
-- [ ] Hunting Dashboard — per-app/instance search rates, missing/upgrade trends, error rates, duration histograms
+- [ ] Lurking Dashboard — per-app/instance search rates, missing/upgrade trends, error rates, duration histograms
 - [ ] Queue Cleaner Dashboard — strikes issued, items removed, blocklist additions, stalled/slow/failed breakdown
 - [ ] Download Clients Dashboard — queue sizes, speeds (up/down), paused states, per-client comparison
 - [ ] Auto-Import Dashboard — import runs, successes vs errors, score distributions

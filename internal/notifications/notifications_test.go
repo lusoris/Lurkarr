@@ -37,8 +37,8 @@ func TestManagerNotify(t *testing.T) {
 	m.Register(ProviderDiscord, p, nil)
 
 	m.Notify(context.Background(), Event{
-		Type:    EventHuntCompleted,
-		Title:   "Hunt Done",
+		Type:    EventLurkCompleted,
+		Title:   "Lurk Done",
 		Message: "Found 5 missing items",
 	})
 
@@ -47,8 +47,8 @@ func TestManagerNotify(t *testing.T) {
 	if len(p.sent) != 1 {
 		t.Fatalf("expected 1 sent, got %d", len(p.sent))
 	}
-	if p.sent[0].Title != "Hunt Done" {
-		t.Errorf("expected title 'Hunt Done', got %q", p.sent[0].Title)
+	if p.sent[0].Title != "Lurk Done" {
+		t.Errorf("expected title 'Lurk Done', got %q", p.sent[0].Title)
 	}
 }
 
@@ -58,7 +58,7 @@ func TestManagerEventFiltering(t *testing.T) {
 	m.Register(ProviderTelegram, p, []EventType{EventError})
 
 	// This should NOT reach the provider.
-	m.Notify(context.Background(), Event{Type: EventHuntCompleted, Title: "ignored"})
+	m.Notify(context.Background(), Event{Type: EventLurkCompleted, Title: "ignored"})
 
 	// This should reach the provider.
 	m.Notify(context.Background(), Event{Type: EventError, Title: "alert"})
@@ -112,8 +112,8 @@ func TestDiscordSend(t *testing.T) {
 
 	d := NewDiscord(ts.URL, "Lurkarr", "")
 	err := d.Send(context.Background(), Event{
-		Type:     EventHuntCompleted,
-		Title:    "Hunt Complete",
+		Type:     EventLurkCompleted,
+		Title:    "Lurk Complete",
 		Message:  "Found 3 items",
 		AppType:  "sonarr",
 		Instance: "main",
@@ -128,8 +128,8 @@ func TestDiscordSend(t *testing.T) {
 		t.Fatal("expected embeds in payload")
 	}
 	embed := embeds[0].(map[string]any)
-	if embed["title"] != "Hunt Complete" {
-		t.Errorf("expected title 'Hunt Complete', got %v", embed["title"])
+	if embed["title"] != "Lurk Complete" {
+		t.Errorf("expected title 'Lurk Complete', got %v", embed["title"])
 	}
 }
 
@@ -181,8 +181,8 @@ func TestTelegramSend(t *testing.T) {
 	// For testing, we need to intercept the request. Use the test server URL.
 	// We'll test the message formatting instead.
 	msg := formatTelegramMessage(Event{
-		Type:     EventHuntCompleted,
-		Title:    "Hunt Done",
+		Type:     EventLurkCompleted,
+		Title:    "Lurk Done",
 		Message:  "5 items found",
 		AppType:  "radarr",
 		Instance: "main",
@@ -255,15 +255,15 @@ func TestGotifySend(t *testing.T) {
 
 	g := NewGotify(ts.URL, "testtoken", 5)
 	err := g.Send(context.Background(), Event{
-		Type:    EventHuntCompleted,
-		Title:   "Hunt Done",
+		Type:    EventLurkCompleted,
+		Title:   "Lurk Done",
 		Message: "Found items",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if received["title"] != "Hunt Done" {
-		t.Errorf("expected title 'Hunt Done', got %v", received["title"])
+	if received["title"] != "Lurk Done" {
+		t.Errorf("expected title 'Lurk Done', got %v", received["title"])
 	}
 }
 
@@ -436,8 +436,8 @@ func TestWebhookTest(t *testing.T) {
 
 func TestFormatPlainMessage(t *testing.T) {
 	msg := formatPlainMessage(Event{
-		Type:     EventHuntCompleted,
-		Title:    "Hunt Complete",
+		Type:     EventLurkCompleted,
+		Title:    "Lurk Complete",
 		Message:  "Found 5 items",
 		AppType:  "sonarr",
 		Instance: "main",
