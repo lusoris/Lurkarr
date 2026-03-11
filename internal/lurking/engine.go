@@ -50,13 +50,18 @@ func (e *Engine) SetNotifier(n notifications.Notifier) {
 	e.notifier = n
 }
 
-// Start launches a lurking goroutine for each app type.
+// Start launches a lurking goroutine for each app type that has a registered lurker.
 func (e *Engine) Start(ctx context.Context) {
 	ctx, e.cancel = context.WithCancel(ctx)
+	started := 0
 	for _, appType := range database.AllAppTypes() {
+		if LurkerFor(appType) == nil {
+			continue
+		}
 		go e.lurkLoop(ctx, appType)
+		started++
 	}
-	slog.Info("lurking engine started", "app_types", len(database.AllAppTypes()))
+	slog.Info("lurking engine started", "app_types", started)
 }
 
 // Stop cancels all lurking goroutines.
