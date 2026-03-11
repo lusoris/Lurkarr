@@ -74,10 +74,10 @@ func TestAppHandlerEnabled(t *testing.T) {
 	}
 
 	h := &appHandler{logger: l, appType: "sonarr"}
-	if !h.Enabled(nil, slog.LevelInfo) {
+	if !h.Enabled(context.Background(), slog.LevelInfo) {
 		t.Error("Enabled() = false, want true")
 	}
-	if !h.Enabled(nil, slog.LevelDebug) {
+	if !h.Enabled(context.Background(), slog.LevelDebug) {
 		t.Error("Enabled(Debug) = false, want true")
 	}
 }
@@ -94,7 +94,7 @@ func TestAppHandlerHandle(t *testing.T) {
 	r := slog.NewRecord(time.Now(), slog.LevelInfo, "test message", 0)
 	r.AddAttrs(slog.String("key", "val"))
 
-	if err := h.Handle(nil, r); err != nil {
+	if err := h.Handle(context.Background(), r); err != nil {
 		t.Fatalf("Handle() error: %v", err)
 	}
 
@@ -162,7 +162,7 @@ func TestAppHandlerWithAttrsAndHandle(t *testing.T) {
 	h2 := h.WithAttrs([]slog.Attr{slog.String("instance", "main")}).(*appHandler)
 
 	r := slog.NewRecord(time.Now(), slog.LevelWarn, "warning msg", 0)
-	if err := h2.Handle(nil, r); err != nil {
+	if err := h2.Handle(context.Background(), r); err != nil {
 		t.Fatalf("Handle() error: %v", err)
 	}
 
@@ -325,7 +325,7 @@ func TestHubBroadcastSlowClient(t *testing.T) {
 
 	// Client with full send buffer
 	client := &wsClient{
-		send: make(chan []byte, 0), // zero-capacity, always full
+		send: make(chan []byte), // zero-capacity, always full
 	}
 	hub.mu.Lock()
 	hub.clients[client] = struct{}{}
@@ -441,9 +441,12 @@ func TestHandleWebSocket(t *testing.T) {
 	defer cancel()
 
 	wsURL := "ws" + srv.URL[4:] // http -> ws
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	conn, resp, err := websocket.Dial(ctx, wsURL, nil)
 	if err != nil {
 		t.Fatalf("websocket dial: %v", err)
+	}
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
 	}
 	defer conn.CloseNow()
 
@@ -482,9 +485,12 @@ func TestHandleWebSocketWithFilters(t *testing.T) {
 	defer cancel()
 
 	wsURL := "ws" + srv.URL[4:] + "?app=sonarr&level=INFO"
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	conn, resp, err := websocket.Dial(ctx, wsURL, nil)
 	if err != nil {
 		t.Fatalf("websocket dial: %v", err)
+	}
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
 	}
 	defer conn.CloseNow()
 
@@ -515,9 +521,12 @@ func TestHandleWebSocketFilterUpdate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.Dial(ctx, "ws"+srv.URL[4:], nil)
+	conn, resp, err := websocket.Dial(ctx, "ws"+srv.URL[4:], nil)
 	if err != nil {
 		t.Fatalf("websocket dial: %v", err)
+	}
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
 	}
 	defer conn.CloseNow()
 

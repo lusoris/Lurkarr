@@ -87,7 +87,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 						return
 					}
-					slog.Info("auto-created user from proxy auth", "username", username)
+					slog.Info("auto-created user from proxy auth", "username", username) //nolint:gosec // G706
 				} else if err != nil {
 					slog.Warn("proxy auth bypass user not found", "username", username) //nolint:gosec // G706
 					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)

@@ -65,7 +65,7 @@ func (p *Pushover) Send(ctx context.Context, event Event) error {
 	if err != nil {
 		return fmt.Errorf("pushover request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("pushover returned status %d", resp.StatusCode)

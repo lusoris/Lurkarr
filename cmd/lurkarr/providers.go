@@ -215,7 +215,7 @@ func startLurkingEngine(lc fx.Lifecycle, db *database.DB, logger *logging.Logger
 	e.SetNotifier(notifMgr)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			e.Start(context.Background())
+			e.Start(context.Background()) //nolint:gosec // G118: engine manages its own lifecycle via Stop()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -231,7 +231,7 @@ func startQueueCleaner(lc fx.Lifecycle, db *database.DB, logger *logging.Logger,
 	c.SetNotifier(notifMgr)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			c.Start(context.Background())
+			c.Start(context.Background()) //nolint:gosec // G118: cleaner manages its own lifecycle via Stop()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -247,7 +247,7 @@ func startAutoImporter(lc fx.Lifecycle, db *database.DB, logger *logging.Logger,
 	imp.SetNotifier(notifMgr)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			imp.Start(context.Background())
+			imp.Start(context.Background()) //nolint:gosec // G118: importer manages its own lifecycle via Stop()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -268,7 +268,7 @@ func startSeerrSync(lc fx.Lifecycle, db *database.DB) {
 	}))
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			se.Start(context.Background())
+			se.Start(context.Background()) //nolint:gosec // G118: sync engine manages its own lifecycle via Stop()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -284,7 +284,7 @@ func startMaintenance(lc fx.Lifecycle, db *database.DB) {
 	lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is called in OnStop
 			go runMaintenance(ctx, db)
 			return nil
 		},

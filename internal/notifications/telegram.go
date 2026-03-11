@@ -59,7 +59,7 @@ func (t *Telegram) sendMessage(ctx context.Context, text string) error {
 	if err != nil {
 		return fmt.Errorf("telegram request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("telegram returned status %d", resp.StatusCode)
@@ -69,23 +69,23 @@ func (t *Telegram) sendMessage(ctx context.Context, text string) error {
 
 func formatTelegramMessage(event Event) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("<b>%s</b>\n", event.Title))
+	fmt.Fprintf(&sb, "<b>%s</b>\n", event.Title)
 	sb.WriteString(event.Message)
 
 	if event.AppType != "" || event.Instance != "" {
 		sb.WriteString("\n")
 		if event.AppType != "" {
-			sb.WriteString(fmt.Sprintf("\n<i>App:</i> %s", event.AppType))
+			fmt.Fprintf(&sb, "\n<i>App:</i> %s", event.AppType)
 		}
 		if event.Instance != "" {
-			sb.WriteString(fmt.Sprintf("\n<i>Instance:</i> %s", event.Instance))
+			fmt.Fprintf(&sb, "\n<i>Instance:</i> %s", event.Instance)
 		}
 	}
 
 	if len(event.Fields) > 0 {
 		sb.WriteString("\n")
 		for k, v := range event.Fields {
-			sb.WriteString(fmt.Sprintf("\n<b>%s:</b> %s", k, v))
+			fmt.Fprintf(&sb, "\n<b>%s:</b> %s", k, v)
 		}
 	}
 	return sb.String()

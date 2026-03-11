@@ -77,7 +77,7 @@ func Logging(next http.Handler) http.Handler {
 		// Normalize path to avoid high cardinality (strip IDs).
 		path := normalizePath(r.URL.Path)
 
-		slog.Info("request",
+		slog.Info("request", //nolint:gosec // G706: structured logging sanitises values
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", sw.status,
@@ -176,7 +176,7 @@ func joinPath(parts []string) string {
 }
 
 func isID(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 	// Numeric ID

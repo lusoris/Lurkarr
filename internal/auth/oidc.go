@@ -124,7 +124,7 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	// Check for error from the provider.
 	if errParam := r.URL.Query().Get("error"); errParam != "" {
 		desc := r.URL.Query().Get("error_description")
-		slog.Warn("OIDC provider returned error", "error", errParam, "description", desc)
+		slog.Warn("OIDC provider returned error", "error", errParam, "description", desc) //nolint:gosec // G706
 		http.Error(w, fmt.Sprintf(`{"error":"oidc: %s"}`, errParam), http.StatusUnauthorized)
 		return
 	}
@@ -183,7 +183,7 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	// Get or create the user.
 	user, err := h.DB.GetOrCreateExternalUser(r.Context(), "oidc", claims.Subject, username)
 	if err != nil {
-		slog.Error("OIDC user lookup/creation failed", "error", err, "sub", claims.Subject)
+		slog.Error("OIDC user lookup/creation failed", "error", err, "sub", claims.Subject) //nolint:gosec // G706
 		http.Error(w, `{"error":"user creation failed"}`, http.StatusInternalServerError)
 		return
 	}
@@ -195,7 +195,7 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("OIDC login successful", "username", username, "sub", claims.Subject)
+	slog.Info("OIDC login successful", "username", username, "sub", claims.Subject) //nolint:gosec // G706
 
 	// Redirect to the home page (frontend will pick up the session cookie).
 	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)

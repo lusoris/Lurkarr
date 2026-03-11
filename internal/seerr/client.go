@@ -211,7 +211,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, out an
 		u += "?" + params.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -222,7 +222,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, out an
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
@@ -240,7 +240,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, out an
 }
 
 func (c *Client) post(ctx context.Context, path string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -250,7 +250,7 @@ func (c *Client) post(ctx context.Context, path string) error {
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))

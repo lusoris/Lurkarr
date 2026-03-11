@@ -59,7 +59,7 @@ func (a *Apprise) Send(ctx context.Context, event Event) error {
 	if err != nil {
 		return fmt.Errorf("apprise request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("apprise returned status %d", resp.StatusCode)

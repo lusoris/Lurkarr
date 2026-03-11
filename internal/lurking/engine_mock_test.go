@@ -91,18 +91,18 @@ func arrServer(t *testing.T, missingItems, cutoffItems []arrclient.SonarrEpisode
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/v3/wanted/missing":
+		switch r.URL.Path {
+		case "/api/v3/wanted/missing":
 			json.NewEncoder(w).Encode(struct {
 				TotalRecords int                       `json:"totalRecords"`
 				Records      []arrclient.SonarrEpisode `json:"records"`
 			}{TotalRecords: len(missingItems), Records: missingItems})
-		case r.URL.Path == "/api/v3/wanted/cutoff":
+		case "/api/v3/wanted/cutoff":
 			json.NewEncoder(w).Encode(struct {
 				TotalRecords int                       `json:"totalRecords"`
 				Records      []arrclient.SonarrEpisode `json:"records"`
 			}{TotalRecords: len(cutoffItems), Records: cutoffItems})
-		case r.URL.Path == "/api/v3/queue":
+		case "/api/v3/queue":
 			json.NewEncoder(w).Encode(arrclient.QueueResponse{})
 		default:
 			json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1})

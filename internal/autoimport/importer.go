@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
 )

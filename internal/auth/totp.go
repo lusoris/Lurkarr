@@ -40,18 +40,18 @@ func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) 
 	wr := standard.NewWithWriter(&buf)
 	if saveErr := qrc.Save(wr); saveErr != nil {
 		// Fallback: return secret without QR if rendering fails
-		return secret, "", nil
+		return secret, "", nil //nolint:nilerr // intentional fallback
 	}
 
 	// Re-encode as PNG
 	img, decErr := png.Decode(&buf)
 	if decErr != nil {
-		return secret, "", nil
+		return secret, "", nil //nolint:nilerr // intentional fallback
 	}
 
 	var pngBuf bytes.Buffer
 	if err := png.Encode(&pngBuf, img); err != nil {
-		return secret, "", nil
+		return secret, "", nil //nolint:nilerr // intentional fallback
 	}
 
 	qrBase64 = base64.StdEncoding.EncodeToString(pngBuf.Bytes())

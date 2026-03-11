@@ -59,10 +59,10 @@ func (e *Email) Send(ctx context.Context, event Event) error {
 
 	client, err := smtp.NewClient(conn, e.Host)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("email smtp client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	if e.StartTLS {
 		tlsConfig := &tls.Config{

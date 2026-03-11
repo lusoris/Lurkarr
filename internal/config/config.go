@@ -64,7 +64,7 @@ func Load() (*Config, error) {
 
 	if v := os.Getenv("DB_MAX_CONNS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 10000 {
-			cfg.DBMaxConns = int32(n) //nolint:gosec // G109: n is bounds-checked above
+			cfg.DBMaxConns = int32(n) // #nosec G109 G115 -- n is bounds-checked above
 		}
 	}
 
@@ -121,7 +121,7 @@ func defaultDBMaxConns() int32 {
 	if cpus > 10000 {
 		cpus = 10000
 	}
-	return int32(cpus)
+	return int32(cpus) // #nosec G115 -- cpus is clamped to [4,10000]
 }
 
 func getEnv(key, fallback string) string {

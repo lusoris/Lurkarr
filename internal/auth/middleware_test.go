@@ -34,7 +34,7 @@ func TestRequireAuth_NoCookie(t *testing.T) {
 	m := &Middleware{DB: store}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
@@ -49,7 +49,7 @@ func TestRequireAuth_InvalidCookieValue(t *testing.T) {
 	m := &Middleware{DB: store}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "not-a-uuid"})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -67,7 +67,7 @@ func TestRequireAuth_SessionNotFound(t *testing.T) {
 	m := &Middleware{DB: store}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessID.String()})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -87,7 +87,7 @@ func TestRequireAuth_UserNotFound(t *testing.T) {
 	m := &Middleware{DB: store}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessID.String()})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -112,7 +112,7 @@ func TestRequireAuth_ValidSession(t *testing.T) {
 		gotUser = UserFromContext(r.Context())
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessID.String()})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -143,7 +143,7 @@ func TestRequireAuth_ProxyBypass(t *testing.T) {
 		gotUser = UserFromContext(r.Context())
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-Forwarded-User", "proxyuser")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -168,7 +168,7 @@ func TestRequireAuth_ProxyBypassUserNotFound(t *testing.T) {
 	}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-Forwarded-User", "unknown")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -188,7 +188,7 @@ func TestRequireAuth_ProxyBypassDisabled(t *testing.T) {
 	}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-Forwarded-User", "proxyuser")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -211,7 +211,7 @@ func TestRequireAuth_ProxyBypassUntrustedIP(t *testing.T) {
 	}
 
 	handler := m.RequireAuth(okHandler())
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.RemoteAddr = "5.5.5.5:1234" // untrusted IP
 	req.Header.Set("X-Forwarded-User", "proxyuser")
 	rec := httptest.NewRecorder()
@@ -243,7 +243,7 @@ func TestRequireAuth_ProxyBypassAutoCreate(t *testing.T) {
 		gotUser = UserFromContext(r.Context())
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-Forwarded-User", "newuser")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -266,7 +266,7 @@ func TestSetSessionCookie_XForwardedProto(t *testing.T) {
 	m := &Middleware{DB: store, SecureCookie: false} // SecureCookie=false but XFP=https
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-Forwarded-Proto", "https")
 	err := m.SetSessionCookie(context.Background(), rec, req, userID)
 	if err != nil {
@@ -296,7 +296,7 @@ func TestSetSessionCookie(t *testing.T) {
 	m := &Middleware{DB: store, SecureCookie: true}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	err := m.SetSessionCookie(context.Background(), rec, req, userID)
 	if err != nil {
 		t.Fatalf("SetSessionCookie error: %v", err)
@@ -330,7 +330,7 @@ func TestSetSessionCookie_CreateError(t *testing.T) {
 	m := &Middleware{DB: store}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	err := m.SetSessionCookie(context.Background(), rec, req, uuid.New())
 	if err == nil {
 		t.Fatal("expected error from SetSessionCookie")
@@ -344,7 +344,7 @@ func TestClearSessionCookie(t *testing.T) {
 	store.EXPECT().DeleteSession(gomock.Any(), sessID).Return(nil)
 	m := &Middleware{DB: store}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessID.String()})
 	rec := httptest.NewRecorder()
 
@@ -364,7 +364,7 @@ func TestClearSessionCookie_NoCookie(t *testing.T) {
 	store := NewMockAuthStore(ctrl)
 	m := &Middleware{DB: store}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	// Should not panic
@@ -376,7 +376,7 @@ func TestClearSessionCookie_InvalidUUID(t *testing.T) {
 	store := NewMockAuthStore(ctrl)
 	m := &Middleware{DB: store}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "not-uuid"})
 	rec := httptest.NewRecorder()
 

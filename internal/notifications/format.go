@@ -14,17 +14,17 @@ func formatPlainMessage(event Event) string {
 	if event.AppType != "" || event.Instance != "" {
 		sb.WriteString("\n")
 		if event.AppType != "" {
-			sb.WriteString(fmt.Sprintf("\nApp: %s", event.AppType))
+			fmt.Fprintf(&sb, "\nApp: %s", event.AppType)
 		}
 		if event.Instance != "" {
-			sb.WriteString(fmt.Sprintf("\nInstance: %s", event.Instance))
+			fmt.Fprintf(&sb, "\nInstance: %s", event.Instance)
 		}
 	}
 
 	if len(event.Fields) > 0 {
 		sb.WriteString("\n")
 		for k, v := range event.Fields {
-			sb.WriteString(fmt.Sprintf("\n%s: %s", k, v))
+			fmt.Fprintf(&sb, "\n%s: %s", k, v)
 		}
 	}
 

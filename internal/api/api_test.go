@@ -30,7 +30,7 @@ func reqWithPathValue(method, path string, body []byte, key, value string) *http
 	if body != nil {
 		r = httptest.NewRequest(method, path, bytes.NewReader(body))
 	} else {
-		r = httptest.NewRequest(method, path, nil)
+		r = httptest.NewRequest(method, path, http.NoBody)
 	}
 	r.SetPathValue(key, value)
 	return r
@@ -41,10 +41,10 @@ func reqWithUserCtx(r *http.Request, user *database.User) *http.Request {
 	return r.WithContext(ctx)
 }
 
-func newTestSchedulerHandler(t *testing.T, ctrl *gomock.Controller) (*SchedulerHandler, *MockStore, *mocks.MockStore) {
+func newTestSchedulerHandler(t *testing.T, ctrl *gomock.Controller) (sh *SchedulerHandler, apiStore *MockStore, schedStore *mocks.MockStore) {
 	t.Helper()
-	apiStore := NewMockStore(ctrl)
-	schedStore := mocks.NewMockStore(ctrl)
+	apiStore = NewMockStore(ctrl)
+	schedStore = mocks.NewMockStore(ctrl)
 	logStore := mocks.NewMockLogStore(ctrl)
 	logStore.EXPECT().InsertLogs(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	logger := logging.New(logStore, logging.NewHub())
@@ -65,7 +65,7 @@ func TestHandleGetStats(t *testing.T) {
 	store.EXPECT().GetAllStats(gomock.Any()).Return([]database.LurkStats{{AppType: "sonarr"}}, nil)
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/stats", nil))
+	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/stats", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -77,7 +77,7 @@ func TestHandleGetStats_Error(t *testing.T) {
 	store.EXPECT().GetAllStats(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/stats", nil))
+	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/stats", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -89,7 +89,7 @@ func TestHandleResetStats(t *testing.T) {
 	store.EXPECT().ResetStats(gomock.Any()).Return(nil)
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResetStats(w, httptest.NewRequest("POST", "/api/stats/reset", nil))
+	h.HandleResetStats(w, httptest.NewRequest("POST", "/api/stats/reset", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -101,7 +101,7 @@ func TestHandleResetStats_Error(t *testing.T) {
 	store.EXPECT().ResetStats(gomock.Any()).Return(errors.New("fail"))
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResetStats(w, httptest.NewRequest("POST", "/api/stats/reset", nil))
+	h.HandleResetStats(w, httptest.NewRequest("POST", "/api/stats/reset", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -113,7 +113,7 @@ func TestHandleGetHourlyCaps(t *testing.T) {
 	store.EXPECT().GetAllHourlyCaps(gomock.Any()).Return(nil, nil)
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetHourlyCaps(w, httptest.NewRequest("GET", "/api/stats/hourly-caps", nil))
+	h.HandleGetHourlyCaps(w, httptest.NewRequest("GET", "/api/stats/hourly-caps", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -125,7 +125,7 @@ func TestHandleGetHourlyCaps_Error(t *testing.T) {
 	store.EXPECT().GetAllHourlyCaps(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &StatsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetHourlyCaps(w, httptest.NewRequest("GET", "/api/stats/hourly-caps", nil))
+	h.HandleGetHourlyCaps(w, httptest.NewRequest("GET", "/api/stats/hourly-caps", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -141,7 +141,7 @@ func TestHandleListHistory(t *testing.T) {
 	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return([]database.LurkHistory{{MediaTitle: "Test"}}, 1, nil)
 	h := &HistoryHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history", nil))
+	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -165,7 +165,7 @@ func TestHandleListHistory_WithParams(t *testing.T) {
 		})
 	h := &HistoryHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history?app=sonarr&limit=100&offset=10", nil))
+	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history?app=sonarr&limit=100&offset=10", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -177,7 +177,7 @@ func TestHandleListHistory_Error(t *testing.T) {
 	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return(nil, 0, errors.New("fail"))
 	h := &HistoryHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history", nil))
+	h.HandleListHistory(w, httptest.NewRequest("GET", "/api/history", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -347,7 +347,7 @@ func TestHandleGetGeneralSettings(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{SecretKey: "supersecret", APITimeout: 30, StatefulResetHours: 168}, nil)
 	h := &SettingsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetGeneralSettings(w, httptest.NewRequest("GET", "/api/settings/general", nil))
+	h.HandleGetGeneralSettings(w, httptest.NewRequest("GET", "/api/settings/general", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -364,7 +364,7 @@ func TestHandleGetGeneralSettings_Error(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &SettingsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetGeneralSettings(w, httptest.NewRequest("GET", "/api/settings/general", nil))
+	h.HandleGetGeneralSettings(w, httptest.NewRequest("GET", "/api/settings/general", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -390,7 +390,7 @@ func TestHandleUpdateGeneralSettings_GetError(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &SettingsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleUpdateGeneralSettings(w, httptest.NewRequest("PUT", "/api/settings/general", nil))
+	h.HandleUpdateGeneralSettings(w, httptest.NewRequest("PUT", "/api/settings/general", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -489,7 +489,7 @@ func TestHandleGetState(t *testing.T) {
 	}
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state", nil))
+	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -501,7 +501,7 @@ func TestHandleGetState_WithFilter(t *testing.T) {
 	store.EXPECT().ListInstances(gomock.Any(), database.AppType("sonarr")).Return(nil, nil)
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state?app=sonarr", nil))
+	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state?app=sonarr", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -512,7 +512,7 @@ func TestHandleGetState_InvalidApp(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state?app=bogus", nil))
+	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state?app=bogus", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -525,7 +525,7 @@ func TestHandleResetState(t *testing.T) {
 	store.EXPECT().ResetState(gomock.Any(), database.AppType("sonarr"), id).Return(nil)
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=sonarr&instance_id="+id.String(), nil))
+	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=sonarr&instance_id="+id.String(), http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -536,7 +536,7 @@ func TestHandleResetState_InvalidApp(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=bogus", nil))
+	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=bogus", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -547,7 +547,7 @@ func TestHandleResetState_InvalidUUID(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=sonarr&instance_id=bad", nil))
+	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=sonarr&instance_id=bad", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -560,7 +560,7 @@ func TestHandleResetState_Error(t *testing.T) {
 	store.EXPECT().ResetState(gomock.Any(), database.AppType("sonarr"), id).Return(errors.New("fail"))
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=sonarr&instance_id="+id.String(), nil))
+	h.HandleResetState(w, httptest.NewRequest("POST", "/api/state/reset?app=sonarr&instance_id="+id.String(), http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -574,7 +574,7 @@ func TestHandleGetState_ListError(t *testing.T) {
 	}
 	h := &StateHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state", nil))
+	h.HandleGetState(w, httptest.NewRequest("GET", "/api/state", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -846,7 +846,7 @@ func TestHandleGetLogs(t *testing.T) {
 	store.EXPECT().QueryLogs(gomock.Any(), gomock.Any()).Return(nil, nil)
 	h := &LogsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs", nil))
+	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -870,7 +870,7 @@ func TestHandleGetLogs_WithParams(t *testing.T) {
 		})
 	h := &LogsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs?app=sonarr&level=error&limit=50", nil))
+	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs?app=sonarr&level=error&limit=50", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -882,7 +882,7 @@ func TestHandleGetLogs_Error(t *testing.T) {
 	store.EXPECT().QueryLogs(gomock.Any(), gomock.Any()).Return(nil, errors.New("fail"))
 	h := &LogsHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs", nil))
+	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -898,7 +898,7 @@ func TestHandleGetProwlarrSettings(t *testing.T) {
 	store.EXPECT().GetProwlarrSettings(gomock.Any()).Return(&database.ProwlarrSettings{URL: "http://localhost:9696", APIKey: "abcdef123456"}, nil)
 	h := &ProwlarrHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/prowlarr/settings", nil))
+	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/prowlarr/settings", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -910,7 +910,7 @@ func TestHandleGetProwlarrSettings_Error(t *testing.T) {
 	store.EXPECT().GetProwlarrSettings(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &ProwlarrHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/prowlarr/settings", nil))
+	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/prowlarr/settings", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -986,7 +986,7 @@ func TestProwlarrGetIndexers_SettingsError(t *testing.T) {
 	store.EXPECT().GetProwlarrSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &ProwlarrHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetIndexers(w, httptest.NewRequest("GET", "/api/prowlarr/indexers", nil))
+	h.HandleGetIndexers(w, httptest.NewRequest("GET", "/api/prowlarr/indexers", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -998,7 +998,7 @@ func TestProwlarrGetIndexerStats_SettingsError(t *testing.T) {
 	store.EXPECT().GetProwlarrSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &ProwlarrHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetIndexerStats(w, httptest.NewRequest("GET", "/api/prowlarr/indexer-stats", nil))
+	h.HandleGetIndexerStats(w, httptest.NewRequest("GET", "/api/prowlarr/indexer-stats", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -1049,7 +1049,7 @@ func TestHandleGetSABnzbdSettings(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{URL: "http://localhost:8080", APIKey: "abcdef123456"}, nil)
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/sabnzbd/settings", nil))
+	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/sabnzbd/settings", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -1061,7 +1061,7 @@ func TestHandleGetSABnzbdSettings_Error(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/sabnzbd/settings", nil))
+	h.HandleGetSettings(w, httptest.NewRequest("GET", "/api/sabnzbd/settings", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -1137,7 +1137,7 @@ func TestSABnzbdGetQueue_SettingsError(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetQueue(w, httptest.NewRequest("GET", "/api/sabnzbd/queue", nil))
+	h.HandleGetQueue(w, httptest.NewRequest("GET", "/api/sabnzbd/queue", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -1149,7 +1149,7 @@ func TestSABnzbdGetHistory_SettingsError(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetHistory(w, httptest.NewRequest("GET", "/api/sabnzbd/history", nil))
+	h.HandleGetHistory(w, httptest.NewRequest("GET", "/api/sabnzbd/history", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -1161,7 +1161,7 @@ func TestSABnzbdGetStats_SettingsError(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/sabnzbd/stats", nil))
+	h.HandleGetStats(w, httptest.NewRequest("GET", "/api/sabnzbd/stats", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -1173,7 +1173,7 @@ func TestSABnzbdPause_SettingsError(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandlePause(w, httptest.NewRequest("POST", "/api/sabnzbd/pause", nil))
+	h.HandlePause(w, httptest.NewRequest("POST", "/api/sabnzbd/pause", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -1185,7 +1185,7 @@ func TestSABnzbdResume_SettingsError(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("no settings"))
 	h := &SABnzbdHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleResume(w, httptest.NewRequest("POST", "/api/sabnzbd/resume", nil))
+	h.HandleResume(w, httptest.NewRequest("POST", "/api/sabnzbd/resume", http.NoBody))
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -1453,7 +1453,7 @@ func TestHandleGetUser(t *testing.T) {
 	user := &database.User{ID: uuid.New(), Username: "admin"}
 	h := &UserHandler{DB: store}
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api/user", nil)
+	r := httptest.NewRequest("GET", "/api/user", http.NoBody)
 	r = reqWithUserCtx(r, user)
 	h.HandleGetUser(w, r)
 	if w.Code != 200 {
@@ -1466,7 +1466,7 @@ func TestHandleGetUser_NoUser(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &UserHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleGetUser(w, httptest.NewRequest("GET", "/api/user", nil))
+	h.HandleGetUser(w, httptest.NewRequest("GET", "/api/user", http.NoBody))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
@@ -1493,7 +1493,7 @@ func TestHandleUpdateUsername_NoUser(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &UserHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleUpdateUsername(w, httptest.NewRequest("POST", "/api/user/username", nil))
+	h.HandleUpdateUsername(w, httptest.NewRequest("POST", "/api/user/username", http.NoBody))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
@@ -1535,7 +1535,7 @@ func TestHandleUpdatePassword_NoUser(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &UserHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleUpdatePassword(w, httptest.NewRequest("POST", "/api/user/password", nil))
+	h.HandleUpdatePassword(w, httptest.NewRequest("POST", "/api/user/password", http.NoBody))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
@@ -1615,7 +1615,7 @@ func TestHandleListSchedules(t *testing.T) {
 	store.EXPECT().ListSchedules(gomock.Any()).Return(nil, nil)
 	h := &SchedulerHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleListSchedules(w, httptest.NewRequest("GET", "/api/schedules", nil))
+	h.HandleListSchedules(w, httptest.NewRequest("GET", "/api/schedules", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -1627,7 +1627,7 @@ func TestHandleListSchedules_Error(t *testing.T) {
 	store.EXPECT().ListSchedules(gomock.Any()).Return(nil, errors.New("fail"))
 	h := &SchedulerHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleListSchedules(w, httptest.NewRequest("GET", "/api/schedules", nil))
+	h.HandleListSchedules(w, httptest.NewRequest("GET", "/api/schedules", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -1639,7 +1639,7 @@ func TestHandleScheduleHistory(t *testing.T) {
 	store.EXPECT().ListScheduleExecutions(gomock.Any(), 50).Return(nil, nil)
 	h := &SchedulerHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleScheduleHistory(w, httptest.NewRequest("GET", "/api/schedules/history", nil))
+	h.HandleScheduleHistory(w, httptest.NewRequest("GET", "/api/schedules/history", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -1651,7 +1651,7 @@ func TestHandleScheduleHistory_WithLimit(t *testing.T) {
 	store.EXPECT().ListScheduleExecutions(gomock.Any(), 100).Return(nil, nil)
 	h := &SchedulerHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleScheduleHistory(w, httptest.NewRequest("GET", "/api/schedules/history?limit=100", nil))
+	h.HandleScheduleHistory(w, httptest.NewRequest("GET", "/api/schedules/history?limit=100", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -1663,7 +1663,7 @@ func TestHandleScheduleHistory_Error(t *testing.T) {
 	store.EXPECT().ListScheduleExecutions(gomock.Any(), 50).Return(nil, errors.New("fail"))
 	h := &SchedulerHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleScheduleHistory(w, httptest.NewRequest("GET", "/api/schedules/history", nil))
+	h.HandleScheduleHistory(w, httptest.NewRequest("GET", "/api/schedules/history", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -1808,7 +1808,7 @@ func TestHandleSetup_AlreadyDone(t *testing.T) {
 	store.EXPECT().UserCount(gomock.Any()).Return(1, nil)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleSetup(w, httptest.NewRequest("POST", "/api/auth/setup", nil))
+	h.HandleSetup(w, httptest.NewRequest("POST", "/api/auth/setup", http.NoBody))
 	if w.Code != 409 {
 		t.Fatalf("expected 409, got %d", w.Code)
 	}
@@ -1820,7 +1820,7 @@ func TestHandleSetup_CountError(t *testing.T) {
 	store.EXPECT().UserCount(gomock.Any()).Return(0, errors.New("fail"))
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.HandleSetup(w, httptest.NewRequest("POST", "/api/auth/setup", nil))
+	h.HandleSetup(w, httptest.NewRequest("POST", "/api/auth/setup", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -1969,7 +1969,7 @@ func TestHandleLogout(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &AuthHandler{DB: store, Auth: mw}
 	w := httptest.NewRecorder()
-	h.HandleLogout(w, httptest.NewRequest("POST", "/api/auth/logout", nil))
+	h.HandleLogout(w, httptest.NewRequest("POST", "/api/auth/logout", http.NoBody))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -1980,7 +1980,7 @@ func TestHandle2FAEnable_NoUser(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.Handle2FAEnable(w, httptest.NewRequest("POST", "/api/auth/2fa/enable", nil))
+	h.Handle2FAEnable(w, httptest.NewRequest("POST", "/api/auth/2fa/enable", http.NoBody))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
@@ -1993,7 +1993,7 @@ func TestHandle2FAEnable_Success(t *testing.T) {
 	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Any()).Return(nil)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", nil)
+	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", http.NoBody)
 	r = reqWithUserCtx(r, user)
 	h.Handle2FAEnable(w, r)
 	if w.Code != 200 {
@@ -2013,7 +2013,7 @@ func TestHandle2FAEnable_SaveError(t *testing.T) {
 	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Any()).Return(errors.New("fail"))
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", nil)
+	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", http.NoBody)
 	r = reqWithUserCtx(r, user)
 	h.Handle2FAEnable(w, r)
 	if w.Code != 500 {
@@ -2026,7 +2026,7 @@ func TestHandle2FADisable_NoUser(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.Handle2FADisable(w, httptest.NewRequest("POST", "/api/auth/2fa/disable", nil))
+	h.Handle2FADisable(w, httptest.NewRequest("POST", "/api/auth/2fa/disable", http.NoBody))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
@@ -2039,7 +2039,7 @@ func TestHandle2FADisable_Success(t *testing.T) {
 	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Nil()).Return(nil)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/auth/2fa/disable", nil)
+	r := httptest.NewRequest("POST", "/api/auth/2fa/disable", http.NoBody)
 	r = reqWithUserCtx(r, user)
 	h.Handle2FADisable(w, r)
 	if w.Code != 200 {
@@ -2054,7 +2054,7 @@ func TestHandle2FADisable_Error(t *testing.T) {
 	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Nil()).Return(errors.New("fail"))
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/auth/2fa/disable", nil)
+	r := httptest.NewRequest("POST", "/api/auth/2fa/disable", http.NoBody)
 	r = reqWithUserCtx(r, user)
 	h.Handle2FADisable(w, r)
 	if w.Code != 500 {
@@ -2067,7 +2067,7 @@ func TestHandle2FAVerify_NoUser(t *testing.T) {
 	store := NewMockStore(ctrl)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
-	h.Handle2FAVerify(w, httptest.NewRequest("POST", "/api/auth/2fa/verify", nil))
+	h.Handle2FAVerify(w, httptest.NewRequest("POST", "/api/auth/2fa/verify", http.NoBody))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}

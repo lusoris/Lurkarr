@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -91,7 +90,7 @@ func (d *Discord) post(ctx context.Context, payload any) error {
 	if err != nil {
 		return fmt.Errorf("discord request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("discord returned status %d", resp.StatusCode)
@@ -114,16 +113,4 @@ func discordColor(et EventType) int {
 	default:
 		return 0x95A5A6 // grey
 	}
-}
-
-// formatDiscordFields is a helper for building embed fields.
-func formatDiscordFields(event Event) string {
-	if len(event.Fields) == 0 {
-		return ""
-	}
-	var sb strings.Builder
-	for k, v := range event.Fields {
-		sb.WriteString(fmt.Sprintf("**%s:** %s\n", k, v))
-	}
-	return sb.String()
 }
