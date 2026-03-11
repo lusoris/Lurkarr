@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
-> Last updated: 2026-03-11
-> State: Phases 0–6 complete, Phase 9a/9b complete, Phase 16 complete. Phase 7 seeding + orphan done, hardlink/cross-seed remaining. Phase 15 ~90% done.
-> Priority order: Phase 7 remaining (hardlinks/cross-seed) → Phase 8 (Blocklist) → feature work
+> Last updated: 2026-03-12
+> State: Phases 0–8 complete, Phase 9a/9b complete, Phase 16 complete. All lint + gosec issues resolved.
+> Priority order: Phase 9a remaining → Phase 10 (Grafana) → Phase 14 (Frontend) → feature work
 
 ---
 
@@ -226,15 +226,18 @@
 - [x] Migration 002 extended with 4 orphan columns
 - [x] 12 tests: parseExcludedCategories + orphan detection logic
 
-### Remaining
-- [ ] Hardlink detection (don't remove if hardlinked)
-- [ ] Cross-seed awareness (detect cross-seeded torrents by content hash match)
+### ✅ Hardlink & Cross-Seed — DONE
+- [x] Hardlink detection (don't remove if hardlinked) — commit `23aba87`
+- [x] Cross-seed awareness (detect cross-seeded torrents by content hash match) — commit `39f62c8`
 
-## Phase 8: Malware & Blocklist
+## ✅ COMPLETED — Phase 8: Blocklist System
 
-- [ ] Community blocklist sync (configurable list URLs)
-- [ ] Block known bad release groups / patterns
-- [ ] Remove matching downloads from queue
+- [x] Community blocklist sync (configurable list URLs, HTTP ETag conditional fetch) — commit `7f7f2ae`
+- [x] Block known bad release groups / patterns (4 pattern types: release_group, title_contains, title_regex, indexer)
+- [x] Remove matching downloads from queue (phase 0 in cleaner, before dedup)
+- [x] Blocklist API: 8 REST endpoints for sources + rules CRUD
+- [x] Migration 003: blocklist_sources + blocklist_rules tables
+- [x] 12 blocklist tests (matcher + parser)
 - [ ] Cross-Arr blocklist sync (propagate across instances of same type)
 
 ## Phase 9a: Authentication & Reverse Proxy Support

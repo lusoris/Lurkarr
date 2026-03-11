@@ -14,8 +14,9 @@ import (
 
 // Hub manages WebSocket clients for log streaming.
 type Hub struct {
-	mu      sync.RWMutex
-	clients map[*wsClient]struct{}
+	mu             sync.RWMutex
+	clients        map[*wsClient]struct{}
+	OriginPatterns []string
 }
 
 type wsClient struct {
@@ -66,8 +67,12 @@ func (h *Hub) Broadcast(entry database.LogEntry) {
 
 // HandleWebSocket upgrades HTTP to WebSocket and registers the client.
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	patterns := h.OriginPatterns
+	if len(patterns) == 0 {
+		patterns = []string{"*"}
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"},
+		OriginPatterns: patterns,
 	})
 	if err != nil {
 		slog.Error("websocket accept failed", "error", err)

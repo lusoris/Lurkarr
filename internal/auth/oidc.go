@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 type OIDCStore interface {
 	GetOrCreateExternalUser(ctx context.Context, provider, externalID, username string) (*database.User, error)
 	CreateSession(ctx context.Context, userID uuid.UUID, duration time.Duration) (*database.Session, error)
+	UpdateUserAdmin(ctx context.Context, id uuid.UUID, isAdmin bool) error
 }
 
 // OIDCConfig holds the OIDC provider configuration.
@@ -188,6 +190,19 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Apply group/role mapping if an admin group is configured.
+	if h.Config.AdminGroup != "" {
+		isAdmin := containsGroup(claims.Groups, h.Config.AdminGroup)
+		if isAdmin != user.IsAdmin {
+			if err := h.DB.UpdateUserAdmin(r.Context(), user.ID, isAdmin); err != nil {
+				slog.Error("failed to update user admin status", "error", err, "user", username)
+			} else {
+				user.IsAdmin = isAdmin
+				slog.Info("OIDC group mapping updated admin status", "username", username, "is_admin", isAdmin)
+			}
+		}
+	}
+
 	// Create session.
 	if err := h.Auth.SetSessionCookie(r.Context(), w, r, user.ID); err != nil {
 		slog.Error("OIDC session creation failed", "error", err)
@@ -251,4 +266,14 @@ func generateState() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// containsGroup checks if a group list contains the target group (case-insensitive).
+func containsGroup(groups []string, target string) bool {
+	for _, g := range groups {
+		if strings.EqualFold(g, target) {
+			return true
+		}
+	}
+	return false
 }

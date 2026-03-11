@@ -46,7 +46,7 @@ func ContextWithUser(ctx context.Context, user *database.User) context.Context {
 type Middleware struct {
 	DB              AuthStore
 	ProxyAuthBypass bool
-	ProxyHeader     string
+	ProxyHeaders    []string
 	TrustedProxies  []*net.IPNet
 	ProxyAutoCreate bool
 	CSRFKey         []byte
@@ -57,12 +57,20 @@ type Middleware struct {
 func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Proxy auth bypass (e.g., Authelia, Authentik)
-		if m.ProxyAuthBypass && m.ProxyHeader != "" {
-			if username := r.Header.Get(m.ProxyHeader); username != "" {
+		if m.ProxyAuthBypass && len(m.ProxyHeaders) > 0 {
+			// Try each configured header in order; use the first non-empty one.
+			var username string
+			for _, hdr := range m.ProxyHeaders {
+				if v := r.Header.Get(hdr); v != "" {
+					username = v
+					break
+				}
+			}
+			if username != "" {
 				// Validate that the request came from a trusted proxy.
 				remoteIP := extractRemoteIP(r)
 				if !isTrustedProxy(m.TrustedProxies, remoteIP) {
-					slog.Warn("proxy auth header from untrusted IP", "ip", remoteIP, "header", m.ProxyHeader) //nolint:gosec // G706
+					slog.Warn("proxy auth header from untrusted IP", "ip", remoteIP, "headers", m.ProxyHeaders) //nolint:gosec // G706
 					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 					return
 				}

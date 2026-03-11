@@ -33,7 +33,7 @@ var databaseModule = fx.Module("database",
 
 var loggingModule = fx.Module("logging",
 	fx.Provide(
-		logging.NewHub,
+		provideHub,
 		provideLogger,
 	),
 )
@@ -106,6 +106,14 @@ func provideDatabase(lc fx.Lifecycle, cfg *config.Config) (*database.DB, error) 
 }
 
 // provideLogger creates the async DB log writer.
+func provideHub(cfg *config.Config) *logging.Hub {
+	hub := logging.NewHub()
+	if len(cfg.AllowedOrigins) > 0 {
+		hub.OriginPatterns = cfg.AllowedOrigins
+	}
+	return hub
+}
+
 func provideLogger(lc fx.Lifecycle, db *database.DB, hub *logging.Hub) *logging.Logger {
 	l := logging.New(db, hub)
 	lc.Append(fx.Hook{
@@ -173,7 +181,7 @@ func provideServerConfig(cfg *config.Config) server.Config {
 		CSRFKey:          csrfKey[:32],
 		AllowedOrigins:   cfg.AllowedOrigins,
 		ProxyAuth:        cfg.ProxyAuth,
-		ProxyHeader:      cfg.ProxyHeader,
+		ProxyHeaders:     cfg.ProxyHeaders,
 		TrustedProxies:   cfg.TrustedProxies,
 		SecureCookie:     cfg.SecureCookie,
 		BasePath:         cfg.BasePath,

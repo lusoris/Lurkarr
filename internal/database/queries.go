@@ -15,9 +15,9 @@ func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*U
 	var u User
 	err := db.Pool.QueryRow(ctx,
 		`INSERT INTO users (username, password) VALUES ($1, $2)
-		 RETURNING id, username, password, totp_secret, auth_provider, external_id, created_at, updated_at`,
+		 RETURNING id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at`,
 		username, passwordHash,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -27,9 +27,9 @@ func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*U
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, auth_provider, external_id, created_at, updated_at FROM users WHERE username = $1`,
+		`SELECT id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user by username: %w", err)
 	}
@@ -39,9 +39,9 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, er
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, auth_provider, external_id, created_at, updated_at FROM users WHERE id = $1`,
+		`SELECT id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
@@ -72,6 +72,14 @@ func (db *DB) SetTOTPSecret(ctx context.Context, id uuid.UUID, secret *string) e
 	return err
 }
 
+func (db *DB) UpdateUserAdmin(ctx context.Context, id uuid.UUID, isAdmin bool) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE users SET is_admin = $1, updated_at = now() WHERE id = $2`,
+		isAdmin, id,
+	)
+	return err
+}
+
 func (db *DB) UserCount(ctx context.Context) (int, error) {
 	var count int
 	err := db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&count)
@@ -82,10 +90,10 @@ func (db *DB) UserCount(ctx context.Context) (int, error) {
 func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID, username string) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, auth_provider, external_id, created_at, updated_at
+		`SELECT id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at
 		 FROM users WHERE auth_provider = $1 AND external_id = $2`,
 		provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err == nil {
 		// Update username if changed at the provider.
 		if u.Username != username {
@@ -102,9 +110,9 @@ func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID,
 	err = db.Pool.QueryRow(ctx,
 		`INSERT INTO users (username, password, auth_provider, external_id)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, username, password, totp_secret, auth_provider, external_id, created_at, updated_at`,
+		 RETURNING id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at`,
 		username, "!oidc-no-local-password", provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create external user: %w", err)
 	}

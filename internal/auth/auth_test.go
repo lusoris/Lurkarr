@@ -107,3 +107,26 @@ func BenchmarkCheckPassword(b *testing.B) {
 		CheckPassword("benchmarkpassword", hash)
 	}
 }
+
+func TestContainsGroup(t *testing.T) {
+	tests := []struct {
+		name   string
+		groups []string
+		target string
+		want   bool
+	}{
+		{"exact match", []string{"admin", "users"}, "admin", true},
+		{"case insensitive", []string{"Admin", "Users"}, "admin", true},
+		{"not found", []string{"users", "editors"}, "admin", false},
+		{"empty groups", nil, "admin", false},
+		{"empty target", []string{"admin"}, "", false},
+		{"multiple groups with match", []string{"group1", "group2", "lurkarr-admins"}, "lurkarr-admins", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := containsGroup(tt.groups, tt.target); got != tt.want {
+				t.Errorf("containsGroup(%v, %q) = %v, want %v", tt.groups, tt.target, got, tt.want)
+			}
+		})
+	}
+}

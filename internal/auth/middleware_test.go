@@ -134,7 +134,7 @@ func TestRequireAuth_ProxyBypass(t *testing.T) {
 	m := &Middleware{
 		DB:              store,
 		ProxyAuthBypass: true,
-		ProxyHeader:     "X-Forwarded-User",
+		ProxyHeaders:    []string{"X-Forwarded-User"},
 		TrustedProxies:  testTrustedNets(),
 	}
 
@@ -163,7 +163,7 @@ func TestRequireAuth_ProxyBypassUserNotFound(t *testing.T) {
 	m := &Middleware{
 		DB:              store,
 		ProxyAuthBypass: true,
-		ProxyHeader:     "X-Forwarded-User",
+		ProxyHeaders:    []string{"X-Forwarded-User"},
 		TrustedProxies:  testTrustedNets(),
 	}
 
@@ -184,7 +184,7 @@ func TestRequireAuth_ProxyBypassDisabled(t *testing.T) {
 	m := &Middleware{
 		DB:              store,
 		ProxyAuthBypass: false,
-		ProxyHeader:     "X-Forwarded-User",
+		ProxyHeaders:    []string{"X-Forwarded-User"},
 	}
 
 	handler := m.RequireAuth(okHandler())
@@ -206,7 +206,7 @@ func TestRequireAuth_ProxyBypassUntrustedIP(t *testing.T) {
 	m := &Middleware{
 		DB:              store,
 		ProxyAuthBypass: true,
-		ProxyHeader:     "X-Forwarded-User",
+		ProxyHeaders:    []string{"X-Forwarded-User"},
 		TrustedProxies:  testTrustedNets(), // only 192.0.2.0/24
 	}
 
@@ -233,7 +233,7 @@ func TestRequireAuth_ProxyBypassAutoCreate(t *testing.T) {
 	m := &Middleware{
 		DB:              store,
 		ProxyAuthBypass: true,
-		ProxyHeader:     "X-Forwarded-User",
+		ProxyHeaders:    []string{"X-Forwarded-User"},
 		TrustedProxies:  testTrustedNets(),
 		ProxyAutoCreate: true,
 	}
@@ -253,6 +253,38 @@ func TestRequireAuth_ProxyBypassAutoCreate(t *testing.T) {
 	}
 	if gotUser == nil || gotUser.Username != "newuser" {
 		t.Errorf("expected auto-created user 'newuser' in context, got %v", gotUser)
+	}
+}
+
+func TestRequireAuth_ProxyMultiHeader(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockAuthStore(ctrl)
+	userID := uuid.New()
+	user := &database.User{ID: userID, Username: "authuser"}
+	store.EXPECT().GetUserByUsername(gomock.Any(), "authuser").Return(user, nil)
+	m := &Middleware{
+		DB:              store,
+		ProxyAuthBypass: true,
+		ProxyHeaders:    []string{"Remote-User", "X-Forwarded-User", "X-authentik-username"},
+		TrustedProxies:  testTrustedNets(),
+	}
+
+	var gotUser *database.User
+	handler := m.RequireAuth(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		gotUser = UserFromContext(r.Context())
+	}))
+
+	// Only the second header is set — should use it.
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	req.Header.Set("X-Forwarded-User", "authuser")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if gotUser == nil || gotUser.Username != "authuser" {
+		t.Errorf("expected user 'authuser' in context, got %v", gotUser)
 	}
 }
 

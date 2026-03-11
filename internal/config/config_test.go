@@ -41,8 +41,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.ProxyAuth != false {
 		t.Error("ProxyAuth should default to false")
 	}
-	if cfg.ProxyHeader != "Remote-User" {
-		t.Errorf("ProxyHeader = %q, want %q", cfg.ProxyHeader, "Remote-User")
+	if len(cfg.ProxyHeaders) != 1 || cfg.ProxyHeaders[0] != "Remote-User" {
+		t.Errorf("ProxyHeaders = %v, want [Remote-User]", cfg.ProxyHeaders)
 	}
 	if cfg.LogLevel != "info" {
 		t.Errorf("LogLevel = %q, want %q", cfg.LogLevel, "info")
@@ -74,8 +74,8 @@ func TestLoadCustomValues(t *testing.T) {
 	if !cfg.ProxyAuth {
 		t.Error("ProxyAuth should be true")
 	}
-	if cfg.ProxyHeader != "X-Auth-User" {
-		t.Errorf("ProxyHeader = %q, want %q", cfg.ProxyHeader, "X-Auth-User")
+	if len(cfg.ProxyHeaders) != 1 || cfg.ProxyHeaders[0] != "X-Auth-User" {
+		t.Errorf("ProxyHeaders = %v, want [X-Auth-User]", cfg.ProxyHeaders)
 	}
 	if len(cfg.AllowedOrigins) != 2 {
 		t.Fatalf("AllowedOrigins len = %d, want 2", len(cfg.AllowedOrigins))

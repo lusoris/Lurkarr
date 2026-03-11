@@ -25,7 +25,7 @@ type Config struct {
 	CSRFKey        []byte
 	AllowedOrigins []string
 	ProxyAuth      bool
-	ProxyHeader    string
+	ProxyHeaders   []string
 	TrustedProxies []*net.IPNet
 	SecureCookie   bool
 	BasePath       string
@@ -54,7 +54,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	authMw := &auth.Middleware{
 		DB:              db,
 		ProxyAuthBypass: cfg.ProxyAuth,
-		ProxyHeader:     cfg.ProxyHeader,
+		ProxyHeaders:    cfg.ProxyHeaders,
 		TrustedProxies:  cfg.TrustedProxies,
 		ProxyAutoCreate: cfg.ProxyAuth,
 		CSRFKey:         cfg.CSRFKey,

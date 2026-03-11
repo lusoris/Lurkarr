@@ -18,7 +18,7 @@ type Config struct {
 	CSRFKey        string
 	AllowedOrigins []string
 	ProxyAuth      bool
-	ProxyHeader    string
+	ProxyHeaders   []string
 	TrustedProxies []*net.IPNet
 	SecureCookie   bool
 	LogLevel       string
@@ -43,7 +43,7 @@ func Load() (*Config, error) {
 		ListenAddr:   getEnv("LISTEN_ADDR", ":8484"),
 		CSRFKey:      getEnv("CSRF_KEY", ""),
 		ProxyAuth:    getEnvBool("PROXY_AUTH", false),
-		ProxyHeader:  getEnv("PROXY_HEADER", "Remote-User"),
+		ProxyHeaders: splitAndTrim(getEnv("PROXY_HEADER", "Remote-User")),
 		SecureCookie: getEnvBool("SECURE_COOKIE", false),
 		LogLevel:     getEnv("LOG_LEVEL", "info"),
 		BasePath:     normalizeBasePath(getEnv("BASE_PATH", "")),
