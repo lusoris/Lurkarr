@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -57,6 +58,12 @@ func TestRateLimitMiddleware(t *testing.T) {
 }
 
 func TestExtractIP(t *testing.T) {
+	// Set up trusted proxies for XFF tests (10.0.0.0/8).
+	_, cidr, _ := net.ParseCIDR("10.0.0.0/8")
+	originalProxies := TrustedProxies
+	TrustedProxies = []*net.IPNet{cidr}
+	defer func() { TrustedProxies = originalProxies }()
+
 	tests := []struct {
 		name     string
 		remote   string
@@ -65,8 +72,9 @@ func TestExtractIP(t *testing.T) {
 	}{
 		{"remote with port", "1.2.3.4:5678", "", "1.2.3.4"},
 		{"remote no port", "1.2.3.4", "", "1.2.3.4"},
-		{"xff single", "10.0.0.1:1234", "9.8.7.6", "9.8.7.6"},
-		{"xff multiple", "10.0.0.1:1234", "9.8.7.6, 10.0.0.2", "9.8.7.6"},
+		{"xff single from trusted proxy", "10.0.0.1:1234", "9.8.7.6", "9.8.7.6"},
+		{"xff multiple from trusted proxy", "10.0.0.1:1234", "9.8.7.6, 10.0.0.2", "9.8.7.6"},
+		{"xff from untrusted proxy ignored", "5.5.5.5:1234", "9.8.7.6", "5.5.5.5"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

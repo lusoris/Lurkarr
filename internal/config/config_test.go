@@ -9,6 +9,9 @@ func clearEnv() {
 	for _, key := range []string{
 		"DATABASE_URL", "LISTEN_ADDR", "CSRF_KEY",
 		"ALLOWED_ORIGINS", "PROXY_AUTH", "PROXY_HEADER", "LOG_LEVEL",
+		"TRUSTED_PROXIES", "BASE_PATH", "SECURE_COOKIE",
+		"OIDC_ENABLED", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
+		"OIDC_REDIRECT_URL", "OIDC_SCOPES", "OIDC_AUTO_CREATE_USER", "OIDC_ADMIN_GROUP",
 	} {
 		os.Unsetenv(key)
 	}
@@ -176,5 +179,161 @@ func TestTrimSpace(t *testing.T) {
 				t.Errorf("trimSpace(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNormalizeBasePath(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", ""},
+		{"/", ""},
+		{"/lurkarr", "/lurkarr"},
+		{"/lurkarr/", "/lurkarr"},
+		{"lurkarr", "/lurkarr"},
+		{"lurkarr/", "/lurkarr"},
+		{"/app/lurkarr/", "/app/lurkarr"},
+		{" /lurkarr ", "/lurkarr"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := normalizeBasePath(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizeBasePath(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseTrustedProxies(t *testing.T) {
+	// Default (empty) returns private ranges.
+	nets, err := parseTrustedProxies("")
+	if err != nil {
+		t.Fatalf("parseTrustedProxies(\"\") error: %v", err)
+	}
+	if len(nets) != len(defaultPrivateNets) {
+		t.Errorf("expected %d default networks, got %d", len(defaultPrivateNets), len(nets))
+	}
+
+	// Custom CIDR.
+	nets, err = parseTrustedProxies("192.168.1.0/24, 10.0.0.0/8")
+	if err != nil {
+		t.Fatalf("parseTrustedProxies error: %v", err)
+	}
+	if len(nets) != 2 {
+		t.Fatalf("expected 2 networks, got %d", len(nets))
+	}
+
+	// Single IP (no mask).
+	nets, err = parseTrustedProxies("1.2.3.4")
+	if err != nil {
+		t.Fatalf("parseTrustedProxies single IP error: %v", err)
+	}
+	if len(nets) != 1 {
+		t.Fatalf("expected 1 network, got %d", len(nets))
+	}
+
+	// Invalid CIDR.
+	_, err = parseTrustedProxies("not-a-cidr")
+	if err == nil {
+		t.Fatal("expected error for invalid CIDR")
+	}
+}
+
+func TestIsTrustedProxy(t *testing.T) {
+	nets, _ := parseTrustedProxies("10.0.0.0/8, 172.16.0.0/12")
+
+	tests := []struct {
+		ip   string
+		want bool
+	}{
+		{"10.0.0.1", true},
+		{"10.255.255.255", true},
+		{"172.16.0.1", true},
+		{"172.31.255.255", true},
+		{"192.168.1.1", false},
+		{"8.8.8.8", false},
+		{"invalid", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ip, func(t *testing.T) {
+			got := IsTrustedProxy(nets, tt.ip)
+			if got != tt.want {
+				t.Errorf("IsTrustedProxy(%q) = %v, want %v", tt.ip, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadOIDCValidation(t *testing.T) {
+	clearEnv()
+	os.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	os.Setenv("OIDC_ENABLED", "true")
+	defer clearEnv()
+
+	// Missing issuer URL.
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error when OIDC_ENABLED=true but OIDC_ISSUER_URL missing")
+	}
+
+	os.Setenv("OIDC_ISSUER_URL", "https://auth.example.com")
+	_, err = Load()
+	if err == nil {
+		t.Fatal("expected error when OIDC_CLIENT_ID missing")
+	}
+
+	os.Setenv("OIDC_CLIENT_ID", "lurkarr")
+	_, err = Load()
+	if err == nil {
+		t.Fatal("expected error when OIDC_REDIRECT_URL missing")
+	}
+
+	os.Setenv("OIDC_REDIRECT_URL", "http://localhost:8484/api/auth/oidc/callback")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+	if !cfg.OIDCEnabled {
+		t.Error("OIDCEnabled should be true")
+	}
+	if cfg.OIDCIssuerURL != "https://auth.example.com" {
+		t.Errorf("OIDCIssuerURL = %q", cfg.OIDCIssuerURL)
+	}
+}
+
+func TestLoadBasePath(t *testing.T) {
+	clearEnv()
+	os.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	os.Setenv("BASE_PATH", "/lurkarr/")
+	defer clearEnv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.BasePath != "/lurkarr" {
+		t.Errorf("BasePath = %q, want %q", cfg.BasePath, "/lurkarr")
+	}
+}
+
+func TestLoadDefaultOIDCScopes(t *testing.T) {
+	clearEnv()
+	os.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	defer clearEnv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if len(cfg.OIDCScopes) != 3 {
+		t.Fatalf("expected 3 default scopes, got %d: %v", len(cfg.OIDCScopes), cfg.OIDCScopes)
+	}
+	expected := []string{"openid", "profile", "email"}
+	for i, s := range expected {
+		if cfg.OIDCScopes[i] != s {
+			t.Errorf("OIDCScopes[%d] = %q, want %q", i, cfg.OIDCScopes[i], s)
+		}
 	}
 }

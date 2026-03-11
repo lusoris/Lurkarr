@@ -4,12 +4,17 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"golang.org/x/time/rate"
 )
+
+// TrustedProxies holds the configured trusted proxy CIDRs for the middleware package.
+// Set during server initialization.
+var TrustedProxies []*net.IPNet
 
 // IPRateLimiter tracks per-IP rate limiters.
 type IPRateLimiter struct {
@@ -82,22 +87,43 @@ func RateLimit(limiter *IPRateLimiter) func(http.Handler) http.Handler {
 }
 
 // extractIP gets the client IP, stripping the port.
+// Only trusts X-Forwarded-For when the direct connection is from a trusted proxy.
 func extractIP(r *http.Request) string {
-	// Check X-Forwarded-For first (common behind reverse proxies).
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP (client IP).
-		if idx := len(xff); idx > 0 {
-			for i, c := range xff {
-				if c == ',' {
-					return xff[:i]
-				}
+	directIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		directIP = r.RemoteAddr
+	}
+
+	// Only parse XFF if the direct connection is from a trusted proxy.
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" && isTrustedProxy(directIP) {
+		// Take the rightmost non-trusted IP (real client).
+		parts := strings.Split(xff, ",")
+		for i := len(parts) - 1; i >= 0; i-- {
+			ip := strings.TrimSpace(parts[i])
+			if ip != "" && !isTrustedProxy(ip) {
+				return ip
 			}
-			return xff
+		}
+		// All XFF IPs are trusted; use the leftmost.
+		if first := strings.TrimSpace(parts[0]); first != "" {
+			return first
 		}
 	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+	return directIP
+}
+
+func isTrustedProxy(ipStr string) bool {
+	if len(TrustedProxies) == 0 {
+		return false
 	}
-	return ip
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, n := range TrustedProxies {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

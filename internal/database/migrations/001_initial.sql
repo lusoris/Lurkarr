@@ -3,13 +3,16 @@
 -- ── Users & Sessions ──────────────────────────────────────────────────────────
 
 CREATE TABLE users (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username    TEXT UNIQUE NOT NULL,
-    password    TEXT NOT NULL,
-    totp_secret TEXT,
-    created_at  TIMESTAMPTZ DEFAULT now(),
-    updated_at  TIMESTAMPTZ DEFAULT now()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username        TEXT UNIQUE NOT NULL,
+    password        TEXT NOT NULL,
+    totp_secret     TEXT,
+    auth_provider   TEXT NOT NULL DEFAULT 'local',
+    external_id     TEXT NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX idx_users_external ON users(auth_provider, external_id) WHERE external_id != '';
 
 CREATE TABLE sessions (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -25,7 +26,19 @@ type Config struct {
 	AllowedOrigins []string
 	ProxyAuth      bool
 	ProxyHeader    string
+	TrustedProxies []*net.IPNet
 	SecureCookie   bool
+	BasePath       string
+
+	// OIDC
+	OIDCEnabled      bool
+	OIDCIssuerURL    string
+	OIDCClientID     string
+	OIDCClientSecret string
+	OIDCRedirectURL  string
+	OIDCScopes       []string
+	OIDCAutoCreate   bool
+	OIDCAdminGroup   string
 }
 
 // Server is the main HTTP server.
@@ -35,10 +48,15 @@ type Server struct {
 
 // New creates a new Server with all routes registered.
 func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, sched *scheduler.Scheduler, notifMgr *notifications.Manager) *Server {
+	// Set trusted proxies for rate limiter IP extraction.
+	middleware.TrustedProxies = cfg.TrustedProxies
+
 	authMw := &auth.Middleware{
 		DB:              db,
 		ProxyAuthBypass: cfg.ProxyAuth,
 		ProxyHeader:     cfg.ProxyHeader,
+		TrustedProxies:  cfg.TrustedProxies,
+		ProxyAutoCreate: cfg.ProxyAuth,
 		CSRFKey:         cfg.CSRFKey,
 		SecureCookie:    cfg.SecureCookie,
 	}
@@ -66,6 +84,30 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	// --- Public routes (no auth) ---
 	mux.Handle("POST /api/auth/login", middleware.RateLimit(loginRL)(http.HandlerFunc(authH.HandleLogin)))
 	mux.HandleFunc("POST /api/auth/setup", authH.HandleSetup)
+
+	// --- OIDC routes (public, no auth) ---
+	if cfg.OIDCEnabled {
+		oidcH := auth.NewOIDCHandler(auth.OIDCConfig{
+			Enabled:      cfg.OIDCEnabled,
+			IssuerURL:    cfg.OIDCIssuerURL,
+			ClientID:     cfg.OIDCClientID,
+			ClientSecret: cfg.OIDCClientSecret,
+			RedirectURL:  cfg.OIDCRedirectURL,
+			Scopes:       cfg.OIDCScopes,
+			AutoCreate:   cfg.OIDCAutoCreate,
+			AdminGroup:   cfg.OIDCAdminGroup,
+		}, db, authMw)
+		mux.HandleFunc("GET /api/auth/oidc/login", oidcH.HandleLogin)
+		mux.HandleFunc("GET /api/auth/oidc/callback", oidcH.HandleCallback)
+	}
+	mux.HandleFunc("GET /api/auth/oidc/info", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if cfg.OIDCEnabled {
+			_, _ = w.Write([]byte(`{"enabled":true}`))
+		} else {
+			_, _ = w.Write([]byte(`{"enabled":false}`))
+		}
+	})
 
 	// --- Health ---
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -178,12 +220,19 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 
 	// Global middleware chain
 	corsMiddleware := middleware.CORS(middleware.CORSConfig{AllowedOrigins: cfg.AllowedOrigins})
-	handler := middleware.Chain(mux,
+	var handler http.Handler
+	handler = middleware.Chain(mux,
 		middleware.Recovery,
 		middleware.RequestID,
 		middleware.Logging,
 		corsMiddleware,
 	)
+
+	// Strip base path prefix if configured (for sub-path reverse proxy hosting).
+	if cfg.BasePath != "" {
+		handler = http.StripPrefix(cfg.BasePath, handler)
+		slog.Info("base path configured", "base_path", cfg.BasePath)
+	}
 
 	return &Server{
 		httpServer: &http.Server{

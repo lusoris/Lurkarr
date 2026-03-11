@@ -69,7 +69,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.Auth.SetSessionCookie(r.Context(), w, user.ID); err != nil {
+	if err := h.Auth.SetSessionCookie(r.Context(), w, r, user.ID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create session"))
 		return
 	}
@@ -142,7 +142,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Auth.SetSessionCookie(r.Context(), w, user.ID); err != nil {
+	if err := h.Auth.SetSessionCookie(r.Context(), w, r, user.ID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create session"))
 		return
 	}

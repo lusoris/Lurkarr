@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -27,6 +28,7 @@ type AuthStore interface {
 	GetSession(ctx context.Context, id uuid.UUID) (*database.Session, error)
 	CreateSession(ctx context.Context, userID uuid.UUID, duration time.Duration) (*database.Session, error)
 	DeleteSession(ctx context.Context, id uuid.UUID) error
+	CreateUser(ctx context.Context, username, passwordHash string) (*database.User, error)
 }
 
 // UserFromContext retrieves the authenticated user from the request context.
@@ -45,6 +47,8 @@ type Middleware struct {
 	DB              AuthStore
 	ProxyAuthBypass bool
 	ProxyHeader     string
+	TrustedProxies  []*net.IPNet
+	ProxyAutoCreate bool
 	CSRFKey         []byte
 	SecureCookie    bool
 }
@@ -55,13 +59,43 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		// Proxy auth bypass (e.g., Authelia, Authentik)
 		if m.ProxyAuthBypass && m.ProxyHeader != "" {
 			if username := r.Header.Get(m.ProxyHeader); username != "" {
-				user, err := m.DB.GetUserByUsername(r.Context(), username)
-				if err == nil {
-					ctx := context.WithValue(r.Context(), userContextKey, user)
-					next.ServeHTTP(w, r.WithContext(ctx))
+				// Validate that the request came from a trusted proxy.
+				remoteIP := extractRemoteIP(r)
+				if !isTrustedProxy(m.TrustedProxies, remoteIP) {
+					slog.Warn("proxy auth header from untrusted IP", "ip", remoteIP, "header", m.ProxyHeader) //nolint:gosec // G706
+					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 					return
 				}
-				slog.Warn("proxy auth bypass user not found", "username", username) //nolint:gosec // G706: slog structured logging mitigates injection
+				user, err := m.DB.GetUserByUsername(r.Context(), username)
+				if err != nil && m.ProxyAutoCreate {
+					// Auto-create user on first proxy auth login.
+					randomPass, genErr := GenerateSecretKey(32)
+					if genErr != nil {
+						slog.Error("failed to generate password for proxy user", "error", genErr)
+						http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+						return
+					}
+					hash, hashErr := HashPassword(randomPass)
+					if hashErr != nil {
+						slog.Error("failed to hash password for proxy user", "error", hashErr)
+						http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+						return
+					}
+					user, err = m.DB.CreateUser(r.Context(), username, hash)
+					if err != nil {
+						slog.Error("failed to auto-create proxy user", "error", err, "username", username) //nolint:gosec // G706
+						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+						return
+					}
+					slog.Info("auto-created user from proxy auth", "username", username)
+				} else if err != nil {
+					slog.Warn("proxy auth bypass user not found", "username", username) //nolint:gosec // G706
+					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+					return
+				}
+				ctx := context.WithValue(r.Context(), userContextKey, user)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
 			}
 		}
 
@@ -109,18 +143,20 @@ func (m *Middleware) CSRFProtect() func(http.Handler) http.Handler {
 }
 
 // SetSessionCookie creates a session and sets the cookie.
-func (m *Middleware) SetSessionCookie(ctx context.Context, w http.ResponseWriter, userID uuid.UUID) error {
+func (m *Middleware) SetSessionCookie(ctx context.Context, w http.ResponseWriter, r *http.Request, userID uuid.UUID) error {
 	session, err := m.DB.CreateSession(ctx, userID, sessionDuration)
 	if err != nil {
 		return err
 	}
+
+	secure := m.SecureCookie || r.Header.Get("X-Forwarded-Proto") == "https"
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    session.ID.String(),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   m.SecureCookie,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(sessionDuration.Seconds()),
 	})
@@ -141,4 +177,27 @@ func (m *Middleware) ClearSessionCookie(ctx context.Context, w http.ResponseWrit
 		HttpOnly: true,
 		MaxAge:   -1,
 	})
+}
+
+// extractRemoteIP gets the direct remote IP (no proxy header parsing).
+func extractRemoteIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// isTrustedProxy checks if an IP is within one of the trusted proxy CIDRs.
+func isTrustedProxy(trustedNets []*net.IPNet, ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, n := range trustedNets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

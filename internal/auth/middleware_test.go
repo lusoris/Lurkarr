@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,12 @@ import (
 
 	"github.com/lusoris/lurkarr/internal/database"
 )
+
+// testTrustedNets returns CIDRs that include the httptest default RemoteAddr (192.0.2.1).
+func testTrustedNets() []*net.IPNet {
+	_, cidr, _ := net.ParseCIDR("192.0.2.0/24")
+	return []*net.IPNet{cidr}
+}
 
 func okHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -128,6 +135,7 @@ func TestRequireAuth_ProxyBypass(t *testing.T) {
 		DB:              store,
 		ProxyAuthBypass: true,
 		ProxyHeader:     "X-Forwarded-User",
+		TrustedProxies:  testTrustedNets(),
 	}
 
 	var gotUser *database.User
@@ -156,6 +164,7 @@ func TestRequireAuth_ProxyBypassUserNotFound(t *testing.T) {
 		DB:              store,
 		ProxyAuthBypass: true,
 		ProxyHeader:     "X-Forwarded-User",
+		TrustedProxies:  testTrustedNets(),
 	}
 
 	handler := m.RequireAuth(okHandler())
@@ -164,7 +173,6 @@ func TestRequireAuth_ProxyBypassUserNotFound(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	// Falls through to cookie auth, which also fails
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", rec.Code)
 	}
@@ -191,6 +199,90 @@ func TestRequireAuth_ProxyBypassDisabled(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_ProxyBypassUntrustedIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockAuthStore(ctrl)
+	// No DB calls expected — rejected before lookup.
+	m := &Middleware{
+		DB:              store,
+		ProxyAuthBypass: true,
+		ProxyHeader:     "X-Forwarded-User",
+		TrustedProxies:  testTrustedNets(), // only 192.0.2.0/24
+	}
+
+	handler := m.RequireAuth(okHandler())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "5.5.5.5:1234" // untrusted IP
+	req.Header.Set("X-Forwarded-User", "proxyuser")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 from untrusted proxy, got %d", rec.Code)
+	}
+}
+
+func TestRequireAuth_ProxyBypassAutoCreate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockAuthStore(ctrl)
+	userID := uuid.New()
+	store.EXPECT().GetUserByUsername(gomock.Any(), "newuser").Return(nil, errors.New("not found"))
+	store.EXPECT().CreateUser(gomock.Any(), "newuser", gomock.Any()).Return(&database.User{
+		ID: userID, Username: "newuser",
+	}, nil)
+	m := &Middleware{
+		DB:              store,
+		ProxyAuthBypass: true,
+		ProxyHeader:     "X-Forwarded-User",
+		TrustedProxies:  testTrustedNets(),
+		ProxyAutoCreate: true,
+	}
+
+	var gotUser *database.User
+	handler := m.RequireAuth(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		gotUser = UserFromContext(r.Context())
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Forwarded-User", "newuser")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if gotUser == nil || gotUser.Username != "newuser" {
+		t.Errorf("expected auto-created user 'newuser' in context, got %v", gotUser)
+	}
+}
+
+func TestSetSessionCookie_XForwardedProto(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockAuthStore(ctrl)
+	userID := uuid.New()
+	store.EXPECT().CreateSession(gomock.Any(), userID, gomock.Any()).Return(&database.Session{
+		ID: uuid.New(), UserID: userID, ExpiresAt: time.Now().Add(time.Hour), CreatedAt: time.Now(),
+	}, nil)
+	m := &Middleware{DB: store, SecureCookie: false} // SecureCookie=false but XFP=https
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	err := m.SetSessionCookie(context.Background(), rec, req, userID)
+	if err != nil {
+		t.Fatalf("SetSessionCookie error: %v", err)
+	}
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			if !c.Secure {
+				t.Error("expected Secure when X-Forwarded-Proto=https")
+			}
+			return
+		}
+	}
+	t.Error("session cookie not found")
+}
+
 func TestSetSessionCookie(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockAuthStore(ctrl)
@@ -204,7 +296,8 @@ func TestSetSessionCookie(t *testing.T) {
 	m := &Middleware{DB: store, SecureCookie: true}
 
 	rec := httptest.NewRecorder()
-	err := m.SetSessionCookie(context.Background(), rec, userID)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	err := m.SetSessionCookie(context.Background(), rec, req, userID)
 	if err != nil {
 		t.Fatalf("SetSessionCookie error: %v", err)
 	}
@@ -237,7 +330,8 @@ func TestSetSessionCookie_CreateError(t *testing.T) {
 	m := &Middleware{DB: store}
 
 	rec := httptest.NewRecorder()
-	err := m.SetSessionCookie(context.Background(), rec, uuid.New())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	err := m.SetSessionCookie(context.Background(), rec, req, uuid.New())
 	if err == nil {
 		t.Fatal("expected error from SetSessionCookie")
 	}

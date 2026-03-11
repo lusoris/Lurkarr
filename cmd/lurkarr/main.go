@@ -13,8 +13,8 @@ import (
 	"github.com/lusoris/lurkarr/internal/autoimport"
 	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/queuecleaner"
 	"github.com/lusoris/lurkarr/internal/scheduler"
@@ -132,12 +132,22 @@ func run() error {
 	}
 
 	srv := server.New(server.Config{
-		Addr:           cfg.ListenAddr,
-		CSRFKey:        csrfKey[:32],
-		AllowedOrigins: cfg.AllowedOrigins,
-		ProxyAuth:      cfg.ProxyAuth,
-		ProxyHeader:    cfg.ProxyHeader,
-		SecureCookie:   cfg.SecureCookie,
+		Addr:             cfg.ListenAddr,
+		CSRFKey:          csrfKey[:32],
+		AllowedOrigins:   cfg.AllowedOrigins,
+		ProxyAuth:        cfg.ProxyAuth,
+		ProxyHeader:      cfg.ProxyHeader,
+		TrustedProxies:   cfg.TrustedProxies,
+		SecureCookie:     cfg.SecureCookie,
+		BasePath:         cfg.BasePath,
+		OIDCEnabled:      cfg.OIDCEnabled,
+		OIDCIssuerURL:    cfg.OIDCIssuerURL,
+		OIDCClientID:     cfg.OIDCClientID,
+		OIDCClientSecret: cfg.OIDCClientSecret,
+		OIDCRedirectURL:  cfg.OIDCRedirectURL,
+		OIDCScopes:       cfg.OIDCScopes,
+		OIDCAutoCreate:   cfg.OIDCAutoCreate,
+		OIDCAdminGroup:   cfg.OIDCAdminGroup,
 	}, db, logger, hub, sched, notifMgr)
 
 	errCh := make(chan error, 1)

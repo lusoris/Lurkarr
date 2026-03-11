@@ -12,6 +12,21 @@
 	let error = $state('');
 	let loading = $state(false);
 	let showTotp = $state(false);
+	let oidcEnabled = $state(false);
+
+	async function checkOIDC() {
+		try {
+			const res = await fetch('/api/auth/oidc/info');
+			if (res.ok) {
+				const data = await res.json();
+				oidcEnabled = data.enabled === true;
+			}
+		} catch {
+			// Silently ignore — OIDC button just won't show.
+		}
+	}
+
+	checkOIDC();
 
 	async function submit() {
 		error = '';
@@ -28,6 +43,10 @@
 			}
 		}
 		loading = false;
+	}
+
+	function loginOIDC() {
+		window.location.href = '/api/auth/oidc/login';
 	}
 </script>
 
@@ -57,5 +76,23 @@
 
 			<Button type="submit" {loading} class="w-full">Sign In</Button>
 		</form>
+
+		{#if oidcEnabled}
+			<div class="relative">
+				<div class="absolute inset-0 flex items-center">
+					<div class="w-full border-t border-surface-700"></div>
+				</div>
+				<div class="relative flex justify-center text-xs">
+					<span class="bg-surface-950 px-2 text-surface-500">or</span>
+				</div>
+			</div>
+
+			<button
+				onclick={loginOIDC}
+				class="w-full rounded-lg bg-surface-800 border border-surface-700 px-4 py-3 text-sm font-medium text-surface-200 hover:bg-surface-700 transition-colors"
+			>
+				Sign in with SSO
+			</button>
+		{/if}
 	</div>
 </div>

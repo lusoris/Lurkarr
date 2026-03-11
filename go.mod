@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/coder/websocket v1.8.14
+	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/go-co-op/gocron/v2 v2.19.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/csrf v1.7.3
@@ -16,6 +17,7 @@ require (
 	github.com/yeqown/go-qrcode/writer/standard v1.3.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.48.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/time v0.15.0
 )
 
@@ -25,6 +27,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

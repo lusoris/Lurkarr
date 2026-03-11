@@ -225,34 +225,33 @@
 
 ## Phase 9a: Authentication & Reverse Proxy Support
 
-> **STATUS: NOT STARTED** — Basic proxy auth header bypass exists (Authelia/Authentik style via `PROXY_AUTH` + `PROXY_HEADER` env vars). Needs hardening and OIDC.
+> **STATUS: CORE COMPLETE** — OIDC login (authz code + PKCE), proxy auth hardening (trusted proxy IP validation), reverse proxy support (BASE_PATH, XFF, XFP) all implemented. Remaining: group/role mapping, multi-provider, multi-header, WebSocket, docs.
 
 ### OIDC / SSO Support
-- [ ] OIDC provider configuration (issuer URL, client ID, client secret, scopes)
-- [ ] OIDC login flow (authorization code + PKCE)
-- [ ] Token validation + refresh (ID token → local session mapping)
-- [ ] Auto-create local user on first OIDC login (optional, configurable)
+- [x] OIDC provider configuration (issuer URL, client ID, client secret, scopes)
+- [x] OIDC login flow (authorization code + PKCE)
+- [x] Token validation + refresh (ID token → local session mapping)
+- [x] Auto-create local user on first OIDC login (optional, configurable)
 - [ ] Group/role claim mapping (e.g., admin group → Lurkarr admin)
 - [ ] Support multiple providers (Authentik, Keycloak, Authelia, Dex, Google, etc.)
-- [ ] `/api/auth/oidc/callback` endpoint
-- [ ] Frontend login page: "Sign in with SSO" button alongside local login
-- [ ] DB table for OIDC provider config (issuer, client_id, redirect_uri, etc.)
-- [ ] Migration for OIDC tables
+- [x] `/api/auth/oidc/callback` endpoint
+- [x] Frontend login page: "Sign in with SSO" button alongside local login
+- [x] DB migration for OIDC fields (auth_provider, external_id on users table)
 
 ### Proxy Authentication Hardening
-- [ ] Trusted proxy IP allowlist (`TRUSTED_PROXIES` env — CIDR ranges, default: private ranges only)
-- [ ] Reject proxy auth headers from untrusted source IPs (currently no IP validation)
+- [x] Trusted proxy IP allowlist (`TRUSTED_PROXIES` env — CIDR ranges, default: private ranges only)
+- [x] Reject proxy auth headers from untrusted source IPs
 - [ ] Support multiple proxy header formats (Remote-User, X-Forwarded-User, X-authentik-username, etc.)
-- [ ] Auto-create user on first proxy auth if not exists (configurable)
+- [x] Auto-create user on first proxy auth if not exists (configurable)
 - [ ] Proxy auth + CSRF interaction audit (bypass CSRF when proxy auth active?)
-- [ ] Log warning when proxy auth enabled without trusted proxy config
+- [x] Log warning when proxy auth enabled without trusted proxy config
 
 ### Reverse Proxy Support
-- [ ] Base path / sub-path support (`BASE_PATH` env, e.g. `/lurkarr/`) — prefix all routes + static assets
-- [ ] Trusted proxy config for `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP` (rate limiter already reads XFF but doesn't validate source)
-- [ ] Respect `X-Forwarded-Proto` for secure cookie decisions (currently `SECURE_COOKIE` env only)
+- [x] Base path / sub-path support (`BASE_PATH` env, e.g. `/lurkarr/`) — prefix all routes + static assets
+- [x] Trusted proxy config for `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP` (rate limiter validates source IP)
+- [x] Respect `X-Forwarded-Proto` for secure cookie decisions
 - [ ] WebSocket upgrade behind reverse proxy (wss:// handling, connection upgrade headers)
-- [ ] Health check endpoint (`/healthz` or `/api/health`) that bypasses auth — for load balancer probes
+- [x] Health check endpoint (`/api/health`) bypasses auth — for load balancer probes
 - [ ] Document reverse proxy configs (Traefik, Caddy, nginx, HAProxy) in README or docs/
 
 ## Phase 9b: Uber FX Dependency Injection ⚡ PRIORITY — DO BEFORE FEATURE WORK

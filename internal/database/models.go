@@ -36,12 +36,14 @@ func ValidAppType(s string) bool {
 }
 
 type User struct {
-	ID         uuid.UUID `json:"id"`
-	Username   string    `json:"username"`
-	Password   string    `json:"-"`
-	TOTPSecret *string   `json:"-"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID           uuid.UUID `json:"id"`
+	Username     string    `json:"username"`
+	Password     string    `json:"-"`
+	TOTPSecret   *string   `json:"-"`
+	AuthProvider string    `json:"auth_provider"` // "local", "oidc", "proxy"
+	ExternalID   string    `json:"external_id,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Session struct {
