@@ -27,7 +27,7 @@ jobs:
           helm package deploy/helm/lurkarr -d .helm-packages
 
       - name: Upload chart artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: helm-chart
           path: .helm-packages/*.tgz
