@@ -146,6 +146,21 @@ func (mr *MockStoreMockRecorder) GetScoringProfile(ctx, appType any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScoringProfile", reflect.TypeOf((*MockStore)(nil).GetScoringProfile), ctx, appType)
 }
 
+// ListEnabledBlocklistRules mocks base method.
+func (m *MockStore) ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnabledBlocklistRules", ctx)
+	ret0, _ := ret[0].([]database.BlocklistRule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnabledBlocklistRules indicates an expected call of ListEnabledBlocklistRules.
+func (mr *MockStoreMockRecorder) ListEnabledBlocklistRules(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledBlocklistRules", reflect.TypeOf((*MockStore)(nil).ListEnabledBlocklistRules), ctx)
+}
+
 // ListEnabledInstances mocks base method.
 func (m *MockStore) ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error) {
 	m.ctrl.T.Helper()

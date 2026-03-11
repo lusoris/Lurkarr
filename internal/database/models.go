@@ -287,6 +287,29 @@ type BlocklistLog struct {
 	BlocklistedAt time.Time `json:"blocklisted_at"`
 }
 
+// BlocklistSource represents a community blocklist URL.
+type BlocklistSource struct {
+	ID                uuid.UUID  `json:"id"`
+	Name              string     `json:"name"`
+	URL               string     `json:"url"`
+	Enabled           bool       `json:"enabled"`
+	SyncIntervalHours int        `json:"sync_interval_hours"`
+	LastSyncedAt      *time.Time `json:"last_synced_at"`
+	ETag              string     `json:"etag,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+}
+
+// BlocklistRule is a pattern for matching and blocking downloads.
+type BlocklistRule struct {
+	ID          uuid.UUID  `json:"id"`
+	SourceID    *uuid.UUID `json:"source_id,omitempty"` // nil for manual rules
+	Pattern     string     `json:"pattern"`
+	PatternType string     `json:"pattern_type"` // release_group, title_contains, title_regex, indexer
+	Reason      string     `json:"reason"`
+	Enabled     bool       `json:"enabled"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
 // NotificationProvider stores configuration for a notification provider.
 type NotificationProvider struct {
 	ID        uuid.UUID       `json:"id"`

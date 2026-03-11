@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
+	"github.com/lusoris/lurkarr/internal/blocklist"
 	"github.com/lusoris/lurkarr/internal/database"
 	downloadclient "github.com/lusoris/lurkarr/internal/downloadclients"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/deluge"
@@ -37,6 +38,7 @@ type Store interface {
 	CountStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string, windowHours int) (int, error)
 	GetSABnzbdSettings(ctx context.Context) (*database.SABnzbdSettings, error)
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
+	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
 }
 
 // Cleaner monitors download queues and removes stalled/slow/duplicate items.
@@ -163,6 +165,38 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	sabStatuses := c.getSABnzbdStatuses(ctx)
 
 	apiVersion := apiVersionFor(appType)
+
+	// 0. Blocklist rule matching — remove items matching user/community blocklist
+	blRules, err := c.db.ListEnabledBlocklistRules(ctx)
+	if err != nil {
+		log.Warn("failed to load blocklist rules", "error", err)
+	} else if len(blRules) > 0 {
+		matcher := blocklist.NewMatcher(blRules, func(title string) blocklist.ReleaseInfo {
+			parsed := ParseRelease(title)
+			return blocklist.ReleaseInfo{ReleaseGroup: parsed.ReleaseGroup}
+		})
+		for _, record := range queue.Records {
+			result := matcher.Check(record)
+			if !result.Matched {
+				continue
+			}
+			log.Warn("blocklist match, removing",
+				"title", record.Title,
+				"rule_type", result.Rule.PatternType,
+				"pattern", result.Rule.Pattern)
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, true); err != nil {
+				log.Error("failed to remove blocklisted item", "error", err)
+				continue
+			}
+			reason := "blocklist_" + result.Rule.PatternType + ":" + result.Rule.Pattern
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason); err != nil {
+				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+			}
+			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
+			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
+		}
+	}
 
 	// 1. Queue deduplication
 	profile, err := c.db.GetScoringProfile(ctx, appType)

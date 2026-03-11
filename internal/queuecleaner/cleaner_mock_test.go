@@ -188,6 +188,7 @@ func TestCleanInstance_StalledItem(t *testing.T) {
 	instID := uuid.New()
 
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
+	store.EXPECT().ListEnabledBlocklistRules(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().AddStrike(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any(), gomock.Any()).Return(nil)
@@ -229,6 +230,7 @@ func TestCleanInstance_ProgressResetStrikes(t *testing.T) {
 	instID := uuid.New()
 
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
+	store.EXPECT().ListEnabledBlocklistRules(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().ResetStrikes(gomock.Any(), database.AppSonarr, instID, "dl-good").Return(nil)
@@ -273,6 +275,7 @@ func TestCleanInstance_FailedImports(t *testing.T) {
 	instID := uuid.New()
 
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
+	store.EXPECT().ListEnabledBlocklistRules(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().LogBlocklist(gomock.Any(), database.AppSonarr, instID, "dl-fail", "Failed.Import", gomock.Any()).Return(nil)

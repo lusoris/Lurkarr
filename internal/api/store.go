@@ -60,6 +60,20 @@ type Store interface {
 	GetBlocklistLog(ctx context.Context, appType database.AppType, limit int) ([]database.BlocklistLog, error)
 	GetAutoImportLog(ctx context.Context, appType database.AppType, limit int) ([]database.AutoImportLog, error)
 
+	// Blocklist Sources & Rules
+	ListBlocklistSources(ctx context.Context) ([]database.BlocklistSource, error)
+	GetBlocklistSource(ctx context.Context, id uuid.UUID) (*database.BlocklistSource, error)
+	CreateBlocklistSource(ctx context.Context, s *database.BlocklistSource) error
+	UpdateBlocklistSource(ctx context.Context, s *database.BlocklistSource) error
+	UpdateBlocklistSourceSync(ctx context.Context, id uuid.UUID, etag string) error
+	DeleteBlocklistSource(ctx context.Context, id uuid.UUID) error
+	ListBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
+	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
+	CreateBlocklistRule(ctx context.Context, r *database.BlocklistRule) error
+	DeleteBlocklistRule(ctx context.Context, id uuid.UUID) error
+	DeleteBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) error
+	CountBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) (int, error)
+
 	// Prowlarr
 	GetProwlarrSettings(ctx context.Context) (*database.ProwlarrSettings, error)
 	UpdateProwlarrSettings(ctx context.Context, s *database.ProwlarrSettings) error

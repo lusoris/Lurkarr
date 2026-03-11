@@ -43,6 +43,49 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
+// CountBlocklistRulesBySource mocks base method.
+func (m *MockStore) CountBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountBlocklistRulesBySource", ctx, sourceID)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountBlocklistRulesBySource indicates an expected call of CountBlocklistRulesBySource.
+func (mr *MockStoreMockRecorder) CountBlocklistRulesBySource(ctx, sourceID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountBlocklistRulesBySource", reflect.TypeOf((*MockStore)(nil).CountBlocklistRulesBySource), ctx, sourceID)
+}
+
+// CreateBlocklistRule mocks base method.
+func (m *MockStore) CreateBlocklistRule(ctx context.Context, r *database.BlocklistRule) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBlocklistRule", ctx, r)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateBlocklistRule indicates an expected call of CreateBlocklistRule.
+func (mr *MockStoreMockRecorder) CreateBlocklistRule(ctx, r any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBlocklistRule", reflect.TypeOf((*MockStore)(nil).CreateBlocklistRule), ctx, r)
+}
+
+// CreateBlocklistSource mocks base method.
+func (m *MockStore) CreateBlocklistSource(ctx context.Context, s *database.BlocklistSource) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBlocklistSource", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateBlocklistSource indicates an expected call of CreateBlocklistSource.
+func (mr *MockStoreMockRecorder) CreateBlocklistSource(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBlocklistSource", reflect.TypeOf((*MockStore)(nil).CreateBlocklistSource), ctx, s)
+}
+
 // CreateInstance mocks base method.
 func (m *MockStore) CreateInstance(ctx context.Context, appType database.AppType, name, apiURL, apiKey string) (*database.AppInstance, error) {
 	m.ctrl.T.Helper()
@@ -99,6 +142,48 @@ func (m *MockStore) CreateUser(ctx context.Context, username, passwordHash strin
 func (mr *MockStoreMockRecorder) CreateUser(ctx, username, passwordHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockStore)(nil).CreateUser), ctx, username, passwordHash)
+}
+
+// DeleteBlocklistRule mocks base method.
+func (m *MockStore) DeleteBlocklistRule(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBlocklistRule", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBlocklistRule indicates an expected call of DeleteBlocklistRule.
+func (mr *MockStoreMockRecorder) DeleteBlocklistRule(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlocklistRule", reflect.TypeOf((*MockStore)(nil).DeleteBlocklistRule), ctx, id)
+}
+
+// DeleteBlocklistRulesBySource mocks base method.
+func (m *MockStore) DeleteBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBlocklistRulesBySource", ctx, sourceID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBlocklistRulesBySource indicates an expected call of DeleteBlocklistRulesBySource.
+func (mr *MockStoreMockRecorder) DeleteBlocklistRulesBySource(ctx, sourceID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlocklistRulesBySource", reflect.TypeOf((*MockStore)(nil).DeleteBlocklistRulesBySource), ctx, sourceID)
+}
+
+// DeleteBlocklistSource mocks base method.
+func (m *MockStore) DeleteBlocklistSource(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBlocklistSource", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBlocklistSource indicates an expected call of DeleteBlocklistSource.
+func (mr *MockStoreMockRecorder) DeleteBlocklistSource(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlocklistSource", reflect.TypeOf((*MockStore)(nil).DeleteBlocklistSource), ctx, id)
 }
 
 // DeleteHistory mocks base method.
@@ -244,6 +329,21 @@ func (m *MockStore) GetBlocklistLog(ctx context.Context, appType database.AppTyp
 func (mr *MockStoreMockRecorder) GetBlocklistLog(ctx, appType, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlocklistLog", reflect.TypeOf((*MockStore)(nil).GetBlocklistLog), ctx, appType, limit)
+}
+
+// GetBlocklistSource mocks base method.
+func (m *MockStore) GetBlocklistSource(ctx context.Context, id uuid.UUID) (*database.BlocklistSource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlocklistSource", ctx, id)
+	ret0, _ := ret[0].(*database.BlocklistSource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlocklistSource indicates an expected call of GetBlocklistSource.
+func (mr *MockStoreMockRecorder) GetBlocklistSource(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlocklistSource", reflect.TypeOf((*MockStore)(nil).GetBlocklistSource), ctx, id)
 }
 
 // GetDownloadClientSettings mocks base method.
@@ -411,6 +511,51 @@ func (mr *MockStoreMockRecorder) GetUserByUsername(ctx, username any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByUsername", reflect.TypeOf((*MockStore)(nil).GetUserByUsername), ctx, username)
 }
 
+// ListBlocklistRules mocks base method.
+func (m *MockStore) ListBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBlocklistRules", ctx)
+	ret0, _ := ret[0].([]database.BlocklistRule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBlocklistRules indicates an expected call of ListBlocklistRules.
+func (mr *MockStoreMockRecorder) ListBlocklistRules(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlocklistRules", reflect.TypeOf((*MockStore)(nil).ListBlocklistRules), ctx)
+}
+
+// ListBlocklistSources mocks base method.
+func (m *MockStore) ListBlocklistSources(ctx context.Context) ([]database.BlocklistSource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBlocklistSources", ctx)
+	ret0, _ := ret[0].([]database.BlocklistSource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBlocklistSources indicates an expected call of ListBlocklistSources.
+func (mr *MockStoreMockRecorder) ListBlocklistSources(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlocklistSources", reflect.TypeOf((*MockStore)(nil).ListBlocklistSources), ctx)
+}
+
+// ListEnabledBlocklistRules mocks base method.
+func (m *MockStore) ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnabledBlocklistRules", ctx)
+	ret0, _ := ret[0].([]database.BlocklistRule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnabledBlocklistRules indicates an expected call of ListEnabledBlocklistRules.
+func (mr *MockStoreMockRecorder) ListEnabledBlocklistRules(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledBlocklistRules", reflect.TypeOf((*MockStore)(nil).ListEnabledBlocklistRules), ctx)
+}
+
 // ListEnabledNotificationProviders mocks base method.
 func (m *MockStore) ListEnabledNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error) {
 	m.ctrl.T.Helper()
@@ -571,6 +716,34 @@ func (m *MockStore) UpdateAppSettings(ctx context.Context, s *database.AppSettin
 func (mr *MockStoreMockRecorder) UpdateAppSettings(ctx, s any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAppSettings", reflect.TypeOf((*MockStore)(nil).UpdateAppSettings), ctx, s)
+}
+
+// UpdateBlocklistSource mocks base method.
+func (m *MockStore) UpdateBlocklistSource(ctx context.Context, s *database.BlocklistSource) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBlocklistSource", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateBlocklistSource indicates an expected call of UpdateBlocklistSource.
+func (mr *MockStoreMockRecorder) UpdateBlocklistSource(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBlocklistSource", reflect.TypeOf((*MockStore)(nil).UpdateBlocklistSource), ctx, s)
+}
+
+// UpdateBlocklistSourceSync mocks base method.
+func (m *MockStore) UpdateBlocklistSourceSync(ctx context.Context, id uuid.UUID, etag string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBlocklistSourceSync", ctx, id, etag)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateBlocklistSourceSync indicates an expected call of UpdateBlocklistSourceSync.
+func (mr *MockStoreMockRecorder) UpdateBlocklistSourceSync(ctx, id, etag any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBlocklistSourceSync", reflect.TypeOf((*MockStore)(nil).UpdateBlocklistSourceSync), ctx, id, etag)
 }
 
 // UpdateDownloadClientSettings mocks base method.

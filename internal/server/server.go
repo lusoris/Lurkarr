@@ -73,6 +73,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	sabnzbdH := &api.SABnzbdHandler{DB: db}
 	userH := &api.UserHandler{DB: db}
 	queueH := &api.QueueHandler{DB: db}
+	blocklistH := &api.BlocklistHandler{DB: db}
 	notificationH := &api.NotificationHandler{DB: db, Manager: notifMgr}
 	seerrH := &api.SeerrHandler{DB: db}
 
@@ -198,6 +199,16 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
 	protected.HandleFunc("GET /api/queue/download-client/{app}", queueH.HandleGetDownloadClientSettings)
 	protected.HandleFunc("PUT /api/queue/download-client/{app}", queueH.HandleUpdateDownloadClientSettings)
+
+	// Blocklist Sources & Rules
+	protected.HandleFunc("GET /api/blocklist/sources", blocklistH.HandleListSources)
+	protected.HandleFunc("POST /api/blocklist/sources", blocklistH.HandleCreateSource)
+	protected.HandleFunc("GET /api/blocklist/sources/{id}", blocklistH.HandleGetSource)
+	protected.HandleFunc("PUT /api/blocklist/sources/{id}", blocklistH.HandleUpdateSource)
+	protected.HandleFunc("DELETE /api/blocklist/sources/{id}", blocklistH.HandleDeleteSource)
+	protected.HandleFunc("GET /api/blocklist/rules", blocklistH.HandleListRules)
+	protected.HandleFunc("POST /api/blocklist/rules", blocklistH.HandleCreateRule)
+	protected.HandleFunc("DELETE /api/blocklist/rules/{id}", blocklistH.HandleDeleteRule)
 
 	// Notifications
 	protected.HandleFunc("GET /api/notifications/providers", notificationH.HandleListProviders)
