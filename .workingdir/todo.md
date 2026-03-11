@@ -256,14 +256,14 @@
 
 ## Phase 9b: Uber FX Dependency Injection ⚡ PRIORITY — DO BEFORE FEATURE WORK
 
-> **STATUS: NOT STARTED** — Currently manual wiring in main.go
+> **STATUS: COMPLETE** — fx.New() app lifecycle with modules, providers, and lifecycle hooks
 
-- [ ] Add go.uber.org/fx dependency
-- [ ] Define fx.Module per package (database, logging, lurking, scheduler, cleaner, etc.)
-- [ ] Refactor main.go from manual wiring to fx.New() app lifecycle
-- [ ] Use fx.Provide / fx.Invoke for service startup
-- [ ] Add fx.Lifecycle hooks for graceful shutdown (replaces manual defer chains)
-- [ ] Health check integration (fx readiness/liveness)
+- [x] Add go.uber.org/fx dependency
+- [x] Define fx.Module per package (config, database, logging, notifications, scheduler, server, services, maintenance)
+- [x] Refactor main.go from manual wiring to fx.New() app lifecycle
+- [x] Use fx.Provide / fx.Invoke for service startup
+- [x] Add fx.Lifecycle hooks for graceful shutdown (replaces manual defer chains + signal handling)
+- [x] Health check integration (existing /api/health endpoint, fx handles signal-based shutdown)
 
 ## Phase 10: Grafana Dashboards (Professional)
 
