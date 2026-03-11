@@ -3,8 +3,6 @@ name: Helm
 on:
   push:
     branches: [develop]
-    paths:
-      - "deploy/helm/**"
   pull_request:
     paths:
       - "deploy/helm/**"
