@@ -224,6 +224,11 @@ type QueueCleanerSettings struct {
 	SeedingMode        string  `json:"seeding_mode"`         // "and" (both conditions) or "or" (either condition)
 	SeedingDeleteFiles bool    `json:"seeding_delete_files"` // Delete downloaded files on seeding removal
 	SeedingSkipPrivate bool    `json:"seeding_skip_private"` // Skip seeding rules for private trackers
+	// Orphan cleanup (all download client types)
+	OrphanEnabled            bool   `json:"orphan_enabled"`             // Enable orphan download detection
+	OrphanGraceMinutes       int    `json:"orphan_grace_minutes"`       // Minutes to wait before considering a download orphaned
+	OrphanDeleteFiles        bool   `json:"orphan_delete_files"`        // Delete downloaded files when removing orphans
+	OrphanExcludedCategories string `json:"orphan_excluded_categories"` // Comma-separated categories to exclude from orphan detection
 }
 
 // QueueStrike represents a strike against a problematic download.

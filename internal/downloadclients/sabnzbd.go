@@ -36,6 +36,25 @@ func (a *SABnzbdAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) {
 	return items, nil
 }
 
+func (a *SABnzbdAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error) {
+	hist, err := a.client.GetHistory(ctx, 200)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]DownloadItem, 0, len(hist.Slots))
+	for _, s := range hist.Slots {
+		items = append(items, DownloadItem{
+			ID:          s.NzoID,
+			Name:        s.Name,
+			Status:      s.Status,
+			Category:    s.Category,
+			Progress:    1.0,
+			CompletedAt: s.CompletedAt,
+		})
+	}
+	return items, nil
+}
+
 func (a *SABnzbdAdapter) PauseAll(ctx context.Context) error {
 	return a.client.Pause(ctx)
 }

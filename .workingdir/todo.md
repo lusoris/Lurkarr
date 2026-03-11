@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-11
-> State: Phases 0–6 complete, Phase 9a/9b complete, partial Phase 7. Phase 15 (docs/research) ~90% done. Phase 16 (code audit) ~95% done. Refactors: hunting→lurking rename, download client restructure, migration consolidation, Whisparr/Eros API rewrite, Seerr naming unification.
-> Priority order: Remaining Phase 16 cleanup → Phase 7 (Download Cleaner) → feature work
+> State: Phases 0–6 complete, Phase 9a/9b complete, Phase 16 complete. Phase 7 seeding rules done, orphan/hardlink/cross-seed remaining. Phase 15 ~90% done.
+> Priority order: Phase 7 remaining (orphans/hardlinks) → Phase 8 (Blocklist) → feature work
 
 ---
 
@@ -185,8 +185,8 @@
 
 ### 16.3 Dead Code / Unused Packages
 - [x] **`internal/cache`** — Removed. Was otter-backed W-TinyLFU cache implemented + tested but never wired in. Deleted since otter/v2 is used directly where needed.
-- [ ] **`internal/downloadclients`** — unified Client interface + 5 adapters built for Phase 7 (Download Cleaner Advanced). Not dead — pending integration.
-- [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called (Phase 7 planned use)
+- [x] **`internal/downloadclients`** — Now wired into queue cleaner (Phase 7 seeding rules). getTorrentClient() factory creates adapters from DB settings.
+- [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called (future use)
 - [x] `downloadclient/sabnzbd.RemoveItem` — Fixed: uses native `DeleteQueueItem` (mode=queue&name=delete)
 
 ### 16.4 Overlapping / Duplicate Code
@@ -206,10 +206,16 @@
 
 ## Phase 7: Download Cleaner (Advanced)
 
-### Seeding Rules (Torrent Clients)
-- [ ] Per-category seeding rules (max ratio, min/max seed time)
-- [ ] Delete source files option
-- [ ] Wire integrated torrent clients (qBit, Transmission, Deluge) into cleaner
+### ✅ Seeding Rules (Torrent Clients) — DONE
+- [x] DownloadItem extended with Ratio, SeedingTime, CompletedAt, AddedAt
+- [x] qBittorrent, Transmission, Deluge adapters populate seeding fields
+- [x] Deluge native client: seeding_time added to defaultFields
+- [x] Migration 002: seeding columns on queue_cleaner_settings + download_client_settings table
+- [x] QueueCleanerSettings model with 6 seeding fields (enabled, max_ratio, max_hours, mode, delete_files, skip_private)
+- [x] DownloadClientSettings model + CRUD queries + API endpoints (GET/PUT /api/queue/download-client/{app})
+- [x] cleanSeeding() phase 4 in queue cleaner: torrent client factory, download ID matching, ratio/time enforcement, and/or mode, skip-private
+- [x] seedingLimitReached() with 14 table-driven tests
+- [x] Delete source files option (SeedingDeleteFiles)
 
 ### Unlinked Download Handling
 - [ ] Detect orphan downloads not linked to any arr item

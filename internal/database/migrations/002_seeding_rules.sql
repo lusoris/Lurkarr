@@ -9,6 +9,13 @@ ALTER TABLE queue_cleaner_settings
     ADD COLUMN seeding_delete_files      BOOLEAN DEFAULT false,
     ADD COLUMN seeding_skip_private      BOOLEAN DEFAULT true;
 
+-- Orphan download cleanup columns.
+ALTER TABLE queue_cleaner_settings
+    ADD COLUMN orphan_enabled            BOOLEAN DEFAULT false,
+    ADD COLUMN orphan_grace_minutes      INT DEFAULT 120,
+    ADD COLUMN orphan_delete_files       BOOLEAN DEFAULT false,
+    ADD COLUMN orphan_excluded_categories TEXT DEFAULT '';
+
 -- Download client configuration per app type.
 CREATE TABLE download_client_settings (
     app_type    TEXT PRIMARY KEY,
@@ -31,6 +38,10 @@ ALTER TABLE queue_cleaner_settings
     DROP COLUMN IF EXISTS seeding_max_hours,
     DROP COLUMN IF EXISTS seeding_mode,
     DROP COLUMN IF EXISTS seeding_delete_files,
-    DROP COLUMN IF EXISTS seeding_skip_private;
+    DROP COLUMN IF EXISTS seeding_skip_private,
+    DROP COLUMN IF EXISTS orphan_enabled,
+    DROP COLUMN IF EXISTS orphan_grace_minutes,
+    DROP COLUMN IF EXISTS orphan_delete_files,
+    DROP COLUMN IF EXISTS orphan_excluded_categories;
 
 DROP TABLE IF EXISTS download_client_settings;

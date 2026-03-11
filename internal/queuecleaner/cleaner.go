@@ -2,7 +2,7 @@ package queuecleaner
 
 //go:generate mockgen -destination=mock_store_test.go -package=queuecleaner github.com/lusoris/lurkarr/internal/queuecleaner Store
 
-import (
+	import (
 	"context"
 	"log/slog"
 	"strconv"
@@ -17,9 +17,10 @@ import (
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/deluge"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
+	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/nzbget"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
-	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/logging"
+	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
 )
@@ -115,6 +116,11 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 			start := time.Now()
 			c.cleanInstance(ctx, log, appType, settings, inst)
 			metrics.QueueCleanerRunDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
+		}
+
+		// 5. Orphan detection — runs once per app type across all instances.
+		if settings.OrphanEnabled {
+			c.cleanOrphans(ctx, log, appType, settings, instances)
 		}
 
 		if !sleep(ctx, time.Duration(settings.CheckIntervalSeconds)*time.Second) {
@@ -447,9 +453,9 @@ func (c *Cleaner) notifyRemoval(ctx context.Context, appType database.AppType, i
 	})
 }
 
-// getTorrentClient builds a unified download client for the given app type's
-// configured torrent client, or returns nil if not configured/enabled.
-func (c *Cleaner) getTorrentClient(ctx context.Context, appType database.AppType) downloadclient.Client {
+// getDownloadClient builds a unified download client for the given app type's
+// configured download client, or returns nil if not configured/enabled.
+func (c *Cleaner) getDownloadClient(ctx context.Context, appType database.AppType) downloadclient.Client {
 	dcs, err := c.db.GetDownloadClientSettings(ctx, appType)
 	if err != nil || !dcs.Enabled || dcs.URL == "" {
 		return nil
@@ -470,6 +476,13 @@ func (c *Cleaner) getTorrentClient(ctx context.Context, appType database.AppType
 	case downloadclient.TypeDeluge:
 		native := deluge.NewClient(dcs.URL, dcs.Password, timeout)
 		return downloadclient.NewDelugeAdapter(native)
+	case downloadclient.TypeSABnzbd:
+		// For SABnzbd, the "password" field stores the API key.
+		native := sabnzbd.NewClient(dcs.URL, dcs.Password, timeout)
+		return downloadclient.NewSABnzbdAdapter(native)
+	case downloadclient.TypeNZBGet:
+		native := nzbget.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
+		return downloadclient.NewNZBGetAdapter(native)
 	default:
 		return nil
 	}
@@ -478,7 +491,7 @@ func (c *Cleaner) getTorrentClient(ctx context.Context, appType database.AppType
 // cleanSeeding checks completed torrent downloads against seeding rules and
 // removes items that have exceeded the configured ratio or seeding time.
 func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord) {
-	torrentClient := c.getTorrentClient(ctx, appType)
+	torrentClient := c.getDownloadClient(ctx, appType)
 	if torrentClient == nil {
 		return
 	}
@@ -564,6 +577,130 @@ func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, i
 		return ratioMet && timeMet
 	}
 	return ratioMet || timeMet // "or" mode (default)
+}
+
+// cleanOrphans detects downloads in the configured download client that are not
+// tracked by any *arr instance of this app type. Works for all client types
+// (torrent and usenet). Items must exceed the grace period and not match any
+// excluded category to be removed.
+func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, instances []database.AppInstance) {
+	dlClient := c.getDownloadClient(ctx, appType)
+	if dlClient == nil {
+		return
+	}
+
+	// Collect all known download IDs from all *arr instances of this app type.
+	knownIDs := make(map[string]bool)
+
+	lurker := lurking.LurkerFor(appType)
+	if lurker == nil {
+		return
+	}
+
+	genSettings, err := c.db.GetGeneralSettings(ctx)
+	if err != nil {
+		log.Error("orphan: failed to load general settings", "error", err)
+		return
+	}
+
+	for _, inst := range instances {
+		client := arrclient.NewClient(
+			inst.APIURL, inst.APIKey,
+			time.Duration(genSettings.APITimeout)*time.Second,
+			genSettings.SSLVerify,
+		)
+		queue, err := lurker.GetQueue(ctx, client)
+		if err != nil {
+			log.Warn("orphan: failed to get queue", "instance", inst.Name, "error", err)
+			continue
+		}
+		for _, r := range queue.Records {
+			if r.DownloadID != "" {
+				knownIDs[strings.ToLower(r.DownloadID)] = true
+			}
+		}
+	}
+
+	// Get all items from the download client (active + completed).
+	items, err := dlClient.GetItems(ctx)
+	if err != nil {
+		log.Error("orphan: failed to get download client items", "error", err)
+		return
+	}
+
+	// Also include history/completed items (important for usenet clients).
+	history, err := dlClient.GetHistory(ctx)
+	if err != nil {
+		log.Warn("orphan: failed to get download client history", "error", err)
+		// Non-fatal — continue with active items only.
+	} else {
+		// Merge, deduplicating by ID.
+		seen := make(map[string]bool, len(items))
+		for _, item := range items {
+			seen[strings.ToLower(item.ID)] = true
+		}
+		for _, item := range history {
+			if !seen[strings.ToLower(item.ID)] {
+				items = append(items, item)
+			}
+		}
+	}
+
+	// Parse excluded categories.
+	excludedCats := parseExcludedCategories(settings.OrphanExcludedCategories)
+
+	now := time.Now().Unix()
+	graceSeconds := int64(settings.OrphanGraceMinutes) * 60
+
+	for _, item := range items {
+		id := strings.ToLower(item.ID)
+
+		// Already tracked by an *arr instance — not an orphan.
+		if knownIDs[id] {
+			continue
+		}
+
+		// Check excluded categories.
+		if excludedCats[strings.ToLower(item.Category)] {
+			continue
+		}
+
+		// Grace period: skip if the item was added recently.
+		if item.AddedAt > 0 && (now-item.AddedAt) < graceSeconds {
+			continue
+		}
+		// For items without AddedAt, use CompletedAt as fallback.
+		if item.AddedAt == 0 && item.CompletedAt > 0 && (now-item.CompletedAt) < graceSeconds {
+			continue
+		}
+
+		log.Info("removing orphan download",
+			"name", item.Name,
+			"id", item.ID,
+			"category", item.Category,
+			"added_at", item.AddedAt,
+		)
+
+		if err := dlClient.RemoveItem(ctx, item.ID, settings.OrphanDeleteFiles); err != nil {
+			log.Error("orphan: failed to remove item", "name", item.Name, "error", err)
+			continue
+		}
+
+		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), "orphan").Inc()
+		c.notifyRemoval(ctx, appType, "orphan", item.Name, "orphan_not_tracked")
+	}
+}
+
+// parseExcludedCategories splits a comma-separated category string into a lookup set.
+func parseExcludedCategories(s string) map[string]bool {
+	cats := make(map[string]bool)
+	for _, c := range strings.Split(s, ",") {
+		c = strings.TrimSpace(strings.ToLower(c))
+		if c != "" {
+			cats[c] = true
+		}
+	}
+	return cats
 }
 
 // getSABnzbdStatuses fetches the SABnzbd queue and returns a map of downloadID -> status.

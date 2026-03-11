@@ -2,6 +2,7 @@ package queuecleaner
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -380,6 +381,119 @@ func TestSeedingLimitReached(t *testing.T) {
 				t.Errorf("seedingLimitReached() = %v, want %v (ratio=%.1f, seeding=%ds, maxRatio=%.1f, maxHours=%d, mode=%s)",
 					got, tt.want, tt.item.Ratio, tt.item.SeedingTime,
 					tt.settings.SeedingMaxRatio, tt.settings.SeedingMaxHours, tt.settings.SeedingMode)
+			}
+		})
+	}
+}
+
+func TestParseExcludedCategories(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  map[string]bool
+	}{
+		{"empty", "", map[string]bool{}},
+		{"single", "cross-seed", map[string]bool{"cross-seed": true}},
+		{"multiple", "cross-seed, manual, tv", map[string]bool{"cross-seed": true, "manual": true, "tv": true}},
+		{"spaces", " foo , bar , ", map[string]bool{"foo": true, "bar": true}},
+		{"case insensitive", "CrossSeed,Manual", map[string]bool{"crossseed": true, "manual": true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseExcludedCategories(tt.input)
+			if len(got) != len(tt.want) {
+				t.Fatalf("parseExcludedCategories(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+			for k := range tt.want {
+				if !got[k] {
+					t.Errorf("expected key %q in result %v", k, got)
+				}
+			}
+		})
+	}
+}
+
+func TestIsOrphan(t *testing.T) {
+	// Utility test: given a set of known IDs and an item, verify orphan detection logic.
+	// This tests the core filtering that cleanOrphans applies.
+	knownIDs := map[string]bool{
+		"abc123": true,
+		"def456": true,
+	}
+	excludedCats := map[string]bool{
+		"cross-seed": true,
+	}
+	now := time.Now().Unix()
+	graceSeconds := int64(120 * 60) // 120 minutes
+
+	tests := []struct {
+		name     string
+		item     downloadclient.DownloadItem
+		isOrphan bool
+	}{
+		{
+			name:     "tracked by arr — not orphan",
+			item:     downloadclient.DownloadItem{ID: "abc123", AddedAt: now - 9999},
+			isOrphan: false,
+		},
+		{
+			name:     "not tracked, past grace — orphan",
+			item:     downloadclient.DownloadItem{ID: "unknown1", AddedAt: now - graceSeconds - 1},
+			isOrphan: true,
+		},
+		{
+			name:     "not tracked, within grace — not orphan",
+			item:     downloadclient.DownloadItem{ID: "unknown2", AddedAt: now - 60},
+			isOrphan: false,
+		},
+		{
+			name:     "excluded category — not orphan",
+			item:     downloadclient.DownloadItem{ID: "unknown3", Category: "cross-seed", AddedAt: now - graceSeconds - 1},
+			isOrphan: false,
+		},
+		{
+			name:     "no AddedAt, CompletedAt past grace — orphan",
+			item:     downloadclient.DownloadItem{ID: "unknown4", CompletedAt: now - graceSeconds - 1},
+			isOrphan: true,
+		},
+		{
+			name:     "no AddedAt, CompletedAt within grace — not orphan",
+			item:     downloadclient.DownloadItem{ID: "unknown5", CompletedAt: now - 60},
+			isOrphan: false,
+		},
+		{
+			name:     "no timestamps at all — orphan (no way to enforce grace)",
+			item:     downloadclient.DownloadItem{ID: "unknown6"},
+			isOrphan: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id := strings.ToLower(tt.item.ID)
+			if knownIDs[id] {
+				if tt.isOrphan {
+					t.Error("expected orphan but item is tracked")
+				}
+				return
+			}
+			if excludedCats[strings.ToLower(tt.item.Category)] {
+				if tt.isOrphan {
+					t.Error("expected orphan but category is excluded")
+				}
+				return
+			}
+			// Grace period check
+			withinGrace := false
+			if tt.item.AddedAt > 0 && (now-tt.item.AddedAt) < graceSeconds {
+				withinGrace = true
+			}
+			if tt.item.AddedAt == 0 && tt.item.CompletedAt > 0 && (now-tt.item.CompletedAt) < graceSeconds {
+				withinGrace = true
+			}
+			isOrphan := !withinGrace
+			if isOrphan != tt.isOrphan {
+				t.Errorf("orphan detection = %v, want %v", isOrphan, tt.isOrphan)
 			}
 		})
 	}

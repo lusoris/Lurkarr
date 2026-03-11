@@ -45,6 +45,27 @@ func (a *NZBGetAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) {
 	return items, nil
 }
 
+func (a *NZBGetAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error) {
+	hist, err := a.client.GetHistory(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]DownloadItem, 0, len(hist))
+	for _, h := range hist {
+		totalSize := (h.FileSizeHi << 32) | h.FileSizeLo
+		items = append(items, DownloadItem{
+			ID:        strconv.Itoa(h.NZBID),
+			Name:      h.NZBName,
+			Status:    h.Status,
+			TotalSize: totalSize,
+			Category:  h.Category,
+			SavePath:  h.DestDir,
+			Progress:  1.0,
+		})
+	}
+	return items, nil
+}
+
 func (a *NZBGetAdapter) PauseAll(ctx context.Context) error {
 	return a.client.Pause(ctx)
 }

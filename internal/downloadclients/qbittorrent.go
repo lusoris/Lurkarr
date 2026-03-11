@@ -44,6 +44,22 @@ func (a *QBittorrentAdapter) GetItems(ctx context.Context) ([]DownloadItem, erro
 	return items, nil
 }
 
+func (a *QBittorrentAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error) {
+	// qBittorrent keeps all torrents (including completed/seeding) in the main list.
+	// Filter to completed items only.
+	items, err := a.GetItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var completed []DownloadItem
+	for _, item := range items {
+		if item.Progress >= 1.0 {
+			completed = append(completed, item)
+		}
+	}
+	return completed, nil
+}
+
 func (a *QBittorrentAdapter) PauseAll(ctx context.Context) error {
 	return a.client.PauseTorrents(ctx, []string{"all"})
 }

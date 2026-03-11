@@ -43,6 +43,22 @@ func (a *DelugeAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) {
 	return items, nil
 }
 
+func (a *DelugeAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error) {
+	// Deluge keeps all torrents in the main list.
+	// Filter to completed items only.
+	items, err := a.GetItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var completed []DownloadItem
+	for _, item := range items {
+		if item.Progress >= 1.0 {
+			completed = append(completed, item)
+		}
+	}
+	return completed, nil
+}
+
 func (a *DelugeAdapter) PauseAll(ctx context.Context) error {
 	torrents, err := a.client.GetTorrents(ctx)
 	if err != nil {

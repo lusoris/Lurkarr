@@ -49,6 +49,22 @@ func (a *TransmissionAdapter) GetItems(ctx context.Context) ([]DownloadItem, err
 	return items, nil
 }
 
+func (a *TransmissionAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error) {
+	// Transmission keeps all torrents in the main list.
+	// Filter to completed items only.
+	items, err := a.GetItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var completed []DownloadItem
+	for _, item := range items {
+		if item.Progress >= 1.0 {
+			completed = append(completed, item)
+		}
+	}
+	return completed, nil
+}
+
 func transmissionStatusString(status int) string {
 	switch status {
 	case transmission.StatusStopped:

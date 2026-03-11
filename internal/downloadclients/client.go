@@ -19,8 +19,8 @@ type DownloadItem struct {
 	SavePath      string  `json:"save_path"`
 	Ratio         float64 `json:"ratio"`        // upload/download ratio (torrent only)
 	SeedingTime   int64   `json:"seeding_time"` // seconds spent seeding (torrent only)
-	CompletedAt   int64   `json:"completed_at"` // unix timestamp of completion (torrent only)
-	AddedAt       int64   `json:"added_at"`     // unix timestamp when added (torrent only)
+	CompletedAt   int64   `json:"completed_at"` // unix timestamp of completion
+	AddedAt       int64   `json:"added_at"`     // unix timestamp when added
 }
 
 // ClientStatus represents the overall status of a download client.
@@ -36,6 +36,8 @@ type ClientStatus struct {
 type Client interface {
 	// GetItems returns all download items (queue + active).
 	GetItems(ctx context.Context) ([]DownloadItem, error)
+	// GetHistory returns completed/historical items no longer actively downloading.
+	GetHistory(ctx context.Context) ([]DownloadItem, error)
 	// PauseAll pauses all downloads.
 	PauseAll(ctx context.Context) error
 	// ResumeAll resumes all downloads.
