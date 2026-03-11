@@ -9,10 +9,15 @@ on:
 
 permissions:
   contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  CHART_NAME: lurkarr
 
 jobs:
   lint-and-package:
-    name: Lint & Package
+    name: Lint, Package & Push
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -29,7 +34,16 @@ jobs:
         run: helm lint deploy/helm/lurkarr
 
       - name: Package chart
-        run: helm package deploy/helm/lurkarr -d .helm-packages
+        run: |
+          COMMIT_SHA=${GITHUB_SHA::7}
+          sed -i "s/^version:.*/version: 0.0.0-dev.${COMMIT_SHA}/" deploy/helm/lurkarr/Chart.yaml
+          helm package deploy/helm/lurkarr -d .helm-packages
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Push chart to GHCR
+        run: helm push .helm-packages/*.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
 
       - name: Upload chart artifact
         uses: actions/upload-artifact@v4
