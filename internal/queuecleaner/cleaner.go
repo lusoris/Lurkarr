@@ -198,9 +198,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 // detectProblem checks if a queue item is stalled, slow, or metadata-stuck.
 // Returns the reason string, or "" if no problem.
 func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string) string {
-	// For Usenet via SABnzbd: check actual SABnzbd status
+	// For Usenet via SABnzbd: check actual SABnzbd status.
 	// SABnzbd items show as "Queued" when they're just waiting for a slot,
-	// NOT because they're stalled. This fixes the Cleanuparr bug.
+	// NOT because they're stalled.
 	if record.Protocol == "usenet" && record.DownloadID != "" {
 		if sabStatus, ok := sabStatuses[record.DownloadID]; ok {
 			switch sabStatus {
