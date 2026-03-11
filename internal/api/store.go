@@ -81,4 +81,8 @@ type Store interface {
 	CreateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	UpdateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	DeleteNotificationProvider(ctx context.Context, id uuid.UUID) error
+
+	// Seerr
+	GetSeerrSettings(ctx context.Context) (*database.SeerrSettings, error)
+	UpdateSeerrSettings(ctx context.Context, s *database.SeerrSettings) error
 }

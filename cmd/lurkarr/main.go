@@ -18,6 +18,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/queuecleaner"
 	"github.com/lusoris/lurkarr/internal/scheduler"
+	"github.com/lusoris/lurkarr/internal/seerr"
 	"github.com/lusoris/lurkarr/internal/server"
 )
 
@@ -88,6 +89,16 @@ func run() error {
 	importer.SetNotifier(notifMgr)
 	importer.Start(ctx)
 	defer importer.Stop()
+
+	seerrSync := seerr.NewSyncEngine(seerr.DBSettingsFunc(func(ctx context.Context) (string, string, bool, int, bool, error) {
+		s, err := db.GetSeerrSettings(ctx)
+		if err != nil {
+			return "", "", false, 0, false, err
+		}
+		return s.URL, s.APIKey, s.Enabled, s.SyncIntervalMinutes, s.AutoApprove, nil
+	}))
+	seerrSync.Start(ctx)
+	defer seerrSync.Stop()
 
 	csrfKey := []byte(cfg.CSRFKey)
 	if len(csrfKey) < 32 {

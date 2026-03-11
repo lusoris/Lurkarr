@@ -366,6 +366,21 @@ func (mr *MockStoreMockRecorder) GetScoringProfile(ctx, appType any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScoringProfile", reflect.TypeOf((*MockStore)(nil).GetScoringProfile), ctx, appType)
 }
 
+// GetSeerrSettings mocks base method.
+func (m *MockStore) GetSeerrSettings(ctx context.Context) (*database.SeerrSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSeerrSettings", ctx)
+	ret0, _ := ret[0].(*database.SeerrSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSeerrSettings indicates an expected call of GetSeerrSettings.
+func (mr *MockStoreMockRecorder) GetSeerrSettings(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSeerrSettings", reflect.TypeOf((*MockStore)(nil).GetSeerrSettings), ctx)
+}
+
 // GetUserByUsername mocks base method.
 func (m *MockStore) GetUserByUsername(ctx context.Context, username string) (*database.User, error) {
 	m.ctrl.T.Helper()
@@ -638,6 +653,20 @@ func (m *MockStore) UpdateScoringProfile(ctx context.Context, p *database.Scorin
 func (mr *MockStoreMockRecorder) UpdateScoringProfile(ctx, p any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateScoringProfile", reflect.TypeOf((*MockStore)(nil).UpdateScoringProfile), ctx, p)
+}
+
+// UpdateSeerrSettings mocks base method.
+func (m *MockStore) UpdateSeerrSettings(ctx context.Context, s *database.SeerrSettings) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSeerrSettings", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateSeerrSettings indicates an expected call of UpdateSeerrSettings.
+func (mr *MockStoreMockRecorder) UpdateSeerrSettings(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSeerrSettings", reflect.TypeOf((*MockStore)(nil).UpdateSeerrSettings), ctx, s)
 }
 
 // UpdateUsername mocks base method.

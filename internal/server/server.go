@@ -56,6 +56,7 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	userH := &api.UserHandler{DB: db}
 	queueH := &api.QueueHandler{DB: db}
 	notificationH := &api.NotificationHandler{DB: db, Manager: notifMgr}
+	seerrH := &api.SeerrHandler{DB: db}
 
 	mux := http.NewServeMux()
 
@@ -161,6 +162,13 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("PUT /api/notifications/providers/{id}", notificationH.HandleUpdateProvider)
 	protected.HandleFunc("DELETE /api/notifications/providers/{id}", notificationH.HandleDeleteProvider)
 	protected.HandleFunc("POST /api/notifications/providers/{id}/test", notificationH.HandleTestProvider)
+
+	// Seerr (Overseerr/Jellyseerr)
+	protected.HandleFunc("GET /api/seerr/settings", seerrH.HandleGetSettings)
+	protected.HandleFunc("PUT /api/seerr/settings", seerrH.HandleUpdateSettings)
+	protected.HandleFunc("POST /api/seerr/test", seerrH.HandleTestConnection)
+	protected.HandleFunc("GET /api/seerr/requests", seerrH.HandleGetRequests)
+	protected.HandleFunc("GET /api/seerr/requests/count", seerrH.HandleGetRequestCount)
 
 	// WebSocket (no CSRF, but auth required)
 	mux.Handle("GET /ws/logs", authMw.RequireAuth(http.HandlerFunc(logsH.HandleWebSocketLogs)))

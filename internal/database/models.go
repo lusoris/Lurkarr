@@ -280,3 +280,23 @@ type NotificationProvider struct {
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }
+
+// SeerrSettings holds Overseerr/Jellyseerr integration configuration.
+type SeerrSettings struct {
+	ID                  uuid.UUID `json:"id"`
+	URL                 string    `json:"url"`
+	APIKey              string    `json:"api_key"`
+	Enabled             bool      `json:"enabled"`
+	SyncIntervalMinutes int       `json:"sync_interval_minutes"`
+	AutoApprove         bool      `json:"auto_approve"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+// MaskedSeerrAPIKey returns the Seerr API key masked for display.
+func (s *SeerrSettings) MaskedSeerrAPIKey() string {
+	if len(s.APIKey) <= 4 {
+		return "****"
+	}
+	return "****" + s.APIKey[len(s.APIKey)-4:]
+}
