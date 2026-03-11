@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
 
 concurrency:
   group: release-${{ github.ref }}
@@ -11,27 +11,10 @@ concurrency:
 permissions:
   contents: write
   packages: write
-  pull-requests: write
 
 jobs:
-  release-please:
-    name: Release Please
-    runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
-    steps:
-      - uses: googleapis/release-please-action@v4
-        id: release
-        with:
-          release-type: go
-          default-branch: main
-
   publish:
     name: Publish (${{ matrix.goos }}/${{ matrix.goarch }})
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -68,20 +51,19 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          go build -ldflags="-s -w -X main.version=${{ needs.release-please.outputs.version }}" \
+          VERSION=${GITHUB_REF_NAME#v}
+          go build -ldflags="-s -w -X main.version=${VERSION}" \
             -o lurkarr-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/lurkarr
 
       - name: Upload release artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ needs.release-please.outputs.tag_name }} \
+          gh release upload ${{ github.ref_name }} \
             lurkarr-${{ matrix.goos }}-${{ matrix.goarch }}
 
   docker-release:
     name: Docker Release
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -108,7 +90,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -116,8 +98,6 @@ jobs:
 
   helm-release:
     name: Helm Chart Release
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,8 +111,9 @@ jobs:
 
       - name: Update chart version
         run: |
-          sed -i "s/^version:.*/version: ${{ needs.release-please.outputs.version }}/" deploy/helm/lurkarr/Chart.yaml
-          sed -i 's/^appVersion:.*/appVersion: "${{ needs.release-please.outputs.version }}"/' deploy/helm/lurkarr/Chart.yaml
+          VERSION=${GITHUB_REF_NAME#v}
+          sed -i "s/^version:.*/version: ${VERSION}/" deploy/helm/lurkarr/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" deploy/helm/lurkarr/Chart.yaml
 
       - name: Package chart
         run: helm package deploy/helm/lurkarr -d .helm-packages
@@ -141,5 +122,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ needs.release-please.outputs.tag_name }} \
+          gh release upload ${{ github.ref_name }} \
             .helm-packages/*.tgz
