@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-11
 > State: Phases 0–6 complete, partial Phase 7. Phase 15 (docs/research) ~90% done. Phase 16 (code audit) complete. Refactors: hunting→lurking rename, download client restructure, migration consolidation.
-> Priority order: Phase 9 (Uber FX) → feature work
+> Priority order: Phase 9a (Auth/Proxy) → Phase 9b (Uber FX) → feature work
 
 ---
 
@@ -223,7 +223,39 @@
 - [ ] Remove matching downloads from queue
 - [ ] Cross-Arr blocklist sync (propagate across instances of same type)
 
-## Phase 9: Uber FX Dependency Injection ⚡ PRIORITY — DO BEFORE FEATURE WORK
+## Phase 9a: Authentication & Reverse Proxy Support
+
+> **STATUS: NOT STARTED** — Basic proxy auth header bypass exists (Authelia/Authentik style via `PROXY_AUTH` + `PROXY_HEADER` env vars). Needs hardening and OIDC.
+
+### OIDC / SSO Support
+- [ ] OIDC provider configuration (issuer URL, client ID, client secret, scopes)
+- [ ] OIDC login flow (authorization code + PKCE)
+- [ ] Token validation + refresh (ID token → local session mapping)
+- [ ] Auto-create local user on first OIDC login (optional, configurable)
+- [ ] Group/role claim mapping (e.g., admin group → Lurkarr admin)
+- [ ] Support multiple providers (Authentik, Keycloak, Authelia, Dex, Google, etc.)
+- [ ] `/api/auth/oidc/callback` endpoint
+- [ ] Frontend login page: "Sign in with SSO" button alongside local login
+- [ ] DB table for OIDC provider config (issuer, client_id, redirect_uri, etc.)
+- [ ] Migration for OIDC tables
+
+### Proxy Authentication Hardening
+- [ ] Trusted proxy IP allowlist (`TRUSTED_PROXIES` env — CIDR ranges, default: private ranges only)
+- [ ] Reject proxy auth headers from untrusted source IPs (currently no IP validation)
+- [ ] Support multiple proxy header formats (Remote-User, X-Forwarded-User, X-authentik-username, etc.)
+- [ ] Auto-create user on first proxy auth if not exists (configurable)
+- [ ] Proxy auth + CSRF interaction audit (bypass CSRF when proxy auth active?)
+- [ ] Log warning when proxy auth enabled without trusted proxy config
+
+### Reverse Proxy Support
+- [ ] Base path / sub-path support (`BASE_PATH` env, e.g. `/lurkarr/`) — prefix all routes + static assets
+- [ ] Trusted proxy config for `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP` (rate limiter already reads XFF but doesn't validate source)
+- [ ] Respect `X-Forwarded-Proto` for secure cookie decisions (currently `SECURE_COOKIE` env only)
+- [ ] WebSocket upgrade behind reverse proxy (wss:// handling, connection upgrade headers)
+- [ ] Health check endpoint (`/healthz` or `/api/health`) that bypasses auth — for load balancer probes
+- [ ] Document reverse proxy configs (Traefik, Caddy, nginx, HAProxy) in README or docs/
+
+## Phase 9b: Uber FX Dependency Injection ⚡ PRIORITY — DO BEFORE FEATURE WORK
 
 > **STATUS: NOT STARTED** — Currently manual wiring in main.go
 
@@ -322,7 +354,9 @@
 | `github.com/coder/websocket` | v1.8.14 | WebSocket (logs, real-time) |
 | `github.com/gorilla/csrf` | v1.7.3 | CSRF protection |
 | `github.com/pquerna/otp` | v1.5.0 | TOTP 2FA |
-| `go.uber.org/fx` | TBD | Dependency injection (Phase 9) |
+| `go.uber.org/fx` | TBD | Dependency injection (Phase 9b) |
+| `github.com/coreos/go-oidc/v3` | TBD | OIDC token verification (Phase 9a) |
+| `golang.org/x/oauth2` | TBD | OAuth2 authorization code flow (Phase 9a) |
 | `github.com/ogen-go/ogen` | TBD | OpenAPI codegen (Phase 11) |
 | `@scalar/api-reference` | TBD | API docs UI (Phase 12) |
 
