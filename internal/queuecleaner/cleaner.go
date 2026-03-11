@@ -508,6 +508,9 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 		itemsByID[strings.ToLower(item.ID)] = item
 	}
 
+	// Build cross-seed map if enabled: count items sharing the same save path & size.
+	crossSeedCounts := countCrossSeeds(items)
+
 	for _, record := range records {
 		if record.Protocol != "torrent" {
 			continue
@@ -531,6 +534,12 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 		}
 
 		if !c.seedingLimitReached(settings, item) {
+			continue
+		}
+
+		// Skip cross-seeded items: multiple torrents sharing the same content.
+		if settings.SkipCrossSeeds && isCrossSeeded(item, crossSeedCounts) {
+			log.Info("cross-seed detected, skipping removal", "title", record.Title, "path", item.SavePath)
 			continue
 		}
 
@@ -656,6 +665,9 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 	// Parse excluded categories.
 	excludedCats := parseExcludedCategories(settings.OrphanExcludedCategories)
 
+	// Build cross-seed map: count items sharing the same save path & size.
+	crossSeedCounts := countCrossSeeds(items)
+
 	now := time.Now().Unix()
 	graceSeconds := int64(settings.OrphanGraceMinutes) * 60
 
@@ -681,6 +693,11 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 			continue
 		}
 
+		// Skip cross-seeded items to avoid breaking other seeders.
+		if settings.SkipCrossSeeds && isCrossSeeded(item, crossSeedCounts) {
+			continue
+		}
+
 		deleteFiles := settings.OrphanDeleteFiles
 		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
 			log.Info("hardlinks detected, skipping file deletion for orphan", "name", item.Name, "path", item.SavePath)
@@ -703,6 +720,33 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), "orphan").Inc()
 		c.notifyRemoval(ctx, appType, "orphan", item.Name, "orphan_not_tracked")
 	}
+}
+
+// pathSizeKey uniquely identifies download content by its location and total size.
+type pathSizeKey struct {
+	SavePath  string
+	TotalSize int64
+}
+
+// countCrossSeeds builds a map from pathSizeKey → number of items sharing that content.
+func countCrossSeeds(items []downloadclient.DownloadItem) map[pathSizeKey]int {
+	counts := make(map[pathSizeKey]int, len(items))
+	for _, item := range items {
+		if item.SavePath == "" || item.TotalSize == 0 {
+			continue
+		}
+		counts[pathSizeKey{SavePath: item.SavePath, TotalSize: item.TotalSize}]++
+	}
+	return counts
+}
+
+// isCrossSeeded returns true if the item shares its save path and total size
+// with at least one other item (indicative of cross-seeding).
+func isCrossSeeded(item downloadclient.DownloadItem, counts map[pathSizeKey]int) bool {
+	if item.SavePath == "" || item.TotalSize == 0 {
+		return false
+	}
+	return counts[pathSizeKey{SavePath: item.SavePath, TotalSize: item.TotalSize}] > 1
 }
 
 // parseExcludedCategories splits a comma-separated category string into a lookup set.

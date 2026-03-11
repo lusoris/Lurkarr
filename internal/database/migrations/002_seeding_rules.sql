@@ -20,6 +20,10 @@ ALTER TABLE queue_cleaner_settings
 ALTER TABLE queue_cleaner_settings
     ADD COLUMN hardlink_protection       BOOLEAN DEFAULT false;
 
+-- Cross-seed awareness: skip removal when multiple torrents share the same content.
+ALTER TABLE queue_cleaner_settings
+    ADD COLUMN skip_cross_seeds          BOOLEAN DEFAULT true;
+
 -- Download client configuration per app type.
 CREATE TABLE download_client_settings (
     app_type    TEXT PRIMARY KEY,
@@ -47,6 +51,7 @@ ALTER TABLE queue_cleaner_settings
     DROP COLUMN IF EXISTS orphan_grace_minutes,
     DROP COLUMN IF EXISTS orphan_delete_files,
     DROP COLUMN IF EXISTS orphan_excluded_categories,
-    DROP COLUMN IF EXISTS hardlink_protection;
+    DROP COLUMN IF EXISTS hardlink_protection,
+    DROP COLUMN IF EXISTS skip_cross_seeds;
 
 DROP TABLE IF EXISTS download_client_settings;

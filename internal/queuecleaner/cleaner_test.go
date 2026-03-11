@@ -495,3 +495,86 @@ func TestIsOrphan(t *testing.T) {
 		})
 	}
 }
+
+func TestCountCrossSeeds(t *testing.T) {
+	items := []downloadclient.DownloadItem{
+		{ID: "hash1", SavePath: "/data/movies/Movie.2024", TotalSize: 5000},
+		{ID: "hash2", SavePath: "/data/movies/Movie.2024", TotalSize: 5000}, // same path+size = cross-seed
+		{ID: "hash3", SavePath: "/data/movies/Movie.2024", TotalSize: 3000}, // same path, different size
+		{ID: "hash4", SavePath: "/data/tv/Show.S01", TotalSize: 8000},       // unique
+		{ID: "hash5", SavePath: "", TotalSize: 1000},                        // no save path
+		{ID: "hash6", SavePath: "/data/music/Album", TotalSize: 0},          // no size
+	}
+
+	counts := countCrossSeeds(items)
+
+	key := pathSizeKey{SavePath: "/data/movies/Movie.2024", TotalSize: 5000}
+	if counts[key] != 2 {
+		t.Errorf("cross-seed count for matching pair = %d, want 2", counts[key])
+	}
+
+	key2 := pathSizeKey{SavePath: "/data/movies/Movie.2024", TotalSize: 3000}
+	if counts[key2] != 1 {
+		t.Errorf("count for different size = %d, want 1", counts[key2])
+	}
+
+	key3 := pathSizeKey{SavePath: "/data/tv/Show.S01", TotalSize: 8000}
+	if counts[key3] != 1 {
+		t.Errorf("unique item count = %d, want 1", counts[key3])
+	}
+
+	if len(counts) != 3 {
+		t.Errorf("total keys = %d, want 3 (excluded empty path and zero size)", len(counts))
+	}
+}
+
+func TestIsCrossSeeded(t *testing.T) {
+	items := []downloadclient.DownloadItem{
+		{ID: "hash1", SavePath: "/data/movies/Movie.2024", TotalSize: 5000},
+		{ID: "hash2", SavePath: "/data/movies/Movie.2024", TotalSize: 5000},
+		{ID: "hash3", SavePath: "/data/tv/Show.S01", TotalSize: 8000},
+		{ID: "hash4", SavePath: "", TotalSize: 1000},
+	}
+	counts := countCrossSeeds(items)
+
+	tests := []struct {
+		name string
+		item downloadclient.DownloadItem
+		want bool
+	}{
+		{
+			name: "cross-seeded item",
+			item: downloadclient.DownloadItem{SavePath: "/data/movies/Movie.2024", TotalSize: 5000},
+			want: true,
+		},
+		{
+			name: "unique item",
+			item: downloadclient.DownloadItem{SavePath: "/data/tv/Show.S01", TotalSize: 8000},
+			want: false,
+		},
+		{
+			name: "empty save path",
+			item: downloadclient.DownloadItem{SavePath: "", TotalSize: 5000},
+			want: false,
+		},
+		{
+			name: "zero size",
+			item: downloadclient.DownloadItem{SavePath: "/data/movies/Movie.2024", TotalSize: 0},
+			want: false,
+		},
+		{
+			name: "unknown path",
+			item: downloadclient.DownloadItem{SavePath: "/data/other", TotalSize: 9999},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isCrossSeeded(tt.item, counts)
+			if got != tt.want {
+				t.Errorf("isCrossSeeded() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

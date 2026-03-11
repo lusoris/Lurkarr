@@ -231,6 +231,8 @@ type QueueCleanerSettings struct {
 	OrphanExcludedCategories string `json:"orphan_excluded_categories"` // Comma-separated categories to exclude from orphan detection
 	// Hardlink protection
 	HardlinkProtection bool `json:"hardlink_protection"` // Skip file deletion if files have hardlinks (nlink > 1)
+	// Cross-seed awareness
+	SkipCrossSeeds bool `json:"skip_cross_seeds"` // Skip removal if multiple torrents share the same content (save path + size)
 }
 
 // QueueStrike represents a strike against a problematic download.
