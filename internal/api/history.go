@@ -9,7 +9,7 @@ import (
 
 // HistoryHandler handles hunt history endpoints.
 type HistoryHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleListHistory handles GET /api/history.

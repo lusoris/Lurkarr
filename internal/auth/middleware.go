@@ -1,5 +1,7 @@
 package auth
 
+//go:generate mockgen -destination=mock_authstore_test.go -package=auth github.com/lusoris/lurkarr/internal/auth AuthStore
+
 import (
 	"context"
 	"log/slog"
@@ -18,15 +20,29 @@ const userContextKey contextKey = "user"
 const sessionCookieName = "lurkarr_session"
 const sessionDuration = 7 * 24 * time.Hour
 
+// AuthStore abstracts the database operations needed by auth middleware.
+type AuthStore interface {
+	GetUserByUsername(ctx context.Context, username string) (*database.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (*database.User, error)
+	GetSession(ctx context.Context, id uuid.UUID) (*database.Session, error)
+	CreateSession(ctx context.Context, userID uuid.UUID, duration time.Duration) (*database.Session, error)
+	DeleteSession(ctx context.Context, id uuid.UUID) error
+}
+
 // UserFromContext retrieves the authenticated user from the request context.
 func UserFromContext(ctx context.Context) *database.User {
 	u, _ := ctx.Value(userContextKey).(*database.User)
 	return u
 }
 
+// ContextWithUser returns a new context with the given user stored in it.
+func ContextWithUser(ctx context.Context, user *database.User) context.Context {
+	return context.WithValue(ctx, userContextKey, user)
+}
+
 // Middleware provides auth and CSRF middleware.
 type Middleware struct {
-	DB              *database.DB
+	DB              AuthStore
 	ProxyAuthBypass bool
 	ProxyHeader     string
 	CSRFKey         []byte

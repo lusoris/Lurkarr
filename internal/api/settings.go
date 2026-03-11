@@ -9,7 +9,7 @@ import (
 
 // SettingsHandler handles settings endpoints.
 type SettingsHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetAppSettings handles GET /api/settings/{app}.

@@ -139,6 +139,14 @@ type Schedule struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// ScheduleExecution represents a single schedule execution log entry.
+type ScheduleExecution struct {
+	ID         int64     `json:"id"`
+	ScheduleID uuid.UUID `json:"schedule_id"`
+	ExecutedAt time.Time `json:"executed_at"`
+	Result     *string   `json:"result"`
+}
+
 type LogEntry struct {
 	ID        int64     `json:"id"`
 	AppType   string    `json:"app_type"`

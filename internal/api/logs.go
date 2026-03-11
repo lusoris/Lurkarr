@@ -10,7 +10,7 @@ import (
 
 // LogsHandler handles log endpoints.
 type LogsHandler struct {
-	DB  *database.DB
+	DB  Store
 	Hub *logging.Hub
 }
 

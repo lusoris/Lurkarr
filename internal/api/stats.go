@@ -2,13 +2,11 @@ package api
 
 import (
 	"net/http"
-
-	"github.com/lusoris/lurkarr/internal/database"
 )
 
 // StatsHandler handles stats endpoints.
 type StatsHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetStats handles GET /api/stats.

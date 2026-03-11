@@ -7,6 +7,10 @@
 *.test
 *.out
 vendor/
+coverage*
+api_cov*
+cover
+cover_*
 
 # SvelteKit
 frontend/node_modules/

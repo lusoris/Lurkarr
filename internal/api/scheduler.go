@@ -12,7 +12,7 @@ import (
 
 // SchedulerHandler handles scheduling endpoints.
 type SchedulerHandler struct {
-	DB        *database.DB
+	DB        Store
 	Scheduler *scheduler.Scheduler
 }
 

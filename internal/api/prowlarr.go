@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/lusoris/lurkarr/internal/arrclient"
-	"github.com/lusoris/lurkarr/internal/database"
 )
 
 // ProwlarrHandler handles Prowlarr-related API endpoints.
 type ProwlarrHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetIndexers returns all Prowlarr indexers.

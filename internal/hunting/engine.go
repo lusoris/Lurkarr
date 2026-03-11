@@ -1,25 +1,43 @@
 package hunting
 
+//go:generate mockgen -destination=mock_store_test.go -package=hunting github.com/lusoris/lurkarr/internal/hunting Store
+
 import (
 	"context"
 	"log/slog"
 	"math/rand/v2"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
 )
 
+// Store abstracts the database operations needed by the hunting Engine.
+type Store interface {
+	GetAppSettings(ctx context.Context, appType database.AppType) (*database.AppSettings, error)
+	ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)
+	GetCurrentHourHits(ctx context.Context, appType database.AppType, instanceID uuid.UUID) (int, error)
+	GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error)
+	GetLastReset(ctx context.Context, appType database.AppType, instanceID uuid.UUID) (*time.Time, error)
+	ResetState(ctx context.Context, appType database.AppType, instanceID uuid.UUID) error
+	IsProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, huntType string) (bool, error)
+	MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, huntType string) error
+	AddHuntHistory(ctx context.Context, appType database.AppType, instanceID uuid.UUID, instanceName string, mediaID int, title, huntType string) error
+	IncrementStats(ctx context.Context, appType database.AppType, instanceID uuid.UUID, missing, upgrades int64) error
+	IncrementHourlyHits(ctx context.Context, appType database.AppType, instanceID uuid.UUID, count int) error
+}
+
 // Engine manages hunting goroutines for all app types.
 type Engine struct {
-	db     *database.DB
+	db     Store
 	logger *logging.Logger
 	cancel context.CancelFunc
 }
 
 // New creates a new hunting engine.
-func New(db *database.DB, logger *logging.Logger) *Engine {
+func New(db Store, logger *logging.Logger) *Engine {
 	return &Engine{db: db, logger: logger}
 }
 

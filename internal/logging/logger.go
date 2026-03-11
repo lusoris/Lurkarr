@@ -15,9 +15,16 @@ const (
 	flushBatchSize = 100
 )
 
+// LogStore abstracts the database operations needed by Logger.
+//go:generate mockgen -destination=mock_logstore_test.go -package=logging github.com/lusoris/lurkarr/internal/logging LogStore
+
+type LogStore interface {
+	InsertLogs(ctx context.Context, entries []database.LogEntry) error
+}
+
 // Logger wraps slog with async DB writes and WebSocket broadcast.
 type Logger struct {
-	db     *database.DB
+	db     LogStore
 	hub    *Hub
 	buffer chan database.LogEntry
 	done   chan struct{}
@@ -25,7 +32,7 @@ type Logger struct {
 }
 
 // New creates a new Logger that writes to DB asynchronously and broadcasts via WebSocket.
-func New(db *database.DB, hub *Hub) *Logger {
+func New(db LogStore, hub *Hub) *Logger {
 	l := &Logger{
 		db:     db,
 		hub:    hub,

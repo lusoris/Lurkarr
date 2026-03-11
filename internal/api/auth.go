@@ -23,7 +23,7 @@ type setupRequest struct {
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	DB   *database.DB
+	DB   Store
 	Auth *auth.Middleware
 }
 

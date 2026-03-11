@@ -55,18 +55,16 @@ func TestAppInstanceMaskedAPIKey(t *testing.T) {
 		apiKey string
 		want   string
 	}{
-		{"normal key", "abcdef1234567890", "****7890"},
-		{"short key", "abc", "****"},
+		{"long key", "abcdef123456", "****3456"},
+		{"short key", "ab", "****"},
+		{"empty key", "", "****"},
 		{"exactly 4", "abcd", "****"},
 		{"5 chars", "abcde", "****bcde"},
-		{"empty", "", "****"},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inst := &AppInstance{APIKey: tt.apiKey}
-			got := inst.MaskedAPIKey()
-			if got != tt.want {
+			a := &AppInstance{APIKey: tt.apiKey}
+			if got := a.MaskedAPIKey(); got != tt.want {
 				t.Errorf("MaskedAPIKey() = %q, want %q", got, tt.want)
 			}
 		})
@@ -75,36 +73,42 @@ func TestAppInstanceMaskedAPIKey(t *testing.T) {
 
 func TestProwlarrSettingsMaskedAPIKey(t *testing.T) {
 	tests := []struct {
+		name   string
 		apiKey string
 		want   string
 	}{
-		{"abcdef1234567890", "****7890"},
-		{"abc", "****"},
-		{"", "****"},
+		{"long key", "abcdef123456", "****3456"},
+		{"short key", "ab", "****"},
+		{"empty key", "", "****"},
+		{"exactly 4", "abcd", "****"},
 	}
 	for _, tt := range tests {
-		p := &ProwlarrSettings{APIKey: tt.apiKey}
-		got := p.MaskedAPIKey()
-		if got != tt.want {
-			t.Errorf("ProwlarrSettings.MaskedAPIKey() with %q = %q, want %q", tt.apiKey, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			p := &ProwlarrSettings{APIKey: tt.apiKey}
+			if got := p.MaskedAPIKey(); got != tt.want {
+				t.Errorf("MaskedAPIKey() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
 func TestSABnzbdSettingsMaskedAPIKey(t *testing.T) {
 	tests := []struct {
+		name   string
 		apiKey string
 		want   string
 	}{
-		{"abcdef1234567890", "****7890"},
-		{"abc", "****"},
-		{"", "****"},
+		{"long key", "abcdef123456", "****3456"},
+		{"short key", "ab", "****"},
+		{"empty key", "", "****"},
+		{"exactly 4", "abcd", "****"},
 	}
 	for _, tt := range tests {
-		s := &SABnzbdSettings{APIKey: tt.apiKey}
-		got := s.MaskedAPIKey()
-		if got != tt.want {
-			t.Errorf("SABnzbdSettings.MaskedAPIKey() with %q = %q, want %q", tt.apiKey, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			s := &SABnzbdSettings{APIKey: tt.apiKey}
+			if got := s.MaskedAPIKey(); got != tt.want {
+				t.Errorf("MaskedAPIKey() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

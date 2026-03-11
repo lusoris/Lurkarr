@@ -9,7 +9,7 @@ import (
 
 // StateHandler handles state reset endpoints.
 type StateHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetState handles GET /api/state.

@@ -5,12 +5,11 @@ import (
 	"net/http"
 
 	"github.com/lusoris/lurkarr/internal/auth"
-	"github.com/lusoris/lurkarr/internal/database"
 )
 
 // UserHandler handles user profile endpoints.
 type UserHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetUser handles GET /api/user.

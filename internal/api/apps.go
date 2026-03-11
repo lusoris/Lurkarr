@@ -11,7 +11,7 @@ import (
 
 // AppsHandler handles app instance CRUD endpoints.
 type AppsHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleListInstances handles GET /api/instances/{app}.

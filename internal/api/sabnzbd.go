@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/lusoris/lurkarr/internal/arrclient"
-	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/sabnzbd"
 )
 
 // SABnzbdHandler handles SABnzbd-related API endpoints.
 type SABnzbdHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetQueue returns the SABnzbd download queue.

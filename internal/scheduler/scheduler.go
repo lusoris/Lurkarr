@@ -1,5 +1,7 @@
 package scheduler
 
+//go:generate mockgen -destination=mock_store_test.go -package=scheduler github.com/lusoris/lurkarr/internal/scheduler Store
+
 import (
 	"context"
 	"fmt"
@@ -9,20 +11,32 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
 )
 
+// Store defines the database methods used by the scheduler.
+type Store interface {
+	CleanupOldHourlyCaps(ctx context.Context) (int64, error)
+	ListSchedules(ctx context.Context) ([]database.Schedule, error)
+	AddScheduleExecution(ctx context.Context, scheduleID uuid.UUID, result string) error
+	ListInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)
+	UpdateInstance(ctx context.Context, id uuid.UUID, name, apiURL, apiKey string, enabled bool) error
+	GetAppSettings(ctx context.Context, appType database.AppType) (*database.AppSettings, error)
+	UpdateAppSettings(ctx context.Context, s *database.AppSettings) error
+}
+
 // Scheduler manages cron-based scheduling via gocron/v2.
 type Scheduler struct {
-	db     *database.DB
+	db     Store
 	logger *logging.Logger
 	cron   gocron.Scheduler
 	mu     sync.Mutex
 }
 
 // New creates a new scheduler.
-func New(db *database.DB, logger *logging.Logger) (*Scheduler, error) {
+func New(db Store, logger *logging.Logger) (*Scheduler, error) {
 	cron, err := gocron.NewScheduler(
 		gocron.WithLocation(time.UTC),
 	)

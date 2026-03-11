@@ -525,12 +525,7 @@ func (db *DB) AddScheduleExecution(ctx context.Context, scheduleID uuid.UUID, re
 	return err
 }
 
-func (db *DB) ListScheduleExecutions(ctx context.Context, limit int) ([]struct {
-	ID         int64     `json:"id"`
-	ScheduleID uuid.UUID `json:"schedule_id"`
-	ExecutedAt time.Time `json:"executed_at"`
-	Result     *string   `json:"result"`
-}, error) {
+func (db *DB) ListScheduleExecutions(ctx context.Context, limit int) ([]ScheduleExecution, error) {
 	rows, err := db.Pool.Query(ctx,
 		`SELECT id, schedule_id, executed_at, result FROM schedule_executions
 		 ORDER BY executed_at DESC LIMIT $1`, limit,
@@ -540,19 +535,9 @@ func (db *DB) ListScheduleExecutions(ctx context.Context, limit int) ([]struct {
 	}
 	defer rows.Close()
 
-	var result []struct {
-		ID         int64     `json:"id"`
-		ScheduleID uuid.UUID `json:"schedule_id"`
-		ExecutedAt time.Time `json:"executed_at"`
-		Result     *string   `json:"result"`
-	}
+	var result []ScheduleExecution
 	for rows.Next() {
-		var e struct {
-			ID         int64     `json:"id"`
-			ScheduleID uuid.UUID `json:"schedule_id"`
-			ExecutedAt time.Time `json:"executed_at"`
-			Result     *string   `json:"result"`
-		}
+		var e ScheduleExecution
 		if err := rows.Scan(&e.ID, &e.ScheduleID, &e.ExecutedAt, &e.Result); err != nil {
 			return nil, err
 		}

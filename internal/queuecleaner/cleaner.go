@@ -1,5 +1,7 @@
 package queuecleaner
 
+//go:generate mockgen -destination=mock_store_test.go -package=queuecleaner github.com/lusoris/lurkarr/internal/queuecleaner Store
+
 import (
 	"context"
 	"log/slog"
@@ -8,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
@@ -15,16 +18,29 @@ import (
 	"github.com/lusoris/lurkarr/internal/sabnzbd"
 )
 
+// Store abstracts the database operations needed by the Cleaner.
+type Store interface {
+	GetQueueCleanerSettings(ctx context.Context, appType database.AppType) (*database.QueueCleanerSettings, error)
+	ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)
+	GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error)
+	GetScoringProfile(ctx context.Context, appType database.AppType) (*database.ScoringProfile, error)
+	LogBlocklist(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID, title, reason string) error
+	ResetStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string) error
+	AddStrike(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID, title, reason string) error
+	CountStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string, windowHours int) (int, error)
+	GetSABnzbdSettings(ctx context.Context) (*database.SABnzbdSettings, error)
+}
+
 // Cleaner monitors download queues and removes stalled/slow/duplicate items.
 type Cleaner struct {
-	db     *database.DB
+	db     Store
 	logger *logging.Logger
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
 
 // New creates a new queue cleaner.
-func New(db *database.DB, logger *logging.Logger) *Cleaner {
+func New(db Store, logger *logging.Logger) *Cleaner {
 	return &Cleaner{db: db, logger: logger}
 }
 

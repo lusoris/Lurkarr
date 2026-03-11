@@ -1,5 +1,7 @@
 package hunting
 
+//go:generate mockgen -destination=mock_arrhunter_test.go -package=hunting github.com/lusoris/lurkarr/internal/hunting ArrHunter
+
 import (
 	"context"
 

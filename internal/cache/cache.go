@@ -10,6 +10,8 @@ import (
 
 const defaultTTL = 30 * time.Second
 
+//go:generate mockgen -destination=mock_settingsloader_test.go -package=cache -source=cache.go -mock_names=settingsLoader=MockSettingsLoader
+
 type settingsLoader interface {
 	GetAppSettings(ctx context.Context, appType database.AppType) (*database.AppSettings, error)
 	GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error)

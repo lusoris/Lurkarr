@@ -1,5 +1,7 @@
 package autoimport
 
+//go:generate mockgen -destination=mock_store_test.go -package=autoimport github.com/lusoris/lurkarr/internal/autoimport Store
+
 import (
 	"context"
 	"log/slog"
@@ -7,24 +9,32 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/hunting"
 	"github.com/lusoris/lurkarr/internal/logging"
 )
 
+// Store abstracts the database operations needed by the Importer.
+type Store interface {
+	ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)
+	GetGeneralSettings(ctx context.Context) (*database.GeneralSettings, error)
+	LogAutoImport(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, mediaTitle string, queueItemID int, action, reason string) error
+}
+
 // Importer watches for downloads stuck with "Unable to Import Automatically"
 // and attempts to resolve them by triggering a manual import if the content
 // matches the expected media by ID and the custom format score is acceptable.
 type Importer struct {
-	db     *database.DB
+	db     Store
 	logger *logging.Logger
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
 
 // New creates a new auto-importer.
-func New(db *database.DB, logger *logging.Logger) *Importer {
+func New(db Store, logger *logging.Logger) *Importer {
 	return &Importer{db: db, logger: logger}
 }
 

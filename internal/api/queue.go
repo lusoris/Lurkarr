@@ -9,7 +9,7 @@ import (
 
 // QueueHandler handles queue cleaner management endpoints.
 type QueueHandler struct {
-	DB *database.DB
+	DB Store
 }
 
 // HandleGetQueueCleanerSettings handles GET /api/queue/settings/{app}.
