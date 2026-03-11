@@ -37,7 +37,7 @@ func (h *SettingsHandler) HandleUpdateAppSettings(w http.ResponseWriter, r *http
 		return
 	}
 
-	limitBody(r)
+	limitBody(w, r)
 	var settings database.AppSettings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -88,7 +88,7 @@ func (h *SettingsHandler) HandleUpdateGeneralSettings(w http.ResponseWriter, r *
 		return
 	}
 
-	limitBody(r)
+	limitBody(w, r)
 	var update database.GeneralSettings
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))

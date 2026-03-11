@@ -65,6 +65,24 @@ func run() error {
 
 	notifMgr := notifications.NewManager()
 
+	// Load notification providers from database.
+	enabledProviders, err := db.ListEnabledNotificationProviders(ctx)
+	if err != nil {
+		slog.Warn("failed to load notification providers", "error", err)
+	} else {
+		configs := make([]notifications.ProviderConfig, len(enabledProviders))
+		for i, np := range enabledProviders {
+			configs[i] = notifications.ProviderConfig{
+				Type:   np.Type,
+				Config: np.Config,
+				Events: np.Events,
+			}
+		}
+		if loadErr := notifMgr.LoadProviders(configs); loadErr != nil {
+			slog.Warn("some notification providers failed to load", "error", loadErr)
+		}
+	}
+
 	engine := hunting.New(db, logger)
 	engine.SetNotifier(notifMgr)
 	engine.Start(ctx)
@@ -78,7 +96,11 @@ func run() error {
 	if err := sched.Start(ctx); err != nil {
 		return fmt.Errorf("start scheduler: %w", err)
 	}
-	defer func() { _ = sched.Stop() }()
+	defer func() {
+		if err := sched.Stop(); err != nil {
+			slog.Warn("failed to stop scheduler", "error", err)
+		}
+	}()
 
 	cleaner := queuecleaner.New(db, logger)
 	cleaner.SetNotifier(notifMgr)
@@ -130,25 +152,39 @@ func run() error {
 			select {
 			case <-ticker.C:
 				mCtx, mCancel := context.WithTimeout(ctx, 30*time.Second)
-				cleaned, _ := db.CleanExpiredSessions(mCtx)
-				if cleaned > 0 {
+				cleaned, err := db.CleanExpiredSessions(mCtx)
+				if err != nil {
+					slog.Warn("failed to clean expired sessions", "error", err)
+				} else if cleaned > 0 {
 					slog.Info("cleaned expired sessions", "count", cleaned)
 				}
-				reset, _ := db.AutoResetExpiredStates(mCtx, 168)
-				if reset > 0 {
+				reset, err := db.AutoResetExpiredStates(mCtx, 168)
+				if err != nil {
+					slog.Warn("failed to auto-reset expired states", "error", err)
+				} else if reset > 0 {
 					slog.Info("auto-reset expired states", "count", reset)
 				}
-				pruned, _ := db.PruneLogs(mCtx, 30)
-				if pruned > 0 {
+				pruned, err := db.PruneLogs(mCtx, 30)
+				if err != nil {
+					slog.Warn("failed to prune logs", "error", err)
+				} else if pruned > 0 {
 					slog.Info("pruned old logs", "count", pruned)
 				}
-				caps, _ := db.CleanupOldHourlyCaps(mCtx)
-				if caps > 0 {
+				caps, err := db.CleanupOldHourlyCaps(mCtx)
+				if err != nil {
+					slog.Warn("failed to cleanup old hourly caps", "error", err)
+				} else if caps > 0 {
 					slog.Info("cleaned old hourly caps", "count", caps)
 				}
-				_ = db.PruneStrikes(mCtx, 7*24*time.Hour)
-				_ = db.PruneAutoImportLog(mCtx, 30*24*time.Hour)
-				_ = db.PruneBlocklistLog(mCtx, 30*24*time.Hour)
+				if err := db.PruneStrikes(mCtx, 7*24*time.Hour); err != nil {
+					slog.Warn("failed to prune strikes", "error", err)
+				}
+				if err := db.PruneAutoImportLog(mCtx, 30*24*time.Hour); err != nil {
+					slog.Warn("failed to prune auto import log", "error", err)
+				}
+				if err := db.PruneBlocklistLog(mCtx, 30*24*time.Hour); err != nil {
+					slog.Warn("failed to prune blocklist log", "error", err)
+				}
 				mCancel()
 			case <-ctx.Done():
 				return

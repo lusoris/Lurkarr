@@ -45,7 +45,7 @@ func (h *ProwlarrHandler) HandleGetIndexerStats(w http.ResponseWriter, r *http.R
 
 // HandleTestConnection tests the Prowlarr connection.
 func (h *ProwlarrHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
-	limitBody(r)
+	limitBody(w, r)
 	var body struct {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`

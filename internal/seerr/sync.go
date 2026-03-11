@@ -21,8 +21,8 @@ type Settings struct {
 	AutoApprove         bool
 }
 
-// SyncEngine periodically polls Seerr for approved requests and triggers
-// searches in the matching arr instance.
+// SyncEngine periodically polls Seerr for pending requests. It monitors
+// request status and optionally auto-approves pending requests.
 type SyncEngine struct {
 	settings SettingsProvider
 	cancel   context.CancelFunc

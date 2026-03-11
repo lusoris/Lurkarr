@@ -274,8 +274,12 @@ func (e *Engine) huntMissing(ctx context.Context, log *slog.Logger, appType data
 	}
 
 	if hunted > 0 {
-		_ = e.db.IncrementStats(ctx, appType, inst.ID, int64(hunted), 0)
-		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, hunted)
+		if err := e.db.IncrementStats(ctx, appType, inst.ID, int64(hunted), 0); err != nil {
+			log.Warn("failed to increment stats", "error", err)
+		}
+		if err := e.db.IncrementHourlyHits(ctx, appType, inst.ID, hunted); err != nil {
+			log.Warn("failed to increment hourly hits", "error", err)
+		}
 		metrics.HuntMissingFound.WithLabelValues(string(appType), inst.Name).Add(float64(hunted))
 	}
 	return hunted
@@ -312,15 +316,23 @@ func (e *Engine) huntUpgrades(ctx context.Context, log *slog.Logger, appType dat
 			continue
 		}
 		metrics.HuntSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
-		_ = e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "upgrade")
-		_ = e.db.AddHuntHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "upgrade")
+		if err := e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "upgrade"); err != nil {
+			log.Warn("failed to mark processed", "media_id", item.ID, "error", err)
+		}
+		if err := e.db.AddHuntHistory(ctx, appType, inst.ID, inst.Name, item.ID, item.Title, "upgrade"); err != nil {
+			log.Warn("failed to add hunt history", "media_id", item.ID, "error", err)
+		}
 		upgraded++
 		log.Info("hunted upgrade", "title", item.Title, "media_id", item.ID)
 	}
 
 	if upgraded > 0 {
-		_ = e.db.IncrementStats(ctx, appType, inst.ID, 0, int64(upgraded))
-		_ = e.db.IncrementHourlyHits(ctx, appType, inst.ID, upgraded)
+		if err := e.db.IncrementStats(ctx, appType, inst.ID, 0, int64(upgraded)); err != nil {
+			log.Warn("failed to increment stats", "error", err)
+		}
+		if err := e.db.IncrementHourlyHits(ctx, appType, inst.ID, upgraded); err != nil {
+			log.Warn("failed to increment hourly hits", "error", err)
+		}
 		metrics.HuntUpgradesFound.WithLabelValues(string(appType), inst.Name).Add(float64(upgraded))
 	}
 	return upgraded

@@ -396,6 +396,21 @@ func (mr *MockStoreMockRecorder) GetUserByUsername(ctx, username any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByUsername", reflect.TypeOf((*MockStore)(nil).GetUserByUsername), ctx, username)
 }
 
+// ListEnabledNotificationProviders mocks base method.
+func (m *MockStore) ListEnabledNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnabledNotificationProviders", ctx)
+	ret0, _ := ret[0].([]database.NotificationProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnabledNotificationProviders indicates an expected call of ListEnabledNotificationProviders.
+func (mr *MockStoreMockRecorder) ListEnabledNotificationProviders(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledNotificationProviders", reflect.TypeOf((*MockStore)(nil).ListEnabledNotificationProviders), ctx)
+}
+
 // ListHuntHistory mocks base method.
 func (m *MockStore) ListHuntHistory(ctx context.Context, q database.HistoryQuery) ([]database.HuntHistory, int, error) {
 	m.ctrl.T.Helper()

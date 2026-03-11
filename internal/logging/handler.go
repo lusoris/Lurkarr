@@ -19,8 +19,10 @@ type Hub struct {
 }
 
 type wsClient struct {
-	conn      *websocket.Conn
-	send      chan []byte
+	conn *websocket.Conn
+	send chan []byte
+
+	mu        sync.RWMutex
 	appFilter string
 	lvlFilter string
 }
@@ -43,10 +45,14 @@ func (h *Hub) Broadcast(entry database.LogEntry) {
 	defer h.mu.RUnlock()
 
 	for c := range h.clients {
-		if c.appFilter != "" && c.appFilter != entry.AppType {
+		c.mu.RLock()
+		appF, lvlF := c.appFilter, c.lvlFilter
+		c.mu.RUnlock()
+
+		if appF != "" && appF != entry.AppType {
 			continue
 		}
-		if c.lvlFilter != "" && c.lvlFilter != entry.Level {
+		if lvlF != "" && lvlF != entry.Level {
 			continue
 		}
 		// Non-blocking send with backpressure
@@ -130,8 +136,10 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			Level string `json:"level"`
 		}
 		if json.Unmarshal(msg, &filter) == nil {
+			client.mu.Lock()
 			client.appFilter = filter.App
 			client.lvlFilter = filter.Level
+			client.mu.Unlock()
 		}
 	}
 

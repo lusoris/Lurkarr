@@ -26,7 +26,7 @@ func (h *SeerrHandler) HandleGetSettings(w http.ResponseWriter, r *http.Request)
 
 // HandleUpdateSettings handles PUT /api/seerr/settings.
 func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) {
-	limitBody(r)
+	limitBody(w, r)
 
 	var req struct {
 		URL                 string `json:"url"`

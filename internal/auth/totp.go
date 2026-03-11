@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"image/png"
 
 	"github.com/pquerna/otp/totp"
 	qrcode "github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"
 )
 
-type nopCloser struct {
-	*bytes.Buffer
+// nopCloseBuffer wraps bytes.Buffer to satisfy io.WriteCloser.
+type nopCloseBuffer struct {
+	bytes.Buffer
 }
 
-func (nopCloser) Close() error { return nil }
+func (nopCloseBuffer) Close() error { return nil }
 
 // GenerateTOTP creates a new TOTP secret and returns the secret string and a QR code as base64 PNG.
 func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) {
@@ -29,22 +31,34 @@ func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) 
 	secret = key.Secret()
 	uri := key.URL()
 
-	qrc, qrErr := qrcode.NewWith(uri)
-	if qrErr != nil {
-		return secret, "", nil //nolint:nilerr // intentional fallback without QR
+	qrc, err := qrcode.NewWith(uri)
+	if err != nil {
+		return "", "", fmt.Errorf("create qr code: %w", err)
 	}
 
-	var buf bytes.Buffer
-	wr := standard.NewWithWriter(nopCloser{&buf})
+	var buf nopCloseBuffer
+	wr := standard.NewWithWriter(&buf)
 	if saveErr := qrc.Save(wr); saveErr != nil {
-		return secret, "", nil //nolint:nilerr // intentional fallback without QR
+		// Fallback: return secret without QR if rendering fails
+		return secret, "", nil
 	}
 
-	qrBase64 = base64.StdEncoding.EncodeToString(buf.Bytes())
+	// Re-encode as PNG
+	img, decErr := png.Decode(&buf)
+	if decErr != nil {
+		return secret, "", nil
+	}
+
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		return secret, "", nil
+	}
+
+	qrBase64 = base64.StdEncoding.EncodeToString(pngBuf.Bytes())
 	return secret, qrBase64, nil
 }
 
-// ValidateTOTP checks a TOTP code against a secret.
+// ValidateTOTP verifies a TOTP code against a secret.
 func ValidateTOTP(code, secret string) bool {
 	return totp.Validate(code, secret)
 }

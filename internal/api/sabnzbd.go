@@ -89,7 +89,7 @@ func (h *SABnzbdHandler) HandleResume(w http.ResponseWriter, r *http.Request) {
 
 // HandleTestConnection tests the SABnzbd connection.
 func (h *SABnzbdHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
-	limitBody(r)
+	limitBody(w, r)
 	var body struct {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`

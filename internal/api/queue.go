@@ -37,7 +37,7 @@ func (h *QueueHandler) HandleUpdateQueueCleanerSettings(w http.ResponseWriter, r
 		return
 	}
 
-	limitBody(r)
+	limitBody(w, r)
 	var s database.QueueCleanerSettings
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -78,7 +78,7 @@ func (h *QueueHandler) HandleUpdateScoringProfile(w http.ResponseWriter, r *http
 		return
 	}
 
-	limitBody(r)
+	limitBody(w, r)
 	var p database.ScoringProfile
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))

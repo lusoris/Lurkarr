@@ -167,7 +167,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				log.Error("failed to remove duplicate", "error", err)
 				continue
 			}
-			_ = c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score")
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score"); err != nil {
+				log.Warn("failed to log blocklist", "title", d.RemoveTitle, "error", err)
+			}
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, d.RemoveTitle, "duplicate_lower_score")
@@ -185,7 +187,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			progress := float64(record.Size-record.Sizeleft) / float64(record.Size)
 			if progress > 0.5 && record.TrackedDownloadStatus != "warning" {
 				// Over 50% and healthy — clear any old strikes
-				_ = c.db.ResetStrikes(ctx, appType, inst.ID, record.DownloadID)
+				if err := c.db.ResetStrikes(ctx, appType, inst.ID, record.DownloadID); err != nil {
+					log.Warn("failed to reset strikes", "download_id", record.DownloadID, "error", err)
+				}
 				continue
 			}
 		}
@@ -215,7 +219,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				log.Error("failed to remove struck item", "error", err)
 				continue
 			}
-			_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes")
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes"); err != nil {
+				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+			}
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
@@ -286,17 +292,34 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 }
 
 // isPrivateTracker determines if a torrent is from a private tracker.
-// Arr's indexer flags or known private tracker patterns indicate this.
+// It uses indexer flags from the arr API (set only by private indexers) as the
+// primary signal, with a known-public-tracker fallback for older arr versions.
 func isPrivateTracker(record arrclient.QueueRecord) bool {
-	// Public trackers have empty or well-known public indexer names
+	// Indexer flags are only populated by private trackers (freeleech, internal, etc.).
+	if record.IndexerFlags != 0 {
+		return true
+	}
+
 	indexer := strings.ToLower(record.Indexer)
 	if indexer == "" {
-		return false // Unknown — assume public
+		return false
 	}
-	// Arrs label items grabbed via Prowlarr with the indexer name.
-	// Private trackers generally have unique names vs public ones like "1337x", "rarbg", "yts", etc.
-	// Without indexer flag data, we default to "not private" — the safe choice.
-	return false
+
+	// Well-known public indexers — if matched, definitely not private.
+	publicIndexers := []string{
+		"1337x", "rarbg", "yts", "nyaa", "eztv", "limetorrents",
+		"thepiratebay", "kickasstorrents", "torrentz2", "glodls",
+		"magnetdl", "ettv", "isohunt", "bt4g", "solidtorrents",
+		"bitsearch", "torrentgalaxy", "fitgirl",
+	}
+	for _, pub := range publicIndexers {
+		if indexer == pub {
+			return false
+		}
+	}
+
+	// Has an indexer name but not recognized as public → treat as private.
+	return true
 }
 
 // cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
@@ -313,7 +336,9 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 			log.Error("failed to remove failed import", "error", err)
 			continue
 		}
-		_ = c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "failed_import: "+reason)
+		if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "failed_import: "+reason); err != nil {
+			log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+		}
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 		metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)

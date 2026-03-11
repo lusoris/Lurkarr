@@ -222,14 +222,55 @@ func TestAPIVersionFor(t *testing.T) {
 }
 
 func TestIsPrivateTracker(t *testing.T) {
-	record := arrclient.QueueRecord{Indexer: "1337x"}
-	if isPrivateTracker(record) {
-		t.Error("expected 1337x to be public")
+	tests := []struct {
+		name    string
+		record  arrclient.QueueRecord
+		private bool
+	}{
+		{
+			name:    "empty indexer is public",
+			record:  arrclient.QueueRecord{},
+			private: false,
+		},
+		{
+			name:    "known public indexer 1337x",
+			record:  arrclient.QueueRecord{Indexer: "1337x"},
+			private: false,
+		},
+		{
+			name:    "known public indexer YTS case-insensitive",
+			record:  arrclient.QueueRecord{Indexer: "YTS"},
+			private: false,
+		},
+		{
+			name:    "known public indexer nyaa",
+			record:  arrclient.QueueRecord{Indexer: "nyaa"},
+			private: false,
+		},
+		{
+			name:    "indexer flags set means private",
+			record:  arrclient.QueueRecord{Indexer: "1337x", IndexerFlags: 1},
+			private: true,
+		},
+		{
+			name:    "unknown indexer treated as private",
+			record:  arrclient.QueueRecord{Indexer: "MyPrivateTracker"},
+			private: true,
+		},
+		{
+			name:    "indexer flags only no name",
+			record:  arrclient.QueueRecord{IndexerFlags: 32},
+			private: true,
+		},
 	}
 
-	empty := arrclient.QueueRecord{}
-	if isPrivateTracker(empty) {
-		t.Error("expected empty indexer to be public")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isPrivateTracker(tt.record)
+			if got != tt.private {
+				t.Errorf("isPrivateTracker(%+v) = %v, want %v", tt.record, got, tt.private)
+			}
+		})
 	}
 }
 

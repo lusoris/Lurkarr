@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -58,5 +59,30 @@ func TestErrorResponseEmpty(t *testing.T) {
 	result := errorResponse("")
 	if result["error"] != "" {
 		t.Errorf("errorResponse empty = %v, want empty error", result)
+	}
+}
+
+func TestLimitBodyRejectsOversized(t *testing.T) {
+	// Create a body larger than maxRequestBodySize (1 MB).
+	bigBody := strings.NewReader(strings.Repeat("x", maxRequestBodySize+1))
+	r := httptest.NewRequest("POST", "/", bigBody)
+	w := httptest.NewRecorder()
+
+	limitBody(w, r)
+
+	// Reading the body should fail with MaxBytesError.
+	buf := make([]byte, maxRequestBodySize+2)
+	_, err := r.Body.Read(buf)
+	if err == nil {
+		t.Fatal("expected error reading oversized body")
+	}
+}
+
+func TestWriteJSONUnmarshalableLogsError(t *testing.T) {
+	rec := httptest.NewRecorder()
+	// A channel is not JSON-marshalable — should log error, not panic.
+	writeJSON(rec, http.StatusOK, make(chan int))
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }

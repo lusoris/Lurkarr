@@ -77,6 +77,7 @@ type Store interface {
 
 	// Notifications
 	ListNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error)
+	ListEnabledNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error)
 	GetNotificationProvider(ctx context.Context, id uuid.UUID) (*database.NotificationProvider, error)
 	CreateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	UpdateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error

@@ -943,6 +943,19 @@ func TestHandleUpdateProwlarrSettings_MaskedKey(t *testing.T) {
 	}
 }
 
+func TestHandleUpdateProwlarrSettings_ShortKey(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UpdateProwlarrSettings(gomock.Any(), gomock.Any()).Return(nil)
+	h := &ProwlarrHandler{DB: store}
+	body, _ := json.Marshal(database.ProwlarrSettings{URL: "http://localhost:9696", APIKey: "ab"})
+	w := httptest.NewRecorder()
+	h.HandleUpdateSettings(w, httptest.NewRequest("PUT", "/api/prowlarr/settings", bytes.NewReader(body)))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: short API key should not panic", w.Code)
+	}
+}
+
 func TestHandleUpdateProwlarrSettings_BadBody(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
@@ -1078,6 +1091,19 @@ func TestHandleUpdateSABnzbdSettings_MaskedKey(t *testing.T) {
 	h.HandleUpdateSettings(w, httptest.NewRequest("PUT", "/api/sabnzbd/settings", bytes.NewReader(body)))
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateSABnzbdSettings_ShortKey(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UpdateSABnzbdSettings(gomock.Any(), gomock.Any()).Return(nil)
+	h := &SABnzbdHandler{DB: store}
+	body, _ := json.Marshal(database.SABnzbdSettings{URL: "http://localhost:8080", APIKey: "ab"})
+	w := httptest.NewRecorder()
+	h.HandleUpdateSettings(w, httptest.NewRequest("PUT", "/api/sabnzbd/settings", bytes.NewReader(body)))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: short API key should not panic", w.Code)
 	}
 }
 

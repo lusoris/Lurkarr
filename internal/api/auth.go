@@ -29,7 +29,7 @@ type AuthHandler struct {
 
 // HandleLogin handles POST /api/auth/login.
 func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	limitBody(r)
+	limitBody(w, r)
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -98,7 +98,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limitBody(r)
+	limitBody(w, r)
 	var req setupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -200,7 +200,7 @@ func (h *AuthHandler) Handle2FAVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limitBody(r)
+	limitBody(w, r)
 	var req struct {
 		Code string `json:"code"`
 	}

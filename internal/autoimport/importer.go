@@ -169,7 +169,9 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 						"file", best.Name,
 						"score", best.CustomFormatScore,
 						"queue_score", record.CustomFormatScore)
-					_ = imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "manual_import_available", best.Name)
+					if err := imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "manual_import_available", best.Name); err != nil {
+						log.Warn("failed to log auto import", "title", record.Title, "error", err)
+					}
 					continue
 				}
 			}
@@ -181,7 +183,9 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 			continue
 		}
 
-		_ = imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "rescan_triggered", formatStatusMessages(record.StatusMessages))
+		if err := imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "rescan_triggered", formatStatusMessages(record.StatusMessages)); err != nil {
+			log.Warn("failed to log auto import", "title", record.Title, "error", err)
+		}
 	}
 }
 

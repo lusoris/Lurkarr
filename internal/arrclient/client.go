@@ -148,6 +148,7 @@ type QueueRecord struct {
 	TimeleftStr           string          `json:"timeleft"`
 	Protocol              string          `json:"protocol"`
 	Indexer               string          `json:"indexer"`
+	IndexerFlags          int             `json:"indexerFlags"`
 	DownloadClient        string          `json:"downloadClient"`
 	TrackedDownloadStatus string          `json:"trackedDownloadStatus"`
 	TrackedDownloadState  string          `json:"trackedDownloadState"`
