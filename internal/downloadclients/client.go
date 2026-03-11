@@ -1,4 +1,4 @@
-// Package downloadclient provides a unified interface for interacting with
+// Package downloadclients provides a unified interface for interacting with
 // download clients (both torrent and usenet).
 package downloadclient
 

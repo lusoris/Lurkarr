@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/lusoris/lurkarr/internal/arrclient"
-	"github.com/lusoris/lurkarr/internal/sabnzbd"
+	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 )
 
 // SABnzbdHandler handles SABnzbd-related API endpoints.

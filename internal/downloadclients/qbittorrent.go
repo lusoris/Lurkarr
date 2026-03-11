@@ -3,7 +3,7 @@ package downloadclient
 import (
 	"context"
 
-	"github.com/lusoris/lurkarr/internal/qbittorrent"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
 )
 
 // QBittorrentAdapter wraps a qBittorrent client to implement the Client interface.

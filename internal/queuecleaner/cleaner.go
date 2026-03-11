@@ -17,7 +17,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
-	"github.com/lusoris/lurkarr/internal/sabnzbd"
+	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 )
 
 // Store abstracts the database operations needed by the Cleaner.

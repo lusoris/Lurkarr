@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/lusoris/lurkarr/internal/nzbget"
+	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/nzbget"
 )
 
 // NZBGetAdapter wraps an NZBGet client to implement the Client interface.

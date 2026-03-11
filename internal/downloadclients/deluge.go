@@ -3,7 +3,7 @@ package downloadclient
 import (
 	"context"
 
-	"github.com/lusoris/lurkarr/internal/deluge"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/deluge"
 )
 
 // DelugeAdapter wraps a Deluge client to implement the Client interface.

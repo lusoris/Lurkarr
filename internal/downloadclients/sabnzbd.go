@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/lusoris/lurkarr/internal/sabnzbd"
+	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 )
 
 // SABnzbdAdapter wraps a SABnzbd client to implement the Client interface.

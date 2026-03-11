@@ -4,7 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/lusoris/lurkarr/internal/transmission"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
 )
 
 // TransmissionAdapter wraps a Transmission client to implement the Client interface.
