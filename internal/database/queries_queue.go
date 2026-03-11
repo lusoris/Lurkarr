@@ -20,7 +20,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        failed_import_remove, failed_import_blocklist, metadata_stuck_minutes,
 		        seeding_enabled, seeding_max_ratio, seeding_max_hours,
 		        seeding_mode, seeding_delete_files, seeding_skip_private,
-		        orphan_enabled, orphan_grace_minutes, orphan_delete_files, orphan_excluded_categories
+		        orphan_enabled, orphan_grace_minutes, orphan_delete_files, orphan_excluded_categories,
+		        hardlink_protection
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -29,7 +30,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.FailedImportRemove, &s.FailedImportBlocklist, &s.MetadataStuckMinutes,
 		&s.SeedingEnabled, &s.SeedingMaxRatio, &s.SeedingMaxHours,
 		&s.SeedingMode, &s.SeedingDeleteFiles, &s.SeedingSkipPrivate,
-		&s.OrphanEnabled, &s.OrphanGraceMinutes, &s.OrphanDeleteFiles, &s.OrphanExcludedCategories)
+		&s.OrphanEnabled, &s.OrphanGraceMinutes, &s.OrphanDeleteFiles, &s.OrphanExcludedCategories,
+		&s.HardlinkProtection)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -47,7 +49,7 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        seeding_enabled = $16, seeding_max_ratio = $17, seeding_max_hours = $18,
 		        seeding_mode = $19, seeding_delete_files = $20, seeding_skip_private = $21,
 		        orphan_enabled = $22, orphan_grace_minutes = $23, orphan_delete_files = $24,
-		        orphan_excluded_categories = $25
+		        orphan_excluded_categories = $25, hardlink_protection = $26
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -56,7 +58,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.FailedImportRemove, s.FailedImportBlocklist, s.MetadataStuckMinutes,
 		s.SeedingEnabled, s.SeedingMaxRatio, s.SeedingMaxHours,
 		s.SeedingMode, s.SeedingDeleteFiles, s.SeedingSkipPrivate,
-		s.OrphanEnabled, s.OrphanGraceMinutes, s.OrphanDeleteFiles, s.OrphanExcludedCategories)
+		s.OrphanEnabled, s.OrphanGraceMinutes, s.OrphanDeleteFiles, s.OrphanExcludedCategories,
+		s.HardlinkProtection)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

@@ -229,6 +229,8 @@ type QueueCleanerSettings struct {
 	OrphanGraceMinutes       int    `json:"orphan_grace_minutes"`       // Minutes to wait before considering a download orphaned
 	OrphanDeleteFiles        bool   `json:"orphan_delete_files"`        // Delete downloaded files when removing orphans
 	OrphanExcludedCategories string `json:"orphan_excluded_categories"` // Comma-separated categories to exclude from orphan detection
+	// Hardlink protection
+	HardlinkProtection bool `json:"hardlink_protection"` // Skip file deletion if files have hardlinks (nlink > 1)
 }
 
 // QueueStrike represents a strike against a problematic download.

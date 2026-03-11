@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-11
-> State: Phases 0–6 complete, Phase 9a/9b complete, Phase 16 complete. Phase 7 seeding rules done, orphan/hardlink/cross-seed remaining. Phase 15 ~90% done.
-> Priority order: Phase 7 remaining (orphans/hardlinks) → Phase 8 (Blocklist) → feature work
+> State: Phases 0–6 complete, Phase 9a/9b complete, Phase 16 complete. Phase 7 seeding + orphan done, hardlink/cross-seed remaining. Phase 15 ~90% done.
+> Priority order: Phase 7 remaining (hardlinks/cross-seed) → Phase 8 (Blocklist) → feature work
 
 ---
 
@@ -217,10 +217,18 @@
 - [x] seedingLimitReached() with 14 table-driven tests
 - [x] Delete source files option (SeedingDeleteFiles)
 
-### Unlinked Download Handling
-- [ ] Detect orphan downloads not linked to any arr item
+### ✅ Orphan Detection (All Download Clients) — DONE
+- [x] GetHistory() added to downloadclient.Client interface
+- [x] GetHistory implemented in all 5 adapters (qBit/Transmission/Deluge filter completed; SABnzbd/NZBGet call native GetHistory)
+- [x] getTorrentClient → getDownloadClient with SABnzbd + NZBGet support
+- [x] cleanOrphans(): aggregates queue records across all *arr instances, cross-refs with download client items+history
+- [x] Grace period (orphan_grace_minutes), excluded categories (orphan_excluded_categories), delete files option
+- [x] Migration 002 extended with 4 orphan columns
+- [x] 12 tests: parseExcludedCategories + orphan detection logic
+
+### Remaining
 - [ ] Hardlink detection (don't remove if hardlinked)
-- [ ] Cross-seed awareness
+- [ ] Cross-seed awareness (detect cross-seeded torrents by content hash match)
 
 ## Phase 8: Malware & Blocklist
 

@@ -2,7 +2,7 @@ package queuecleaner
 
 //go:generate mockgen -destination=mock_store_test.go -package=queuecleaner github.com/lusoris/lurkarr/internal/queuecleaner Store
 
-	import (
+import (
 	"context"
 	"log/slog"
 	"strconv"
@@ -534,6 +534,12 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			continue
 		}
 
+		deleteFiles := settings.SeedingDeleteFiles
+		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
+			log.Info("hardlinks detected, skipping file deletion", "title", record.Title, "path", item.SavePath)
+			deleteFiles = false
+		}
+
 		log.Info("seeding limit reached, removing",
 			"title", record.Title,
 			"ratio", item.Ratio,
@@ -541,10 +547,11 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			"max_ratio", settings.SeedingMaxRatio,
 			"max_hours", settings.SeedingMaxHours,
 			"mode", settings.SeedingMode,
+			"delete_files", deleteFiles,
 		)
 
 		// Remove from the torrent client directly.
-		if err := torrentClient.RemoveItem(ctx, item.ID, settings.SeedingDeleteFiles); err != nil {
+		if err := torrentClient.RemoveItem(ctx, item.ID, deleteFiles); err != nil {
 			log.Error("failed to remove seeded torrent", "title", record.Title, "error", err)
 			continue
 		}
@@ -674,14 +681,21 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 			continue
 		}
 
+		deleteFiles := settings.OrphanDeleteFiles
+		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
+			log.Info("hardlinks detected, skipping file deletion for orphan", "name", item.Name, "path", item.SavePath)
+			deleteFiles = false
+		}
+
 		log.Info("removing orphan download",
 			"name", item.Name,
 			"id", item.ID,
 			"category", item.Category,
 			"added_at", item.AddedAt,
+			"delete_files", deleteFiles,
 		)
 
-		if err := dlClient.RemoveItem(ctx, item.ID, settings.OrphanDeleteFiles); err != nil {
+		if err := dlClient.RemoveItem(ctx, item.ID, deleteFiles); err != nil {
 			log.Error("orphan: failed to remove item", "name", item.Name, "error", err)
 			continue
 		}

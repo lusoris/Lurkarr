@@ -484,10 +484,7 @@ func TestIsOrphan(t *testing.T) {
 				return
 			}
 			// Grace period check
-			withinGrace := false
-			if tt.item.AddedAt > 0 && (now-tt.item.AddedAt) < graceSeconds {
-				withinGrace = true
-			}
+			withinGrace := tt.item.AddedAt > 0 && (now-tt.item.AddedAt) < graceSeconds
 			if tt.item.AddedAt == 0 && tt.item.CompletedAt > 0 && (now-tt.item.CompletedAt) < graceSeconds {
 				withinGrace = true
 			}

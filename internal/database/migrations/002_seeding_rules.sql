@@ -16,6 +16,10 @@ ALTER TABLE queue_cleaner_settings
     ADD COLUMN orphan_delete_files       BOOLEAN DEFAULT false,
     ADD COLUMN orphan_excluded_categories TEXT DEFAULT '';
 
+-- Hardlink protection: skip file deletion when files have hardlinks.
+ALTER TABLE queue_cleaner_settings
+    ADD COLUMN hardlink_protection       BOOLEAN DEFAULT false;
+
 -- Download client configuration per app type.
 CREATE TABLE download_client_settings (
     app_type    TEXT PRIMARY KEY,
@@ -42,6 +46,7 @@ ALTER TABLE queue_cleaner_settings
     DROP COLUMN IF EXISTS orphan_enabled,
     DROP COLUMN IF EXISTS orphan_grace_minutes,
     DROP COLUMN IF EXISTS orphan_delete_files,
-    DROP COLUMN IF EXISTS orphan_excluded_categories;
+    DROP COLUMN IF EXISTS orphan_excluded_categories,
+    DROP COLUMN IF EXISTS hardlink_protection;
 
 DROP TABLE IF EXISTS download_client_settings;
