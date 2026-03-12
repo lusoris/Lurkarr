@@ -4,7 +4,10 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    { "title": "System", "url": "/d/lurkarr-system", "type": "link", "icon": "bolt" },
+    { "title": "Logs", "url": "/d/lurkarr-logs", "type": "link", "icon": "document-info" }
+  ],
   "panels": [
     {
       "collapsed": false,
@@ -27,7 +30,7 @@
       "title": "Total Searches (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_lurk_searches_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_searches_total{app_type=~\"$app_type\", instance=~\"$instance\"}[24h]))",
         "legendFormat": "searches"
       }]
     },
@@ -45,7 +48,7 @@
       "title": "Missing Found (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_lurk_missing_found_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_missing_found_total{app_type=~\"$app_type\", instance=~\"$instance\"}[24h]))",
         "legendFormat": "missing"
       }]
     },
@@ -63,7 +66,7 @@
       "title": "Upgrades Found (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_lurk_upgrades_found_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_upgrades_found_total{app_type=~\"$app_type\", instance=~\"$instance\"}[24h]))",
         "legendFormat": "upgrades"
       }]
     },
@@ -75,13 +78,13 @@
           "thresholds": { "steps": [{ "color": "red", "value": null }] }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 1 },
       "id": 4,
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Lurk Errors (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_lurk_errors_total[24h]))",
+        "expr": "sum(increase(lurkarr_lurk_errors_total{app_type=~\"$app_type\", instance=~\"$instance\"}[24h]))",
         "legendFormat": "errors"
       }]
     },
@@ -93,14 +96,32 @@
           "thresholds": { "steps": [{ "color": "orange", "value": null }] }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 1 },
       "id": 5,
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "title": "Queue Items Removed (24h)",
+      "title": "Queue Removed (24h)",
       "type": "stat",
       "targets": [{
-        "expr": "sum(increase(lurkarr_queue_cleaner_items_removed_total[24h]))",
+        "expr": "sum(increase(lurkarr_queue_cleaner_items_removed_total{app_type=~\"$app_type\", instance=~\"$instance\"}[24h]))",
         "legendFormat": "removed"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "semi-dark-red", "value": null }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 1 },
+      "id": 7,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Blocklist Adds (24h)",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(increase(lurkarr_queue_cleaner_blocklist_additions_total{app_type=~\"$app_type\", instance=~\"$instance\"}[24h]))",
+        "legendFormat": "blocklist"
       }]
     },
     {
@@ -111,7 +132,7 @@
           "thresholds": { "steps": [{ "color": "yellow", "value": null }] }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 1 },
       "id": 6,
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "title": "Scheduler Runs (24h)",
@@ -138,7 +159,7 @@
       "title": "Lurk Searches per App Type",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type) (rate(lurkarr_lurk_searches_total[$__rate_interval]))",
+        "expr": "sum by (app_type) (rate(lurkarr_lurk_searches_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
         "legendFormat": "{{app_type}}"
       }]
     },
@@ -152,11 +173,11 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(lurkarr_lurk_missing_found_total[$__rate_interval]))",
+          "expr": "sum(rate(lurkarr_lurk_missing_found_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "missing"
         },
         {
-          "expr": "sum(rate(lurkarr_lurk_upgrades_found_total[$__rate_interval]))",
+          "expr": "sum(rate(lurkarr_lurk_upgrades_found_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "upgrades"
         }
       ]
@@ -166,22 +187,38 @@
       "fieldConfig": { "defaults": { "unit": "s" } },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
       "id": 12,
-      "title": "Lurk Duration (p95)",
+      "title": "Lurk Duration (p50 / p95 / p99)",
       "type": "timeseries",
-      "targets": [{
-        "expr": "histogram_quantile(0.95, sum by (le, app_type) (rate(lurkarr_lurk_duration_seconds_bucket[$__rate_interval])))",
-        "legendFormat": "{{app_type}} p95"
-      }]
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, app_type) (rate(lurkarr_lurk_duration_seconds_bucket{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{app_type}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, app_type) (rate(lurkarr_lurk_duration_seconds_bucket{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{app_type}} p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, app_type) (rate(lurkarr_lurk_duration_seconds_bucket{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{app_type}} p99"
+        }
+      ]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] }
+        }
+      },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
       "id": 13,
-      "title": "Lurk Errors by App Type",
+      "title": "Lurk Error Rate %",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type) (rate(lurkarr_lurk_errors_total[$__rate_interval]))",
+        "expr": "sum by (app_type) (rate(lurkarr_lurk_errors_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval])) / clamp_min(sum by (app_type) (rate(lurkarr_lurk_searches_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval])), 1)",
         "legendFormat": "{{app_type}}"
       }]
     },
@@ -196,36 +233,48 @@
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "short" } },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 23 },
       "id": 20,
       "title": "Items Removed by Instance",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (instance) (rate(lurkarr_queue_cleaner_items_removed_total[$__rate_interval]))",
+        "expr": "sum by (instance) (rate(lurkarr_queue_cleaner_items_removed_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
         "legendFormat": "{{instance}}"
       }]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "short" } },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 23 },
       "id": 21,
       "title": "Strikes Issued",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type) (rate(lurkarr_queue_cleaner_strikes_total[$__rate_interval]))",
+        "expr": "sum by (app_type) (rate(lurkarr_queue_cleaner_strikes_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
+        "legendFormat": "{{app_type}}"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 23 },
+      "id": 23,
+      "title": "Blocklist Additions",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sum by (app_type) (rate(lurkarr_queue_cleaner_blocklist_additions_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
         "legendFormat": "{{app_type}}"
       }]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "s" } },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 23 },
       "id": 22,
       "title": "Cleaner Run Duration (p95)",
       "type": "timeseries",
       "targets": [{
-        "expr": "histogram_quantile(0.95, sum by (le, app_type) (rate(lurkarr_queue_cleaner_run_duration_seconds_bucket[$__rate_interval])))",
+        "expr": "histogram_quantile(0.95, sum by (le, app_type) (rate(lurkarr_queue_cleaner_run_duration_seconds_bucket{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval])))",
         "legendFormat": "{{app_type}} p95"
       }]
     },
@@ -240,7 +289,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "reqps" } },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
       "id": 30,
       "title": "Request Rate by Method",
       "type": "timeseries",
@@ -252,9 +301,9 @@
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "reqps" } },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
       "id": 31,
-      "title": "Error Rate (4xx/5xx)",
+      "title": "Error Rate (4xx / 5xx)",
       "type": "timeseries",
       "targets": [
         {
@@ -266,6 +315,24 @@
           "legendFormat": "5xx"
         }
       ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 }] }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "id": 36,
+      "title": "HTTP Error Rate %",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sum(rate(lurkarr_http_requests_total{status=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(lurkarr_http_requests_total[$__rate_interval])), 1)",
+        "legendFormat": "5xx %"
+      }]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -350,12 +417,18 @@
       "fieldConfig": { "defaults": { "unit": "Bps" } },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 57 },
       "id": 41,
-      "title": "Download Speed",
+      "title": "Download / Upload Speed",
       "type": "timeseries",
-      "targets": [{
-        "expr": "lurkarr_download_client_speed_bytes_per_second{direction=\"download\"}",
-        "legendFormat": "{{client_type}} ({{instance}})"
-      }]
+      "targets": [
+        {
+          "expr": "lurkarr_download_client_speed_bytes_per_second{direction=\"download\"}",
+          "legendFormat": "↓ {{client_type}} ({{instance}})"
+        },
+        {
+          "expr": "lurkarr_download_client_speed_bytes_per_second{direction=\"upload\"}",
+          "legendFormat": "↑ {{client_type}} ({{instance}})"
+        }
+      ]
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -390,7 +463,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "short" } },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 66 },
       "id": 50,
       "title": "Scheduler Executions by Task",
       "type": "timeseries",
@@ -401,8 +474,20 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 66 },
+      "id": 54,
+      "title": "Scheduler Duration (p95)",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, task_type) (rate(lurkarr_scheduler_duration_seconds_bucket[$__rate_interval])))",
+        "legendFormat": "{{task_type}} p95"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": { "defaults": { "unit": "short" } },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 66 },
       "id": 51,
       "title": "Scheduler Errors",
       "type": "timeseries",
@@ -419,7 +504,7 @@
       "title": "Auto-Import Runs by App Type",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type) (rate(lurkarr_autoimport_runs_total[$__rate_interval]))",
+        "expr": "sum by (app_type) (rate(lurkarr_autoimport_runs_total{app_type=~\"$app_type\"}[$__rate_interval]))",
         "legendFormat": "{{app_type}}"
       }]
     },
@@ -431,7 +516,7 @@
       "title": "Auto-Import Errors",
       "type": "timeseries",
       "targets": [{
-        "expr": "sum by (app_type, instance) (rate(lurkarr_autoimport_errors_total[$__rate_interval]))",
+        "expr": "sum by (app_type, instance) (rate(lurkarr_autoimport_errors_total{app_type=~\"$app_type\", instance=~\"$instance\"}[$__rate_interval]))",
         "legendFormat": "{{app_type}} ({{instance}})"
       }]
     }
@@ -448,6 +533,36 @@
         "name": "DS_PROMETHEUS",
         "query": "prometheus",
         "type": "datasource"
+      },
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "definition": "label_values(lurkarr_lurk_searches_total, app_type)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "App Type",
+        "multi": true,
+        "name": "app_type",
+        "query": { "query": "label_values(lurkarr_lurk_searches_total, app_type)" },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "definition": "label_values(lurkarr_lurk_searches_total{app_type=~\"$app_type\"}, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Instance",
+        "multi": true,
+        "name": "instance",
+        "query": { "query": "label_values(lurkarr_lurk_searches_total{app_type=~\"$app_type\"}, instance)" },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -456,5 +571,5 @@
   "timezone": "utc",
   "title": "Lurkarr",
   "uid": "lurkarr-overview",
-  "version": 1
+  "version": 2
 }

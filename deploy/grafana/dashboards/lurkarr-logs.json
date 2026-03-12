@@ -1,0 +1,201 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "Overview", "url": "/d/lurkarr-overview", "type": "link", "icon": "apps" },
+    { "title": "System", "url": "/d/lurkarr-system", "type": "link", "icon": "bolt" }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Log Volume",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "tooltip": { "mode": "multi" } },
+      "title": "Log Volume by Level",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sum by (level) (count_over_time({job=\"lurkarr\"} | json | level=~\"$level\" [$__auto]))",
+        "legendFormat": "{{level}}"
+      }]
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 7 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["sum"] } },
+      "title": "Total Lines (range)",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(count_over_time({job=\"lurkarr\"} | json | level=~\"$level\" [$__auto]))",
+        "legendFormat": "total"
+      }]
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "red", "value": null }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 7 },
+      "id": 3,
+      "options": { "reduceOptions": { "calcs": ["sum"] } },
+      "title": "Error Lines (range)",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(count_over_time({job=\"lurkarr\"} | json | level=\"ERROR\" [$__auto]))",
+        "legendFormat": "errors"
+      }]
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "yellow", "value": null }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 7 },
+      "id": 4,
+      "options": { "reduceOptions": { "calcs": ["sum"] } },
+      "title": "Warn Lines (range)",
+      "type": "stat",
+      "targets": [{
+        "expr": "sum(count_over_time({job=\"lurkarr\"} | json | level=\"WARN\" [$__auto]))",
+        "legendFormat": "warnings"
+      }]
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 7 },
+      "id": 5,
+      "options": { "tooltip": { "mode": "multi" } },
+      "title": "Error Rate over Time",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sum(count_over_time({job=\"lurkarr\"} | json | level=\"ERROR\" [$__auto]))",
+        "legendFormat": "errors"
+      }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 101,
+      "title": "Log Stream",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 12 },
+      "id": 10,
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "Logs",
+      "type": "logs",
+      "targets": [{
+        "expr": "{job=\"lurkarr\"} | json | level=~\"$level\" |~ \"$search\"",
+        "legendFormat": ""
+      }]
+    },
+
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 102,
+      "title": "By Component",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+          "id": 20,
+          "title": "Log Volume by Component",
+          "type": "timeseries",
+          "targets": [{
+            "expr": "sum by (component) (count_over_time({job=\"lurkarr\"} | json | level=~\"$level\" | component != \"\" [$__auto]))",
+            "legendFormat": "{{component}}"
+          }]
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+          "id": 21,
+          "title": "Errors by Component",
+          "type": "timeseries",
+          "targets": [{
+            "expr": "sum by (component) (count_over_time({job=\"lurkarr\"} | json | level=\"ERROR\" | component != \"\" [$__auto]))",
+            "legendFormat": "{{component}}"
+          }]
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["lurkarr", "logs"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Level",
+        "multi": true,
+        "name": "level",
+        "options": [
+          { "selected": true, "text": "All", "value": "$__all" },
+          { "selected": false, "text": "DEBUG", "value": "DEBUG" },
+          { "selected": false, "text": "INFO", "value": "INFO" },
+          { "selected": false, "text": "WARN", "value": "WARN" },
+          { "selected": false, "text": "ERROR", "value": "ERROR" }
+        ],
+        "query": "DEBUG,INFO,WARN,ERROR",
+        "type": "custom"
+      },
+      {
+        "current": { "selected": false, "text": "", "value": "" },
+        "hide": 0,
+        "label": "Search",
+        "name": "search",
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Lurkarr Logs",
+  "uid": "lurkarr-logs",
+  "version": 1
+}

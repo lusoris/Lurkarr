@@ -1,0 +1,346 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "Overview", "url": "/d/lurkarr-overview", "type": "link", "icon": "apps" },
+    { "title": "Logs", "url": "/d/lurkarr-logs", "type": "link", "icon": "document-info" }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Process",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 500 }, { "color": "red", "value": 2000 }] }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Goroutines",
+      "type": "stat",
+      "targets": [{
+        "expr": "go_goroutines{job=\"lurkarr\"}",
+        "legendFormat": "goroutines"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Heap In Use",
+      "type": "stat",
+      "targets": [{
+        "expr": "go_memstats_heap_inuse_bytes{job=\"lurkarr\"}",
+        "legendFormat": "heap"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Resident Memory",
+      "type": "stat",
+      "targets": [{
+        "expr": "process_resident_memory_bytes{job=\"lurkarr\"}",
+        "legendFormat": "RSS"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Open FDs",
+      "type": "stat",
+      "targets": [{
+        "expr": "process_open_fds{job=\"lurkarr\"}",
+        "legendFormat": "fds"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Threads",
+      "type": "stat",
+      "targets": [{
+        "expr": "go_threads{job=\"lurkarr\"}",
+        "legendFormat": "threads"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Uptime",
+      "type": "stat",
+      "targets": [{
+        "expr": "time() - process_start_time_seconds{job=\"lurkarr\"}",
+        "legendFormat": "uptime"
+      }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 101,
+      "title": "CPU & Goroutines",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "id": 10,
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "rate(process_cpu_seconds_total{job=\"lurkarr\"}[$__rate_interval])",
+        "legendFormat": "CPU cores"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "id": 11,
+      "title": "Goroutines",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "go_goroutines{job=\"lurkarr\"}",
+        "legendFormat": "goroutines"
+      }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 102,
+      "title": "Memory",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 20,
+      "options": { "tooltip": { "mode": "multi" } },
+      "title": "Heap Memory",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "go_memstats_heap_alloc_bytes{job=\"lurkarr\"}",
+          "legendFormat": "heap alloc"
+        },
+        {
+          "expr": "go_memstats_heap_inuse_bytes{job=\"lurkarr\"}",
+          "legendFormat": "heap in-use"
+        },
+        {
+          "expr": "go_memstats_heap_sys_bytes{job=\"lurkarr\"}",
+          "legendFormat": "heap sys"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 21,
+      "options": { "tooltip": { "mode": "multi" } },
+      "title": "Process Memory",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"lurkarr\"}",
+          "legendFormat": "RSS"
+        },
+        {
+          "expr": "process_virtual_memory_bytes{job=\"lurkarr\"}",
+          "legendFormat": "Virtual"
+        },
+        {
+          "expr": "go_memstats_alloc_bytes{job=\"lurkarr\"}",
+          "legendFormat": "Go Alloc"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "Bps" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 22,
+      "title": "Alloc Rate",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "rate(go_memstats_alloc_bytes_total{job=\"lurkarr\"}[$__rate_interval])",
+        "legendFormat": "alloc rate"
+      }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "id": 23,
+      "title": "Heap Objects",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "go_memstats_heap_objects{job=\"lurkarr\"}",
+        "legendFormat": "objects"
+      }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 103,
+      "title": "GC",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "id": 30,
+      "title": "GC Pause Duration (p50 / p99)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "go_gc_duration_seconds{job=\"lurkarr\", quantile=\"0.5\"}",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "go_gc_duration_seconds{job=\"lurkarr\", quantile=\"1\"}",
+          "legendFormat": "max"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "id": 31,
+      "title": "GC Cycles Rate",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "rate(go_gc_duration_seconds_count{job=\"lurkarr\"}[$__rate_interval])",
+        "legendFormat": "gc/s"
+      }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "id": 104,
+      "title": "File Descriptors",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "id": 40,
+      "title": "File Descriptors (Open / Max)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "process_open_fds{job=\"lurkarr\"}",
+          "legendFormat": "open"
+        },
+        {
+          "expr": "process_max_fds{job=\"lurkarr\"}",
+          "legendFormat": "max"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 0.9 }] }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "id": 41,
+      "title": "FD Utilization %",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "process_open_fds{job=\"lurkarr\"} / process_max_fds{job=\"lurkarr\"}",
+        "legendFormat": "utilization"
+      }]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["lurkarr", "system"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Prometheus",
+        "name": "DS_PROMETHEUS",
+        "query": "prometheus",
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Lurkarr System",
+  "uid": "lurkarr-system",
+  "version": 1
+}

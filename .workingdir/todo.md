@@ -283,21 +283,21 @@
 - [x] Add fx.Lifecycle hooks for graceful shutdown (replaces manual defer chains + signal handling)
 - [x] Health check integration (existing /api/health endpoint, fx handles signal-based shutdown)
 
-## Phase 10: Grafana Dashboards (Professional)
+## ✅ COMPLETED — Phase 10: Grafana Dashboards (Professional)
 
-> **STATUS: PARTIAL** — 1 overview dashboard exists (460 lines), metrics endpoint + full monitoring stack deployed
+> **STATUS: COMPLETE** — 3 dashboards: enhanced overview (lurkarr.json), system/runtime (lurkarr-system.json), logs (lurkarr-logs.json)
 
-- [ ] Lurking Dashboard — per-app/instance search rates, missing/upgrade trends, error rates, duration histograms
-- [ ] Queue Cleaner Dashboard — strikes issued, items removed, blocklist additions, stalled/slow/failed breakdown
-- [ ] Download Clients Dashboard — queue sizes, speeds (up/down), paused states, per-client comparison
-- [ ] Auto-Import Dashboard — import runs, successes vs errors, score distributions
-- [ ] Scheduler Dashboard — task executions, durations, errors, rule activity timeline
-- [ ] HTTP/API Dashboard — request rates, latencies (p50/p95/p99), error rates, rate limit hits
-- [ ] Notifications Dashboard — send counts, per-provider success/failure rates
-- [ ] System Overview Dashboard — Go runtime metrics (goroutines, memory, GC), DB connection pool stats
-- [ ] Loki Log Dashboard — structured log exploration, error aggregation (REPLACES frontend /logs page)
-- [ ] Arr Stack Overview Dashboard — Sonarr/Radarr/Lidarr/etc health, queue sizes, activity status
-- [ ] Dashboard variables — instance picker, time range, app_type filter across all dashboards
+- [x] Lurking Dashboard — per-app/instance search rates, missing/upgrade trends, error rate %, duration histograms (p50/p95/p99)
+- [x] Queue Cleaner Dashboard — strikes issued, items removed, blocklist additions, cleaner run duration (p95)
+- [x] Download Clients Dashboard — queue sizes, speeds (up/down), paused states, per-client comparison
+- [x] Auto-Import Dashboard — import runs by app type, errors by app type + instance
+- [x] Scheduler Dashboard — task executions, durations (p95), errors by task type
+- [x] HTTP/API Dashboard — request rates, latencies (p50/p95/p99), error rate %, rate limit hits, top endpoints, response sizes
+- [ ] Notifications Dashboard — send counts, per-provider success/failure rates (BLOCKED: no notification metrics exist yet)
+- [x] System Overview Dashboard — Go runtime metrics (goroutines, heap, RSS, GC pause, alloc rate, FDs, CPU, threads, uptime)
+- [x] Loki Log Dashboard — structured log exploration, volume by level, error aggregation, component breakdown, text search
+- [ ] Arr Stack Overview Dashboard — Sonarr/Radarr/Lidarr/etc health (BLOCKED: requires scraping arr /api endpoints directly)
+- [x] Dashboard variables — $app_type + $instance pickers on overview, $level + $search on logs, $DS_PROMETHEUS datasource selector
 
 ## Phase 11: OpenAPI Spec + ogen Codegen
 
