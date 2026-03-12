@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-12
-> State: Phases 0–12, 14, 16 complete. All lint + gosec issues resolved.
-> Priority order: Phase 15 (Docs) → Phase 9a (remaining auth) → Phase 13 (Coder)
+> State: Phases 0–12, 14–16 complete. All lint + gosec issues resolved.
+> Priority order: Phase 9a (remaining auth) → Phase 13 (Coder) → ADRs
 
 ---
 
@@ -338,9 +338,7 @@
 - [ ] Auto-import config UI (enable/disable per instance, score threshold)
 - [ ] Cross-instance dedup detection settings
 
-## Phase 15: Documentation & Research
-
-> **STATUS: IN PROGRESS** — 11 research docs created in docs/research/
+## ✅ COMPLETED — Phase 15: Documentation & Research
 
 - [x] Technology stack overview (docs/research/tech-stack.md)
 - [x] Uber FX deep dive + migration plan (docs/research/uber-fx.md)
@@ -353,8 +351,8 @@
 - [x] Go best practices (docs/research/go-best-practices.md)
 - [x] SvelteKit 5 + TailwindCSS v4 (docs/research/sveltekit-tailwind.md)
 - [x] PostgreSQL + pgx + goose (docs/research/database-pgx-goose.md)
+- [x] User-facing documentation (README.md — comprehensive rewrite with all features, env vars, deployment, reverse proxy, OIDC, monitoring)
 - [ ] Architecture decision records (ADRs)
-- [ ] User-facing documentation (setup guide, configuration reference)
 
 ---
 
