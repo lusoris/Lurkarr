@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-12
 > State: Phases 0–16 complete. All lint + gosec issues resolved.
-> Priority order: Phase 13 (Coder) → ADRs
+> Priority order: ADRs
 
 ---
 
@@ -311,18 +311,18 @@
 - [x] Add Scalar HTML page at /api/docs (interactive API reference via CDN)
 - [x] Zero-config: reads embedded openapi.yaml, base path aware
 
-## Phase 13: Coder Development Environment
+## ✅ COMPLETED — Phase 13: Coder Development Environment
 
-> **STATUS: NOT STARTED** — No template, devcontainer, or .tf files exist
+> **STATUS: COMPLETE** — Terraform template in deploy/coder/main.tf
 > **Coder instance:** https://code.dev.cauda.dev (K8s-based)
 
-- [ ] Create Coder template (Terraform-based, K8s provisioner) for Lurkarr development
-- [ ] Include: Go toolchain, Node.js, PostgreSQL sidecar, Docker-in-Docker
-- [ ] Pre-install VS Code extensions (Go, Svelte, Tailwind, GitLens)
-- [ ] Auto-clone repo from GitHub (already linked)
-- [ ] Include monitoring stack (Prometheus + Grafana) in dev environment
-- [ ] Environment variables + secrets management
-- [ ] Onboard project on Coder instance (https://code.dev.cauda.dev)
+- [x] Create Coder template (Terraform-based, K8s provisioner) for Lurkarr development
+- [x] Include: Go toolchain, Node.js, PostgreSQL sidecar, Docker-in-Docker
+- [x] Pre-install VS Code extensions (Go, Svelte, Tailwind, GitLens)
+- [x] Auto-clone repo from GitHub (already linked)
+- [x] Include monitoring stack (Prometheus + Grafana) in dev environment — Grafana app exposed on :3000
+- [x] Environment variables + secrets management
+- [ ] Onboard project on Coder instance (https://code.dev.cauda.dev) — manual step
 - [ ] Document template usage in README
 
 ## ✅ COMPLETED — Phase 14: Frontend Gaps
