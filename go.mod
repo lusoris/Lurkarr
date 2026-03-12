@@ -3,7 +3,6 @@ module github.com/lusoris/lurkarr
 go 1.26.1
 
 require (
-	github.com/coder/websocket v1.8.14
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/go-co-op/gocron/v2 v2.19.1
 	github.com/google/uuid v1.6.0

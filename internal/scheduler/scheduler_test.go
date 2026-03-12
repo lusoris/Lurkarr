@@ -12,21 +12,17 @@ import (
 
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
-	"github.com/lusoris/lurkarr/internal/mocks"
 )
 
-func newTestLogger(ctrl *gomock.Controller) *logging.Logger {
-	logStore := mocks.NewMockLogStore(ctrl)
-	logStore.EXPECT().InsertLogs(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	hub := logging.NewHub()
-	return logging.New(logStore, hub)
+func newTestLogger() *logging.Logger {
+	return logging.New()
 }
 
 func newTestScheduler(ctrl *gomock.Controller, store Store) *Scheduler {
 	cron, _ := gocron.NewScheduler(gocron.WithLocation(time.UTC))
 	return &Scheduler{
 		db:     store,
-		logger: newTestLogger(ctrl),
+		logger: newTestLogger(),
 		cron:   cron,
 	}
 }
@@ -381,7 +377,7 @@ func TestReload_RemovesOldJobs(t *testing.T) {
 func TestNew(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	s, err := New(store, newTestLogger(ctrl))
+	s, err := New(store, newTestLogger())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -396,7 +392,7 @@ func TestStartAndStop(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().ListSchedules(gomock.Any()).Return(nil, nil)
 
-	s, err := New(store, newTestLogger(ctrl))
+	s, err := New(store, newTestLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +410,7 @@ func TestStart_ReloadError(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().ListSchedules(gomock.Any()).Return(nil, errors.New("fail"))
 
-	s, err := New(store, newTestLogger(ctrl))
+	s, err := New(store, newTestLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

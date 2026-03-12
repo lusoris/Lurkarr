@@ -14,14 +14,10 @@ import (
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
-	"github.com/lusoris/lurkarr/internal/mocks"
 )
 
-func newTestLogger(ctrl *gomock.Controller) *logging.Logger {
-	logStore := mocks.NewMockLogStore(ctrl)
-	logStore.EXPECT().InsertLogs(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	hub := logging.NewHub()
-	return logging.New(logStore, hub)
+func newTestLogger() *logging.Logger {
+	return logging.New()
 }
 
 func defaultQCSettings() *database.QueueCleanerSettings {
@@ -58,7 +54,7 @@ func TestCleanerStartStop(t *testing.T) {
 	store.EXPECT().GetQueueCleanerSettings(gomock.Any(), gomock.Any()).Return(defaultQCSettings(), nil).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -80,7 +76,7 @@ func TestCleanLoopCancellation(t *testing.T) {
 	store.EXPECT().GetQueueCleanerSettings(gomock.Any(), database.AppSonarr).Return(defaultQCSettings(), nil).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), database.AppSonarr).Return(nil, nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -97,7 +93,7 @@ func TestCleanLoopSettingsError(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetQueueCleanerSettings(gomock.Any(), database.AppSonarr).Return(nil, context.DeadlineExceeded).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -119,7 +115,7 @@ func TestCleanLoopDisabled(t *testing.T) {
 	disabled.Enabled = false
 	store.EXPECT().GetQueueCleanerSettings(gomock.Any(), database.AppSonarr).Return(disabled, nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -146,7 +142,7 @@ func TestCleanInstance_EmptyQueue(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -195,7 +191,7 @@ func TestCleanInstance_StalledItem(t *testing.T) {
 	store.EXPECT().CountStrikes(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any()).Return(3, nil)
 	store.EXPECT().LogBlocklist(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any(), gomock.Any()).Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -235,7 +231,7 @@ func TestCleanInstance_ProgressResetStrikes(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().ResetStrikes(gomock.Any(), database.AppSonarr, instID, "dl-good").Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -280,7 +276,7 @@ func TestCleanInstance_FailedImports(t *testing.T) {
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().LogBlocklist(gomock.Any(), database.AppSonarr, instID, "dl-fail", "Failed.Import", gomock.Any()).Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -295,7 +291,7 @@ func TestCleanInstance_GeneralSettingsError(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(nil, context.DeadlineExceeded)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -310,7 +306,7 @@ func TestCleanInstance_UnsupportedAppType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -422,7 +418,7 @@ func TestGetSABnzbdStatuses_Disabled(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)
@@ -437,7 +433,7 @@ func TestGetSABnzbdStatuses_Error(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, context.DeadlineExceeded)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	c := New(store, logger)

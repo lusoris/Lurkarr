@@ -630,7 +630,7 @@ func TestSyncBlocklistAcross(t *testing.T) {
 	}, nil)
 	store.EXPECT().LogBlocklist(gomock.Any(), database.AppRadarr, instB, "dl-10", "Bad.Release.2024.x264-BADGROUP", "cross_arr_sync").Return(nil)
 
-	logger := logging.New(nil, logging.NewHub())
+	logger := logging.New()
 	defer logger.Close()
 	c := &Cleaner{db: store, logger: logger}
 
@@ -687,7 +687,7 @@ func TestSyncBlocklistAcrossSkipsOwnRemovals(t *testing.T) {
 		SSLVerify:  true,
 	}, nil)
 
-	logger := logging.New(nil, logging.NewHub())
+	logger := logging.New()
 	defer logger.Close()
 	c := &Cleaner{db: store, logger: logger}
 

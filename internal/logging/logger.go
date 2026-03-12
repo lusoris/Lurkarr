@@ -1,158 +1,37 @@
 package logging
 
 import (
-	"context"
 	"log/slog"
-	"sync"
-	"time"
-
-	"github.com/lusoris/lurkarr/internal/database"
 )
 
-const (
-	ringBufferSize = 10_000
-	flushInterval  = 500 * time.Millisecond
-	flushBatchSize = 100
-)
+// Logger provides app-scoped structured logging via slog.
+// Log output goes to stdout via the default slog handler; use Loki for
+// aggregation and Grafana for exploration.
+type Logger struct{}
 
-// LogStore abstracts the database operations needed by Logger.
-//go:generate mockgen -destination=mock_logstore_test.go -package=logging github.com/lusoris/lurkarr/internal/logging LogStore
-
-type LogStore interface {
-	InsertLogs(ctx context.Context, entries []database.LogEntry) error
+// New creates a new Logger.
+func New() *Logger {
+	return &Logger{}
 }
 
-// Logger wraps slog with async DB writes and WebSocket broadcast.
-type Logger struct {
-	db     LogStore
-	hub    *Hub
-	buffer chan database.LogEntry
-	done   chan struct{}
-	wg     sync.WaitGroup
-}
-
-// New creates a new Logger that writes to DB asynchronously and broadcasts via WebSocket.
-func New(db LogStore, hub *Hub) *Logger {
-	l := &Logger{
-		db:     db,
-		hub:    hub,
-		buffer: make(chan database.LogEntry, ringBufferSize),
-		done:   make(chan struct{}),
-	}
-	l.wg.Add(1)
-	go l.flusher()
-	return l
-}
-
-// Log writes a log entry to the ring buffer (non-blocking).
+// Log writes a structured log entry via slog.
 func (l *Logger) Log(appType, level, message string) {
-	entry := database.LogEntry{
-		AppType:   appType,
-		Level:     level,
-		Message:   message,
-		CreatedAt: time.Now(),
+	lvl := slog.LevelInfo
+	switch level {
+	case "DEBUG":
+		lvl = slog.LevelDebug
+	case "WARN":
+		lvl = slog.LevelWarn
+	case "ERROR":
+		lvl = slog.LevelError
 	}
-	// Non-blocking send — if buffer is full, drop the new entry.
-	// Trying to drop-oldest from a channel is racy with the flusher goroutine
-	// and can accidentally consume entries the flusher was about to read.
-	select {
-	case l.buffer <- entry:
-	default:
-		// Buffer full — drop this entry rather than risk racing with flusher
-	}
-	// Broadcast to WebSocket clients immediately
-	l.hub.Broadcast(entry)
+	slog.Log(nil, lvl, message, "app_type", appType) //nolint:staticcheck // nil context is fine for slog.Log
 }
 
 // ForApp returns an slog.Logger scoped to a specific app type.
 func (l *Logger) ForApp(appType string) *slog.Logger {
-	return slog.New(&appHandler{logger: l, appType: appType})
+	return slog.Default().With("app_type", appType)
 }
 
-// Close flushes remaining entries and stops the flusher.
-func (l *Logger) Close() {
-	close(l.done)
-	l.wg.Wait()
-}
-
-func (l *Logger) flusher() {
-	defer l.wg.Done()
-	ticker := time.NewTicker(flushInterval)
-	defer ticker.Stop()
-	var batch []database.LogEntry
-
-	for {
-		select {
-		case entry := <-l.buffer:
-			batch = append(batch, entry)
-			if len(batch) >= flushBatchSize {
-				l.flush(batch)
-				batch = nil
-			}
-		case <-ticker.C:
-			if len(batch) > 0 {
-				l.flush(batch)
-				batch = nil
-			}
-		case <-l.done:
-			// Drain remaining
-			for {
-				select {
-				case entry := <-l.buffer:
-					batch = append(batch, entry)
-				default:
-					if len(batch) > 0 {
-						l.flush(batch)
-					}
-					return
-				}
-			}
-		}
-	}
-}
-
-func (l *Logger) flush(entries []database.LogEntry) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := l.db.InsertLogs(ctx, entries); err != nil {
-		slog.Error("failed to flush logs to database", "error", err, "count", len(entries))
-	}
-}
-
-// appHandler is an slog.Handler that routes logs through our Logger.
-type appHandler struct {
-	logger  *Logger
-	appType string
-	attrs   []slog.Attr
-}
-
-func (h *appHandler) Enabled(_ context.Context, _ slog.Level) bool {
-	return true
-}
-
-func (h *appHandler) Handle(_ context.Context, r slog.Record) error {
-	msg := r.Message
-	if len(h.attrs) > 0 {
-		for _, a := range h.attrs {
-			msg += " " + a.Key + "=" + a.Value.String()
-		}
-	}
-	r.Attrs(func(a slog.Attr) bool {
-		msg += " " + a.Key + "=" + a.Value.String()
-		return true
-	})
-	h.logger.Log(h.appType, r.Level.String(), msg)
-	return nil
-}
-
-func (h *appHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &appHandler{
-		logger:  h.logger,
-		appType: h.appType,
-		attrs:   append(h.attrs, attrs...),
-	}
-}
-
-func (h *appHandler) WithGroup(_ string) slog.Handler {
-	return h
-}
+// Close is a no-op (kept for interface compatibility).
+func (l *Logger) Close() {}

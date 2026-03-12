@@ -40,9 +40,6 @@ type Store interface {
 	ListLurkHistory(ctx context.Context, q database.HistoryQuery) ([]database.LurkHistory, int, error)
 	DeleteHistory(ctx context.Context, appType database.AppType) error
 
-	// Logs
-	QueryLogs(ctx context.Context, q database.LogQuery) ([]database.LogEntry, error)
-
 	// Stats
 	GetAllStats(ctx context.Context) ([]database.LurkStats, error)
 	ResetStats(ctx context.Context) error

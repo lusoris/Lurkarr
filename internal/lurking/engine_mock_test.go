@@ -14,14 +14,10 @@ import (
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
-	"github.com/lusoris/lurkarr/internal/mocks"
 )
 
-func newTestLogger(ctrl *gomock.Controller) *logging.Logger {
-	logStore := mocks.NewMockLogStore(ctrl)
-	logStore.EXPECT().InsertLogs(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	hub := logging.NewHub()
-	return logging.New(logStore, hub)
+func newTestLogger() *logging.Logger {
+	return logging.New()
 }
 
 // defaultGeneralSettings returns a standard GeneralSettings for tests.
@@ -36,7 +32,7 @@ func defaultGeneralSettings() *database.GeneralSettings {
 func TestEngineNewAndStop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	e := New(store, logger)
@@ -56,7 +52,7 @@ func TestEngineStartStop(t *testing.T) {
 	).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	e := New(store, logger)
@@ -69,7 +65,7 @@ func TestEngineStartStop(t *testing.T) {
 func TestEngineSleep(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 
@@ -134,7 +130,7 @@ func TestLurkInstance_Success(t *testing.T) {
 	store.EXPECT().IncrementStats(gomock.Any(), database.AppSonarr, instID, int64(2), int64(0)).Return(nil)
 	store.EXPECT().IncrementHourlyHits(gomock.Any(), database.AppSonarr, instID, 2).Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -158,7 +154,7 @@ func TestLurkInstance_HourlyCapReached(t *testing.T) {
 	instID := uuid.New()
 	store.EXPECT().GetCurrentHourHits(gomock.Any(), database.AppSonarr, instID).Return(100, nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -178,7 +174,7 @@ func TestLurkInstance_HourHitsError(t *testing.T) {
 	instID := uuid.New()
 	store.EXPECT().GetCurrentHourHits(gomock.Any(), database.AppSonarr, instID).Return(0, context.DeadlineExceeded)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -199,7 +195,7 @@ func TestLurkInstance_GeneralSettingsError(t *testing.T) {
 	store.EXPECT().GetCurrentHourHits(gomock.Any(), database.AppSonarr, instID).Return(0, nil)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(nil, context.DeadlineExceeded)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -221,7 +217,7 @@ func TestLurkInstance_LastResetError(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().GetLastReset(gomock.Any(), database.AppSonarr, instID).Return(nil, context.DeadlineExceeded)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -257,7 +253,7 @@ func TestLurkInstance_StateReset(t *testing.T) {
 	store.EXPECT().IncrementStats(gomock.Any(), database.AppSonarr, instID, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	store.EXPECT().IncrementHourlyHits(gomock.Any(), database.AppSonarr, instID, gomock.Any()).Return(nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -292,7 +288,7 @@ func TestLurkInstance_MinDownloadQueueSize(t *testing.T) {
 	store.EXPECT().GetLastReset(gomock.Any(), database.AppSonarr, instID).Return(nil, nil)
 	// No IncrementStats or AddLurkHistory expected — queue at capacity
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -315,7 +311,7 @@ func TestLurkMissing_FetchError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -336,7 +332,7 @@ func TestLurkUpgrades_NoUpgrades(t *testing.T) {
 	srv := arrServer(t, nil, nil)
 	defer srv.Close()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -368,7 +364,7 @@ func TestLurkUpgrades_WithItems(t *testing.T) {
 	store.EXPECT().IncrementStats(gomock.Any(), database.AppSonarr, instID, int64(0), int64(2)).Return(nil)
 	store.EXPECT().IncrementHourlyHits(gomock.Any(), database.AppSonarr, instID, 2).Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	log := logger.ForApp("sonarr")
@@ -385,7 +381,7 @@ func TestLurkUpgrades_WithItems(t *testing.T) {
 func TestGetMissingItems_NilLurker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 
@@ -401,7 +397,7 @@ func TestGetMissingItems_NilLurker(t *testing.T) {
 func TestGetUpgradeItems_NilLurker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 
@@ -417,7 +413,7 @@ func TestGetUpgradeItems_NilLurker(t *testing.T) {
 func TestTriggerSearch_NilLurker(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 
@@ -432,7 +428,7 @@ func TestLurkLoopSettingsError(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetAppSettings(gomock.Any(), database.AppSonarr).Return(nil, context.DeadlineExceeded).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -453,7 +449,7 @@ func TestLurkLoopInstancesError(t *testing.T) {
 	).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), database.AppSonarr).Return(nil, context.DeadlineExceeded).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -474,7 +470,7 @@ func TestLurkLoopNoInstances(t *testing.T) {
 	).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), database.AppSonarr).Return(nil, nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 	e := New(store, logger)
 	ctx, cancel := context.WithCancel(context.Background())

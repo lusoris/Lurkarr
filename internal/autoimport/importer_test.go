@@ -14,14 +14,10 @@ import (
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/logging"
-	"github.com/lusoris/lurkarr/internal/mocks"
 )
 
-func newTestLogger(ctrl *gomock.Controller) *logging.Logger {
-	logStore := mocks.NewMockLogStore(ctrl)
-	logStore.EXPECT().InsertLogs(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	hub := logging.NewHub()
-	return logging.New(logStore, hub)
+func newTestLogger() *logging.Logger {
+	return logging.New()
 }
 
 func defaultGeneralSettings() *database.GeneralSettings {
@@ -212,7 +208,7 @@ func TestImporterStartStop(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().ListEnabledInstances(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -226,7 +222,7 @@ func TestCheckInstance_NoInstances(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -273,7 +269,7 @@ func TestCheckInstance_WithStuckImport(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().LogAutoImport(gomock.Any(), database.AppSonarr, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -295,7 +291,7 @@ func TestCheckInstance_GeneralSettingsError(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(nil, context.DeadlineExceeded)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -316,7 +312,7 @@ func TestCheckInstance_UnsupportedAppType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -332,7 +328,7 @@ func TestImportLoopCancellation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -360,7 +356,7 @@ func TestImportLoop_WithInstances(t *testing.T) {
 		}, nil).AnyTimes()
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -384,7 +380,7 @@ func TestImportLoop_ListInstancesError(t *testing.T) {
 	store.EXPECT().ListEnabledInstances(gomock.Any(), database.AppSonarr).
 		Return(nil, context.DeadlineExceeded).AnyTimes()
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -437,7 +433,7 @@ func TestCheckInstance_ManualImportAvailable(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().LogAutoImport(gomock.Any(), database.AppSonarr, gomock.Any(), gomock.Any(), "Test.Movie.2024", 1, "manual_import_available", "file1.mkv").Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)
@@ -477,7 +473,7 @@ func TestCheckInstance_FallbackRescan(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().LogAutoImport(gomock.Any(), database.AppSonarr, gomock.Any(), 42, "Test.Movie", 1, "rescan_triggered", gomock.Any()).Return(nil)
 
-	logger := newTestLogger(ctrl)
+	logger := newTestLogger()
 	defer logger.Close()
 
 	imp := New(store, logger)

@@ -3,4 +3,3 @@ package mocks
 
 //go:generate mockgen -typed -destination mock_scheduler_store.go -package mocks github.com/lusoris/lurkarr/internal/scheduler Store
 //go:generate mockgen -typed -destination mock_auth_store.go -package mocks github.com/lusoris/lurkarr/internal/auth AuthStore
-//go:generate mockgen -typed -destination mock_logging_store.go -package mocks github.com/lusoris/lurkarr/internal/logging LogStore

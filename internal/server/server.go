@@ -16,7 +16,6 @@ import (
 	"github.com/lusoris/lurkarr/internal/api"
 	"github.com/lusoris/lurkarr/internal/auth"
 	"github.com/lusoris/lurkarr/internal/database"
-	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/middleware"
 	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/scheduler"
@@ -100,7 +99,7 @@ func spaHandler(fsys fs.FS) http.Handler {
 }
 
 // New creates a new Server with all routes registered.
-func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, sched *scheduler.Scheduler, notifMgr *notifications.Manager) *Server {
+func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *notifications.Manager) *Server {
 	// Set trusted proxies for rate limiter IP extraction.
 	middleware.TrustedProxies = cfg.TrustedProxies
 
@@ -118,7 +117,6 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	settingsH := &api.SettingsHandler{DB: db}
 	appsH := &api.AppsHandler{DB: db}
 	historyH := &api.HistoryHandler{DB: db}
-	logsH := &api.LogsHandler{DB: db, Hub: hub}
 	statsH := &api.StatsHandler{DB: db}
 	stateH := &api.StateHandler{DB: db}
 	schedulerH := &api.SchedulerHandler{DB: db, Scheduler: sched}
@@ -220,9 +218,6 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("GET /api/history", historyH.HandleListHistory)
 	protected.HandleFunc("DELETE /api/history/{app}", historyH.HandleDeleteHistory)
 
-	// Logs
-	protected.HandleFunc("GET /api/logs", logsH.HandleGetLogs)
-
 	// Stats
 	protected.HandleFunc("GET /api/stats", statsH.HandleGetStats)
 	protected.HandleFunc("POST /api/stats/reset", statsH.HandleResetStats)
@@ -290,9 +285,6 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	protected.HandleFunc("POST /api/seerr/test", seerrH.HandleTestConnection)
 	protected.HandleFunc("GET /api/seerr/requests", seerrH.HandleGetRequests)
 	protected.HandleFunc("GET /api/seerr/requests/count", seerrH.HandleGetRequestCount)
-
-	// WebSocket (no CSRF, but auth required)
-	mux.Handle("GET /ws/logs", authMw.RequireAuth(http.HandlerFunc(logsH.HandleWebSocketLogs)))
 
 	// Mount protected routes with auth + CSRF + token injection
 	mux.Handle("/api/", authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected))))

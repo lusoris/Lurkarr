@@ -45,9 +45,7 @@ func newTestSchedulerHandler(t *testing.T, ctrl *gomock.Controller) (sh *Schedul
 	t.Helper()
 	apiStore = NewMockStore(ctrl)
 	schedStore = mocks.NewMockStore(ctrl)
-	logStore := mocks.NewMockLogStore(ctrl)
-	logStore.EXPECT().InsertLogs(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	logger := logging.New(logStore, logging.NewHub())
+	logger := logging.New()
 	sched, err := scheduler.New(schedStore, logger)
 	if err != nil {
 		t.Fatal(err)
@@ -831,58 +829,6 @@ func TestHandleGetAutoImportLog_Error(t *testing.T) {
 	h := &QueueHandler{DB: store}
 	w := httptest.NewRecorder()
 	h.HandleGetAutoImportLog(w, reqWithPathValue("GET", "/api/queue/imports/sonarr", nil, "app", "sonarr"))
-	if w.Code != 500 {
-		t.Fatalf("expected 500, got %d", w.Code)
-	}
-}
-
-// =============================================================================
-// LogsHandler tests
-// =============================================================================
-
-func TestHandleGetLogs(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
-	store.EXPECT().QueryLogs(gomock.Any(), gomock.Any()).Return(nil, nil)
-	h := &LogsHandler{DB: store}
-	w := httptest.NewRecorder()
-	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs", http.NoBody))
-	if w.Code != 200 {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestHandleGetLogs_WithParams(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
-	store.EXPECT().QueryLogs(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ interface{}, q database.LogQuery) ([]database.LogEntry, error) {
-			if q.Limit != 50 {
-				t.Errorf("expected limit 50, got %d", q.Limit)
-			}
-			if q.AppType != "sonarr" {
-				t.Errorf("expected app=sonarr, got %s", q.AppType)
-			}
-			if q.Level != "error" {
-				t.Errorf("expected level=error, got %s", q.Level)
-			}
-			return nil, nil
-		})
-	h := &LogsHandler{DB: store}
-	w := httptest.NewRecorder()
-	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs?app=sonarr&level=error&limit=50", http.NoBody))
-	if w.Code != 200 {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestHandleGetLogs_Error(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
-	store.EXPECT().QueryLogs(gomock.Any(), gomock.Any()).Return(nil, errors.New("fail"))
-	h := &LogsHandler{DB: store}
-	w := httptest.NewRecorder()
-	h.HandleGetLogs(w, httptest.NewRequest("GET", "/api/logs", http.NoBody))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}

@@ -34,10 +34,7 @@ var databaseModule = fx.Module("database",
 )
 
 var loggingModule = fx.Module("logging",
-	fx.Provide(
-		provideHub,
-		provideLogger,
-	),
+	fx.Provide(provideLogger),
 )
 
 var notificationsModule = fx.Module("notifications",
@@ -107,24 +104,9 @@ func provideDatabase(lc fx.Lifecycle, cfg *config.Config) (*database.DB, error) 
 	return db, nil
 }
 
-// provideLogger creates the async DB log writer.
-func provideHub(cfg *config.Config) *logging.Hub {
-	hub := logging.NewHub()
-	if len(cfg.AllowedOrigins) > 0 {
-		hub.OriginPatterns = cfg.AllowedOrigins
-	}
-	return hub
-}
-
-func provideLogger(lc fx.Lifecycle, db *database.DB, hub *logging.Hub) *logging.Logger {
-	l := logging.New(db, hub)
-	lc.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
-			l.Close()
-			return nil
-		},
-	})
-	return l
+// provideLogger creates the structured logger.
+func provideLogger() *logging.Logger {
+	return logging.New()
 }
 
 // provideNotifications creates the notification manager and loads providers from DB.
@@ -203,8 +185,8 @@ func provideServerConfig(cfg *config.Config) server.Config {
 // --- Lifecycle starters (fx.Invoke targets) ---
 
 // startServer creates the HTTP server and manages its lifecycle.
-func startServer(lc fx.Lifecycle, shutdowner fx.Shutdowner, cfg server.Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, sched *scheduler.Scheduler, notifMgr *notifications.Manager) {
-	srv := server.New(cfg, db, logger, hub, sched, notifMgr)
+func startServer(lc fx.Lifecycle, shutdowner fx.Shutdowner, cfg server.Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *notifications.Manager) {
+	srv := server.New(cfg, db, sched, notifMgr)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {
@@ -325,11 +307,6 @@ func runMaintenance(ctx context.Context, db *database.DB) {
 				slog.Warn("failed to auto-reset expired states", "error", err)
 			} else if reset > 0 {
 				slog.Info("auto-reset expired states", "count", reset)
-			}
-			if pruned, err := db.PruneLogs(mCtx, 30); err != nil {
-				slog.Warn("failed to prune logs", "error", err)
-			} else if pruned > 0 {
-				slog.Info("pruned old logs", "count", pruned)
 			}
 			if caps, err := db.CleanupOldHourlyCaps(mCtx); err != nil {
 				slog.Warn("failed to cleanup old hourly caps", "error", err)

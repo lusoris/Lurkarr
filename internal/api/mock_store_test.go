@@ -647,21 +647,6 @@ func (mr *MockStoreMockRecorder) ListSchedules(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSchedules", reflect.TypeOf((*MockStore)(nil).ListSchedules), ctx)
 }
 
-// QueryLogs mocks base method.
-func (m *MockStore) QueryLogs(ctx context.Context, q database.LogQuery) ([]database.LogEntry, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryLogs", ctx, q)
-	ret0, _ := ret[0].([]database.LogEntry)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// QueryLogs indicates an expected call of QueryLogs.
-func (mr *MockStoreMockRecorder) QueryLogs(ctx, q any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryLogs", reflect.TypeOf((*MockStore)(nil).QueryLogs), ctx, q)
-}
-
 // ResetState mocks base method.
 func (m *MockStore) ResetState(ctx context.Context, appType database.AppType, instanceID uuid.UUID) error {
 	m.ctrl.T.Helper()
