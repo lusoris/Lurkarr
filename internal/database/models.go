@@ -234,6 +234,8 @@ type QueueCleanerSettings struct {
 	HardlinkProtection bool `json:"hardlink_protection"` // Skip file deletion if files have hardlinks (nlink > 1)
 	// Cross-seed awareness
 	SkipCrossSeeds bool `json:"skip_cross_seeds"` // Skip removal if multiple torrents share the same content (save path + size)
+	// Cross-Arr blocklist sync
+	CrossArrSync bool `json:"cross_arr_sync"` // Propagate blocklist removals to all instances of the same app type
 }
 
 // QueueStrike represents a strike against a problematic download.

@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-12
-> State: Phases 0–8 complete, Phase 9a/9b complete, Phase 16 complete. All lint + gosec issues resolved.
-> Priority order: Phase 9a remaining → Phase 10 (Grafana) → Phase 14 (Frontend) → feature work
+> State: Phases 0–9b complete, Phase 16 complete. All lint + gosec issues resolved.
+> Priority order: Cross-Arr blocklist sync → Phase 10 (Grafana) → Phase 14 (Frontend) → feature work
 
 ---
 
@@ -249,16 +249,17 @@
 - [x] OIDC login flow (authorization code + PKCE)
 - [x] Token validation + refresh (ID token → local session mapping)
 - [x] Auto-create local user on first OIDC login (optional, configurable)
-- [ ] Group/role claim mapping (e.g., admin group → Lurkarr admin)
+- [x] Group/role claim mapping (e.g., admin group → Lurkarr admin) — commit `b2a608a`
 - [ ] Support multiple providers (Authentik, Keycloak, Authelia, Dex, Google, etc.)
 - [x] `/api/auth/oidc/callback` endpoint
 - [x] Frontend login page: "Sign in with SSO" button alongside local login
 - [x] DB migration for OIDC fields (auth_provider, external_id on users table)
+- [x] Migration 004: is_admin column on users table
 
 ### Proxy Authentication Hardening
 - [x] Trusted proxy IP allowlist (`TRUSTED_PROXIES` env — CIDR ranges, default: private ranges only)
 - [x] Reject proxy auth headers from untrusted source IPs
-- [ ] Support multiple proxy header formats (Remote-User, X-Forwarded-User, X-authentik-username, etc.)
+- [x] Support multiple proxy header formats (comma-separated PROXY_HEADER env) — commit `b2a608a`
 - [x] Auto-create user on first proxy auth if not exists (configurable)
 - [ ] Proxy auth + CSRF interaction audit (bypass CSRF when proxy auth active?)
 - [x] Log warning when proxy auth enabled without trusted proxy config
@@ -267,7 +268,7 @@
 - [x] Base path / sub-path support (`BASE_PATH` env, e.g. `/lurkarr/`) — prefix all routes + static assets
 - [x] Trusted proxy config for `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP` (rate limiter validates source IP)
 - [x] Respect `X-Forwarded-Proto` for secure cookie decisions
-- [ ] WebSocket upgrade behind reverse proxy (wss:// handling, connection upgrade headers)
+- [x] WebSocket origin patterns configurable via AllowedOrigins — commit `b2a608a`
 - [x] Health check endpoint (`/api/health`) bypasses auth — for load balancer probes
 - [ ] Document reverse proxy configs (Traefik, Caddy, nginx, HAProxy) in README or docs/
 

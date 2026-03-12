@@ -2,13 +2,21 @@ package queuecleaner
 
 import (
 	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	downloadclient "github.com/lusoris/lurkarr/internal/downloadclients"
+	"github.com/lusoris/lurkarr/internal/logging"
+	"go.uber.org/mock/gomock"
 )
 
 func TestDetectProblemStalled(t *testing.T) {
@@ -576,5 +584,122 @@ func TestIsCrossSeeded(t *testing.T) {
 				t.Errorf("isCrossSeeded() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSyncBlocklistAcross(t *testing.T) {
+	// Create a mock arr server for instance B that has a matching title in its queue.
+	var deleteCount atomic.Int32
+	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v3/queue") && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(arrclient.QueueResponse{
+				TotalRecords: 2,
+				Records: []arrclient.QueueRecord{
+					{ID: 10, DownloadID: "dl-10", Title: "Bad.Release.2024.x264-BADGROUP", Status: "downloading"},
+					{ID: 11, DownloadID: "dl-11", Title: "Good.Release.2024.x265-GOODGROUP", Status: "downloading"},
+				},
+			})
+		case strings.HasPrefix(r.URL.Path, "/api/v3/queue/") && r.Method == http.MethodDelete:
+			deleteCount.Add(1)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer serverB.Close()
+
+	instA := uuid.New()
+	instB := uuid.New()
+
+	instances := []database.AppInstance{
+		{ID: instA, AppType: database.AppRadarr, Name: "Radarr-1", APIURL: "http://unused", APIKey: "key1", Enabled: true},
+		{ID: instB, AppType: database.AppRadarr, Name: "Radarr-2", APIURL: serverB.URL, APIKey: "key2", Enabled: true},
+	}
+
+	// Instance A removed "Bad.Release.2024.x264-BADGROUP" — should propagate to B.
+	removals := map[uuid.UUID][]string{
+		instA: {"Bad.Release.2024.x264-BADGROUP"},
+	}
+
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{
+		APITimeout: 10,
+		SSLVerify:  true,
+	}, nil)
+	store.EXPECT().LogBlocklist(gomock.Any(), database.AppRadarr, instB, "dl-10", "Bad.Release.2024.x264-BADGROUP", "cross_arr_sync").Return(nil)
+
+	logger := logging.New(nil, logging.NewHub())
+	defer logger.Close()
+	c := &Cleaner{db: store, logger: logger}
+
+	settings := &database.QueueCleanerSettings{
+		RemoveFromClient: true,
+		CrossArrSync:     true,
+	}
+
+	c.syncBlocklistAcross(context.Background(), slog.Default(), database.AppRadarr, settings, instances, removals)
+
+	// Should have deleted exactly 1 item (Bad.Release matching from instance B).
+	if got := deleteCount.Load(); got != 1 {
+		t.Errorf("delete count = %d, want 1", got)
+	}
+}
+
+func TestSyncBlocklistAcrossSkipsOwnRemovals(t *testing.T) {
+	// Instance A removed a title, and that same title is also in A's queue
+	// (shouldn't happen in practice, but verifies skip logic).
+	var deleteCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v3/queue") && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(arrclient.QueueResponse{
+				TotalRecords: 1,
+				Records: []arrclient.QueueRecord{
+					{ID: 20, DownloadID: "dl-20", Title: "Removed.Release.2024", Status: "downloading"},
+				},
+			})
+		case strings.HasPrefix(r.URL.Path, "/api/v3/queue/") && r.Method == http.MethodDelete:
+			deleteCount.Add(1)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	instA := uuid.New()
+
+	instances := []database.AppInstance{
+		{ID: instA, AppType: database.AppRadarr, Name: "Radarr-1", APIURL: server.URL, APIKey: "key1", Enabled: true},
+	}
+
+	// Instance A removed "Removed.Release.2024" — should NOT re-delete from A's queue.
+	removals := map[uuid.UUID][]string{
+		instA: {"Removed.Release.2024"},
+	}
+
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{
+		APITimeout: 10,
+		SSLVerify:  true,
+	}, nil)
+
+	logger := logging.New(nil, logging.NewHub())
+	defer logger.Close()
+	c := &Cleaner{db: store, logger: logger}
+
+	settings := &database.QueueCleanerSettings{
+		RemoveFromClient: true,
+		CrossArrSync:     true,
+	}
+
+	c.syncBlocklistAcross(context.Background(), slog.Default(), database.AppRadarr, settings, instances, removals)
+
+	// Should NOT have deleted anything (the title was removed by this instance itself).
+	if got := deleteCount.Load(); got != 0 {
+		t.Errorf("delete count = %d, want 0 (own removal should be skipped)", got)
 	}
 }

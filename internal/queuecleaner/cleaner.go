@@ -111,12 +111,16 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 			continue
 		}
 
+		removals := make(map[uuid.UUID][]string) // instanceID -> removed titles
 		for _, inst := range instances {
 			if ctx.Err() != nil {
 				return
 			}
 			start := time.Now()
-			c.cleanInstance(ctx, log, appType, settings, inst)
+			removed := c.cleanInstance(ctx, log, appType, settings, inst)
+			if len(removed) > 0 {
+				removals[inst.ID] = removed
+			}
 			metrics.QueueCleanerRunDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
 		}
 
@@ -125,24 +129,29 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 			c.cleanOrphans(ctx, log, appType, settings, instances)
 		}
 
+		// 6. Cross-Arr blocklist sync — propagate removals to sibling instances.
+		if settings.CrossArrSync && len(instances) > 1 && len(removals) > 0 {
+			c.syncBlocklistAcross(ctx, log, appType, settings, instances, removals)
+		}
+
 		if !sleep(ctx, time.Duration(settings.CheckIntervalSeconds)*time.Second) {
 			return
 		}
 	}
 }
 
-func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance) {
+func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance) []string {
 	log = log.With("instance", inst.Name)
 
 	lurker := lurking.LurkerFor(appType)
 	if lurker == nil {
-		return
+		return nil
 	}
 
 	genSettings, err := c.db.GetGeneralSettings(ctx)
 	if err != nil {
 		log.Error("failed to load general settings", "error", err)
-		return
+		return nil
 	}
 
 	client := arrclient.NewClient(
@@ -154,17 +163,19 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	queue, err := lurker.GetQueue(ctx, client)
 	if err != nil {
 		log.Error("failed to get queue", "error", err)
-		return
+		return nil
 	}
 
 	if len(queue.Records) == 0 {
-		return
+		return nil
 	}
 
 	// Get SABnzbd queue status for Usenet items
 	sabStatuses := c.getSABnzbdStatuses(ctx)
 
 	apiVersion := apiVersionFor(appType)
+
+	var removed []string
 
 	// 0. Blocklist rule matching — remove items matching user/community blocklist
 	blRules, err := c.db.ListEnabledBlocklistRules(ctx)
@@ -192,6 +203,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason); err != nil {
 				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
 			}
+			removed = append(removed, record.Title)
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
@@ -215,6 +227,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score"); err != nil {
 				log.Warn("failed to log blocklist", "title", d.RemoveTitle, "error", err)
 			}
+			removed = append(removed, d.RemoveTitle)
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, d.RemoveTitle, "duplicate_lower_score")
@@ -267,6 +280,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes"); err != nil {
 				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
 			}
+			removed = append(removed, record.Title)
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
@@ -282,6 +296,8 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	if settings.SeedingEnabled {
 		c.cleanSeeding(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
 	}
+
+	return removed
 }
 
 // detectProblem checks if a queue item is stalled, slow, or metadata-stuck.
@@ -627,6 +643,78 @@ func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, i
 		return ratioMet && timeMet
 	}
 	return ratioMet || timeMet // "or" mode (default)
+}
+
+// syncBlocklistAcross propagates removals to sibling instances of the same app type.
+// When a release is removed from one instance, this checks all other instances
+// for queue items with the same title and removes them with blocklist=true.
+func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, instances []database.AppInstance, removals map[uuid.UUID][]string) {
+	// Build a set of all removed titles across all instances.
+	removedTitles := make(map[string]bool)
+	for _, titles := range removals {
+		for _, t := range titles {
+			removedTitles[t] = true
+		}
+	}
+	if len(removedTitles) == 0 {
+		return
+	}
+
+	genSettings, err := c.db.GetGeneralSettings(ctx)
+	if err != nil {
+		log.Error("cross-arr sync: failed to load general settings", "error", err)
+		return
+	}
+
+	apiVersion := apiVersionFor(appType)
+
+	for _, inst := range instances {
+		if ctx.Err() != nil {
+			return
+		}
+
+		// Skip instances that had their own removals — those titles are already gone.
+		ownRemovals := make(map[string]bool)
+		for _, t := range removals[inst.ID] {
+			ownRemovals[t] = true
+		}
+
+		lurker := lurking.LurkerFor(appType)
+		if lurker == nil {
+			continue
+		}
+
+		client := arrclient.NewClient(
+			inst.APIURL, inst.APIKey,
+			time.Duration(genSettings.APITimeout)*time.Second,
+			genSettings.SSLVerify,
+		)
+
+		queue, err := lurker.GetQueue(ctx, client)
+		if err != nil {
+			log.Warn("cross-arr sync: failed to get queue", "instance", inst.Name, "error", err)
+			continue
+		}
+
+		for _, record := range queue.Records {
+			if !removedTitles[record.Title] || ownRemovals[record.Title] {
+				continue
+			}
+			log.Info("cross-arr sync: removing matching item",
+				"instance", inst.Name, "title", record.Title)
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, true); err != nil {
+				log.Error("cross-arr sync: failed to remove item",
+					"instance", inst.Name, "title", record.Title, "error", err)
+				continue
+			}
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "cross_arr_sync"); err != nil {
+				log.Warn("cross-arr sync: failed to log blocklist", "title", record.Title, "error", err)
+			}
+			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
+			c.notifyRemoval(ctx, appType, inst.Name, record.Title, "cross_arr_sync")
+		}
+	}
 }
 
 // cleanOrphans detects downloads in the configured download client that are not
