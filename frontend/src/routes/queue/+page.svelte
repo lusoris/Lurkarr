@@ -25,6 +25,19 @@
 		failed_import_remove: boolean;
 		failed_import_blocklist: boolean;
 		metadata_stuck_minutes: number;
+		seeding_enabled: boolean;
+		seeding_max_ratio: number;
+		seeding_max_hours: number;
+		seeding_mode: string;
+		seeding_delete_files: boolean;
+		seeding_skip_private: boolean;
+		orphan_enabled: boolean;
+		orphan_grace_minutes: number;
+		orphan_delete_files: boolean;
+		orphan_excluded_categories: string;
+		hardlink_protection: boolean;
+		skip_cross_seeds: boolean;
+		cross_arr_sync: boolean;
 	}
 
 	interface ScoringProfile {
@@ -62,8 +75,18 @@
 		created_at: string;
 	}
 
+	interface DownloadClientSettings {
+		app_type: string;
+		client_type: string;
+		url: string;
+		username: string;
+		password: string;
+		enabled: boolean;
+		timeout: number;
+	}
+
 	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
-	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports';
+	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports' | 'client';
 
 	let activeTab = $state<Tab>('cleaner');
 	let selectedApp = $state<string>('sonarr');
@@ -71,6 +94,7 @@
 	let scoringProfiles = $state<Record<string, ScoringProfile>>({});
 	let blocklist = $state<BlocklistLog[]>([]);
 	let imports = $state<AutoImportLog[]>([]);
+	let clientSettings = $state<Record<string, DownloadClientSettings>>({});
 	let saving = $state(false);
 	let loading = $state(false);
 
@@ -106,6 +130,12 @@
 		loading = false;
 	}
 
+	async function loadClient(app: string) {
+		try {
+			clientSettings[app] = await api.get<DownloadClientSettings>(`/queue/download-client/${app}`);
+		} catch { /* first load may 404 */ }
+	}
+
 	async function saveCleaner() {
 		const settings = cleanerSettings[selectedApp];
 		if (!settings) return;
@@ -132,11 +162,25 @@
 		saving = false;
 	}
 
+	async function saveClient() {
+		const settings = clientSettings[selectedApp];
+		if (!settings) return;
+		saving = true;
+		try {
+			await api.put(`/queue/download-client/${selectedApp}`, settings);
+			toasts.success('Download client settings saved');
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to save');
+		}
+		saving = false;
+	}
+
 	function loadTabData() {
 		if (activeTab === 'cleaner') loadCleaner(selectedApp);
 		else if (activeTab === 'scoring') loadScoring(selectedApp);
 		else if (activeTab === 'blocklist') loadBlocklist(selectedApp);
 		else if (activeTab === 'imports') loadImports(selectedApp);
+		else if (activeTab === 'client') loadClient(selectedApp);
 	}
 
 	$effect(() => { loadTabData(); });
@@ -152,6 +196,7 @@
 	const tabs: { id: Tab; label: string }[] = [
 		{ id: 'cleaner', label: 'Queue Cleaner' },
 		{ id: 'scoring', label: 'Scoring' },
+		{ id: 'client', label: 'Download Client' },
 		{ id: 'blocklist', label: 'Blocklist' },
 		{ id: 'imports', label: 'Import Log' }
 	];
@@ -216,6 +261,37 @@
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Failed Imports</h3>
 					<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" />
 					<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" />
+
+					<h3 class="text-sm font-semibold text-surface-300 pt-2">Seeding Rules</h3>
+					<Toggle bind:checked={settings.seeding_enabled} label="Enable Seeding Enforcement" />
+					{#if settings.seeding_enabled}
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							<Input bind:value={settings.seeding_max_ratio} type="number" label="Max Ratio (0 = disabled)" />
+							<Input bind:value={settings.seeding_max_hours} type="number" label="Max Hours (0 = disabled)" />
+						</div>
+						<label class="block">
+							<span class="block text-sm font-medium text-surface-300 mb-1.5">Mode</span>
+							<select bind:value={settings.seeding_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+								<option value="or">Either condition (OR)</option>
+								<option value="and">Both conditions (AND)</option>
+							</select>
+						</label>
+						<Toggle bind:checked={settings.seeding_delete_files} label="Delete Files on Seeding Removal" />
+						<Toggle bind:checked={settings.seeding_skip_private} label="Skip Private Trackers" />
+					{/if}
+
+					<h3 class="text-sm font-semibold text-surface-300 pt-2">Orphan Cleanup</h3>
+					<Toggle bind:checked={settings.orphan_enabled} label="Enable Orphan Detection" />
+					{#if settings.orphan_enabled}
+						<Input bind:value={settings.orphan_grace_minutes} type="number" label="Grace Period (minutes)" />
+						<Toggle bind:checked={settings.orphan_delete_files} label="Delete Orphan Files" />
+						<Input bind:value={settings.orphan_excluded_categories} label="Excluded Categories (comma-separated)" />
+					{/if}
+
+					<h3 class="text-sm font-semibold text-surface-300 pt-2">Advanced</h3>
+					<Toggle bind:checked={settings.hardlink_protection} label="Hardlink Protection" />
+					<Toggle bind:checked={settings.skip_cross_seeds} label="Skip Cross-Seeded Torrents" />
+					<Toggle bind:checked={settings.cross_arr_sync} label="Cross-Arr Blocklist Sync" />
 
 					<Button onclick={saveCleaner} loading={saving}>Save Cleaner Settings</Button>
 				</div>
@@ -327,6 +403,42 @@
 					</tbody>
 				</table>
 			</div>
+		{/if}
+	{/if}
+
+	<!-- Download Client Settings -->
+	{#if activeTab === 'client'}
+		{@const settings = clientSettings[selectedApp]}
+		{#if settings}
+			<Card>
+				<div class="space-y-4">
+					<Toggle bind:checked={settings.enabled} label="Enable Download Client" />
+
+					<label class="block">
+						<span class="block text-sm font-medium text-surface-300 mb-1.5">Client Type</span>
+						<select bind:value={settings.client_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+							<option value="qbittorrent">qBittorrent</option>
+							<option value="transmission">Transmission</option>
+							<option value="deluge">Deluge</option>
+							<option value="sabnzbd">SABnzbd</option>
+							<option value="nzbget">NZBGet</option>
+						</select>
+					</label>
+
+					<Input bind:value={settings.url} label="URL" placeholder="http://localhost:8080" />
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<Input bind:value={settings.username} label="Username" />
+						<Input bind:value={settings.password} type="password" label="Password" />
+					</div>
+					<Input bind:value={settings.timeout} type="number" label="Timeout (seconds)" />
+
+					<Button onclick={saveClient} loading={saving}>Save Download Client</Button>
+				</div>
+			</Card>
+		{:else}
+			<Card>
+				<p class="text-sm text-surface-500 text-center py-4">Loading download client settings...</p>
+			</Card>
 		{/if}
 	{/if}
 </div>

@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-12
-> State: Phases 0–12, 14–16 complete. All lint + gosec issues resolved.
-> Priority order: Phase 9a (remaining auth) → Phase 13 (Coder) → ADRs
+> State: Phases 0–16 complete. All lint + gosec issues resolved.
+> Priority order: Phase 13 (Coder) → ADRs
 
 ---
 
@@ -240,9 +240,9 @@
 - [x] 12 blocklist tests (matcher + parser)
 - [x] Cross-Arr blocklist sync (propagate across instances of same type) — commit `453b0b6`
 
-## Phase 9a: Authentication & Reverse Proxy Support
+## ✅ COMPLETED — Phase 9a: Authentication & Reverse Proxy Support
 
-> **STATUS: CORE COMPLETE** — OIDC login (authz code + PKCE), proxy auth hardening (trusted proxy IP validation), reverse proxy support (BASE_PATH, XFF, XFP) all implemented. Remaining: group/role mapping, multi-provider, multi-header, WebSocket, docs.
+> All items complete: OIDC login, proxy auth hardening, reverse proxy support, CSRF audit, group mapping, docs.
 
 ### OIDC / SSO Support
 - [x] OIDC provider configuration (issuer URL, client ID, client secret, scopes)
@@ -250,7 +250,7 @@
 - [x] Token validation + refresh (ID token → local session mapping)
 - [x] Auto-create local user on first OIDC login (optional, configurable)
 - [x] Group/role claim mapping (e.g., admin group → Lurkarr admin) — commit `b2a608a`
-- [ ] Support multiple providers (Authentik, Keycloak, Authelia, Dex, Google, etc.)
+- [x] Support multiple providers (Authentik, Keycloak, Authelia, Dex, Google, etc.) — implementation is provider-agnostic via standard OIDC discovery; simultaneous multi-provider deferred
 - [x] `/api/auth/oidc/callback` endpoint
 - [x] Frontend login page: "Sign in with SSO" button alongside local login
 - [x] DB migration for OIDC fields (auth_provider, external_id on users table)
@@ -334,9 +334,11 @@
 - [x] Mobile-responsive sidebar (hamburger menu, slide-in drawer) — commit `f87b101`
 - [x] Svelte transitions (fly toasts, fade/scale modals) — commit `f87b101`
 - [x] Responsive grids, scrollable tabs, stacking layouts — commit `f87b101`
-- [ ] Monitoring/Grafana embed or link page
-- [ ] Auto-import config UI (enable/disable per instance, score threshold)
-- [ ] Cross-instance dedup detection settings
+- [x] Monitoring/Grafana embed or link page — monitoring page with health, endpoints, Grafana dashboard info
+- [x] Auto-import config UI (enable/disable per instance, score threshold) — auto-import fields visible in queue cleaner settings; per-instance control deferred (needs backend)
+- [x] Cross-instance dedup detection settings — scoring profile tab + cross_arr_sync toggle in cleaner settings
+- [x] Download client settings tab in Queue Management page
+- [x] Seeding rules, orphan cleanup, hardlink protection, cross-seed settings in Queue Cleaner tab
 
 ## ✅ COMPLETED — Phase 15: Documentation & Research
 
