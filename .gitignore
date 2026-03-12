@@ -15,6 +15,7 @@ cover_*
 # SvelteKit
 frontend/node_modules/
 frontend/build/
+!frontend/build/.gitkeep
 frontend/.svelte-kit/
 
 # IDE

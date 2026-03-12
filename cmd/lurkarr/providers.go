@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/fx"
 
+	"github.com/lusoris/lurkarr/frontend"
 	"github.com/lusoris/lurkarr/internal/autoimport"
 	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/lusoris/lurkarr/internal/database"
@@ -187,6 +188,7 @@ func provideServerConfig(cfg *config.Config) server.Config {
 		SecureCookie:     cfg.SecureCookie,
 		BasePath:         cfg.BasePath,
 		OpenAPISpec:      openapi.Spec,
+		FrontendFS:       frontend.BuildFS(),
 		OIDCEnabled:      cfg.OIDCEnabled,
 		OIDCIssuerURL:    cfg.OIDCIssuerURL,
 		OIDCClientID:     cfg.OIDCClientID,

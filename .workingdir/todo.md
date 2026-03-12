@@ -261,7 +261,7 @@
 - [x] Reject proxy auth headers from untrusted source IPs
 - [x] Support multiple proxy header formats (comma-separated PROXY_HEADER env) — commit `b2a608a`
 - [x] Auto-create user on first proxy auth if not exists (configurable)
-- [ ] Proxy auth + CSRF interaction audit (bypass CSRF when proxy auth active?)
+- [x] Proxy auth + CSRF interaction audit — CSRF correctly enforced even with proxy auth; fixed missing frontend CSRF token handling
 - [x] Log warning when proxy auth enabled without trusted proxy config
 
 ### Reverse Proxy Support
@@ -270,7 +270,7 @@
 - [x] Respect `X-Forwarded-Proto` for secure cookie decisions
 - [x] WebSocket origin patterns configurable via AllowedOrigins — commit `b2a608a`
 - [x] Health check endpoint (`/api/health`) bypasses auth — for load balancer probes
-- [ ] Document reverse proxy configs (Traefik, Caddy, nginx, HAProxy) in README or docs/
+- [x] Document reverse proxy configs (Traefik, Caddy, nginx, HAProxy) in README or docs/ — covered in README rewrite
 
 ## Phase 9b: Uber FX Dependency Injection ⚡ PRIORITY — DO BEFORE FEATURE WORK
 

@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/gorilla/csrf"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
 
@@ -45,6 +48,7 @@ type Config struct {
 	SecureCookie   bool
 	BasePath       string
 	OpenAPISpec    []byte
+	FrontendFS     fs.FS
 
 	// OIDC
 	OIDCEnabled      bool
@@ -60,6 +64,39 @@ type Config struct {
 // Server is the main HTTP server.
 type Server struct {
 	httpServer *http.Server
+}
+
+// csrfInjectToken wraps a handler to expose the CSRF token in a response header
+// so the SPA can read it and send it back on mutating requests.
+func csrfInjectToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-CSRF-Token", csrf.Token(r))
+		next.ServeHTTP(w, r)
+	})
+}
+
+// spaHandler serves an SPA from an fs.FS. It tries the exact path first,
+// then falls back to index.html for client-side routing.
+func spaHandler(fsys fs.FS) http.Handler {
+	fileServer := http.FileServerFS(fsys)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Try to serve the exact file.
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+		if _, err := fs.Stat(fsys, path); err == nil {
+			// Cache immutable assets aggressively.
+			if strings.HasPrefix(path, "_app/immutable/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		// SPA fallback: serve index.html for all other paths.
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 }
 
 // New creates a new Server with all routes registered.
@@ -257,8 +294,13 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 	// WebSocket (no CSRF, but auth required)
 	mux.Handle("GET /ws/logs", authMw.RequireAuth(http.HandlerFunc(logsH.HandleWebSocketLogs)))
 
-	// Mount protected routes with auth + CSRF
-	mux.Handle("/api/", authMw.CSRFProtect()(authMw.RequireAuth(protected)))
+	// Mount protected routes with auth + CSRF + token injection
+	mux.Handle("/api/", authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected))))
+
+	// Serve embedded frontend SPA (if built).
+	if cfg.FrontendFS != nil {
+		mux.Handle("/", spaHandler(cfg.FrontendFS))
+	}
 
 	// Global middleware chain
 	corsMiddleware := middleware.CORS(middleware.CORSConfig{AllowedOrigins: cfg.AllowedOrigins})
