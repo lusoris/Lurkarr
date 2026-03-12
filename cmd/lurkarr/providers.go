@@ -13,6 +13,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/autoimport"
 	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/lusoris/lurkarr/internal/database"
+	"github.com/lusoris/lurkarr/internal/healthpoller"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/notifications"
@@ -56,6 +57,7 @@ var servicesModule = fx.Module("services",
 		startQueueCleaner,
 		startAutoImporter,
 		startSeerrSync,
+		startHealthPoller,
 	),
 )
 
@@ -267,6 +269,21 @@ func startSeerrSync(lc fx.Lifecycle, db *database.DB) {
 		},
 		OnStop: func(ctx context.Context) error {
 			se.Stop()
+			return nil
+		},
+	})
+}
+
+// startHealthPoller creates the arr health poller and manages its lifecycle.
+func startHealthPoller(lc fx.Lifecycle, db *database.DB) {
+	hp := healthpoller.New(db)
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			hp.Start(context.Background()) //nolint:gosec // G118: poller manages its own lifecycle via Stop()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			hp.Stop()
 			return nil
 		},
 	})

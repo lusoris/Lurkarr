@@ -130,6 +130,51 @@ func (c *Client) TestConnection(ctx context.Context, apiVersion string) (*System
 	return &status, nil
 }
 
+// HealthCheck represents a single health check entry from an *Arr app.
+type HealthCheck struct {
+	Source  string `json:"source"`
+	Type    string `json:"type"`    // "ok", "notice", "warning", "error"
+	Message string `json:"message"`
+	WikiURL string `json:"wikiUrl"`
+}
+
+// GetHealth returns the health checks for the instance.
+func (c *Client) GetHealth(ctx context.Context, apiVersion string) ([]HealthCheck, error) {
+	var checks []HealthCheck
+	if err := c.get(ctx, "/api/"+apiVersion+"/health", &checks); err != nil {
+		return nil, fmt.Errorf("get health: %w", err)
+	}
+	return checks, nil
+}
+
+// DiskSpace represents disk space information from an *Arr app.
+type DiskSpace struct {
+	Path       string `json:"path"`
+	Label      string `json:"label"`
+	FreeSpace  int64  `json:"freeSpace"`
+	TotalSpace int64  `json:"totalSpace"`
+}
+
+// GetDiskSpace returns disk space information for the instance.
+func (c *Client) GetDiskSpace(ctx context.Context, apiVersion string) ([]DiskSpace, error) {
+	var disks []DiskSpace
+	if err := c.get(ctx, "/api/"+apiVersion+"/diskspace", &disks); err != nil {
+		return nil, fmt.Errorf("get disk space: %w", err)
+	}
+	return disks, nil
+}
+
+// APIVersionFor returns the API version string for a given app type.
+// Lidarr, Readarr, and Prowlarr use v1; all others use v3.
+func APIVersionFor(appType string) string {
+	switch appType {
+	case "lidarr", "readarr", "prowlarr":
+		return "v1"
+	default:
+		return "v3"
+	}
+}
+
 // CommandResponse is the response from a command endpoint.
 type CommandResponse struct {
 	ID     int    `json:"id"`
@@ -208,6 +253,15 @@ func (q *QueueRecord) MediaID() int {
 type QueueResponse struct {
 	TotalRecords int           `json:"totalRecords"`
 	Records      []QueueRecord `json:"records"`
+}
+
+// GetQueue returns the download queue for any arr instance.
+func (c *Client) GetQueue(ctx context.Context, apiVersion string) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, "/api/"+apiVersion+"/queue?pageSize=1000", &resp); err != nil {
+		return nil, fmt.Errorf("get queue: %w", err)
+	}
+	return &resp, nil
 }
 
 // IsPrivateIP checks if a URL points to a private/loopback address.

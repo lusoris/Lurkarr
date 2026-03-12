@@ -207,3 +207,42 @@ var (
 		Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 	}, []string{"provider"})
 )
+
+// ── Arr Instance metrics ─────────────────────────────────────────────────────
+
+var (
+	ArrInstanceUp = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "arr",
+		Name:      "instance_up",
+		Help:      "Whether an arr instance is reachable (1=up, 0=down).",
+	}, []string{"app_type", "instance", "version"})
+
+	ArrHealthIssues = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "arr",
+		Name:      "health_issues",
+		Help:      "Number of health check issues reported by an arr instance.",
+	}, []string{"app_type", "instance", "type"})
+
+	ArrDiskFreeBytes = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "arr",
+		Name:      "disk_free_bytes",
+		Help:      "Free disk space in bytes as reported by an arr instance.",
+	}, []string{"app_type", "instance", "path"})
+
+	ArrDiskTotalBytes = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "arr",
+		Name:      "disk_total_bytes",
+		Help:      "Total disk space in bytes as reported by an arr instance.",
+	}, []string{"app_type", "instance", "path"})
+
+	ArrQueueTotal = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "arr",
+		Name:      "queue_total",
+		Help:      "Total items in the arr download queue.",
+	}, []string{"app_type", "instance"})
+)
