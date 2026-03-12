@@ -181,3 +181,29 @@ var (
 		Help:      "Total autoimport errors.",
 	}, []string{"app_type", "instance"})
 )
+
+// ── Notification metrics ─────────────────────────────────────────────────────
+
+var (
+	NotificationSentTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "lurkarr",
+		Subsystem: "notifications",
+		Name:      "sent_total",
+		Help:      "Total notifications sent.",
+	}, []string{"provider", "event_type"})
+
+	NotificationErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "lurkarr",
+		Subsystem: "notifications",
+		Name:      "errors_total",
+		Help:      "Total notification delivery errors.",
+	}, []string{"provider", "event_type"})
+
+	NotificationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "lurkarr",
+		Subsystem: "notifications",
+		Name:      "duration_seconds",
+		Help:      "Duration of notification delivery in seconds.",
+		Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+	}, []string{"provider"})
+)

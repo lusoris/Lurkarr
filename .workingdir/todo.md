@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-12
-> State: Phases 0–16 complete. All lint + gosec issues resolved.
-> Priority order: ADRs
+> State: All phases complete. All lint + gosec issues resolved. ADRs written.
+> Priority order: Remaining cleanup items
 
 ---
 
@@ -293,7 +293,7 @@
 - [x] Auto-Import Dashboard — import runs by app type, errors by app type + instance
 - [x] Scheduler Dashboard — task executions, durations (p95), errors by task type
 - [x] HTTP/API Dashboard — request rates, latencies (p50/p95/p99), error rate %, rate limit hits, top endpoints, response sizes
-- [ ] Notifications Dashboard — send counts, per-provider success/failure rates (BLOCKED: no notification metrics exist yet)
+- [x] Notifications Dashboard — send counts, per-provider success/failure rates, delivery latency (lurkarr-notifications.json)
 - [x] System Overview Dashboard — Go runtime metrics (goroutines, heap, RSS, GC pause, alloc rate, FDs, CPU, threads, uptime)
 - [x] Loki Log Dashboard — structured log exploration, volume by level, error aggregation, component breakdown, text search
 - [ ] Arr Stack Overview Dashboard — Sonarr/Radarr/Lidarr/etc health (BLOCKED: requires scraping arr /api endpoints directly)
@@ -323,7 +323,7 @@
 - [x] Include monitoring stack (Prometheus + Grafana) in dev environment — Grafana app exposed on :3000
 - [x] Environment variables + secrets management
 - [ ] Onboard project on Coder instance (https://code.dev.cauda.dev) — manual step
-- [ ] Document template usage in README
+- [x] Document template usage in README
 
 ## ✅ COMPLETED — Phase 14: Frontend Gaps
 
@@ -354,7 +354,7 @@
 - [x] SvelteKit 5 + TailwindCSS v4 (docs/research/sveltekit-tailwind.md)
 - [x] PostgreSQL + pgx + goose (docs/research/database-pgx-goose.md)
 - [x] User-facing documentation (README.md — comprehensive rewrite with all features, env vars, deployment, reverse proxy, OIDC, monitoring)
-- [ ] Architecture decision records (ADRs)
+- [x] Architecture decision records (ADRs) — 8 ADRs in docs/adr/
 
 ---
 

@@ -224,8 +224,21 @@ Pre-built dashboards are included in `deploy/`:
 - **Lurkarr Overview** (`deploy/grafana/dashboards/lurkarr.json`) — Search rates, missing/upgrade trends, error rates, durations
 - **Lurkarr System** (`deploy/grafana/dashboards/lurkarr-system.json`) — Go runtime: goroutines, heap, GC, CPU, threads
 - **Lurkarr Logs** (`deploy/grafana/dashboards/lurkarr-logs.json`) — Loki log exploration, volume by level, error aggregation
+- **Lurkarr Notifications** (`deploy/grafana/dashboards/lurkarr-notifications.json`) — Send rates, error rates, delivery latency by provider
 
 A monitoring stack (Prometheus + Loki + Grafana) is included in `deploy/docker-compose.monitoring.yml`.
+
+## Development Environment (Coder)
+
+A Terraform template for [Coder](https://coder.com) workspaces is in `deploy/coder/`. It provisions a K8s pod with:
+
+- Go 1.26 + Node.js 22 toolchain
+- PostgreSQL 17 sidecar (pre-configured)
+- code-server with VS Code extensions (Go, Svelte, Tailwind, GitLens)
+- Auto-clone, dependency install, and database migrations on startup
+- Lurkarr + Grafana exposed as Coder apps
+
+Upload the template to your Coder instance and create a workspace — the startup script handles everything.
 
 ## Tech Stack
 

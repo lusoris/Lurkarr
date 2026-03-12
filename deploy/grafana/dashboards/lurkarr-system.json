@@ -6,7 +6,8 @@
   "id": null,
   "links": [
     { "title": "Overview", "url": "/d/lurkarr-overview", "type": "link", "icon": "apps" },
-    { "title": "Logs", "url": "/d/lurkarr-logs", "type": "link", "icon": "document-info" }
+    { "title": "Logs", "url": "/d/lurkarr-logs", "type": "link", "icon": "document-info" },
+    { "title": "Notifications", "url": "/d/lurkarr-notifications", "type": "link", "icon": "bell" }
   ],
   "panels": [
     {

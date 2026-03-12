@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
+
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 // EventType enumerates the types of events that can trigger notifications.
@@ -129,13 +132,19 @@ func (m *Manager) Notify(ctx context.Context, event Event) {
 		wg.Add(1)
 		go func(e providerEntry) {
 			defer wg.Done()
+			start := time.Now()
+			name := e.provider.Name()
 			if err := e.provider.Send(ctx, event); err != nil {
+				metrics.NotificationErrorsTotal.WithLabelValues(name, string(event.Type)).Inc()
 				slog.Error("notification delivery failed",
-					"provider", e.provider.Name(),
+					"provider", name,
 					"event", event.Type,
 					"error", err,
 				)
+			} else {
+				metrics.NotificationSentTotal.WithLabelValues(name, string(event.Type)).Inc()
 			}
+			metrics.NotificationDuration.WithLabelValues(name).Observe(time.Since(start).Seconds())
 		}(entry)
 	}
 	wg.Wait()

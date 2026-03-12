@@ -6,7 +6,8 @@
   "id": null,
   "links": [
     { "title": "System", "url": "/d/lurkarr-system", "type": "link", "icon": "bolt" },
-    { "title": "Logs", "url": "/d/lurkarr-logs", "type": "link", "icon": "document-info" }
+    { "title": "Logs", "url": "/d/lurkarr-logs", "type": "link", "icon": "document-info" },
+    { "title": "Notifications", "url": "/d/lurkarr-notifications", "type": "link", "icon": "bell" }
   ],
   "panels": [
     {
