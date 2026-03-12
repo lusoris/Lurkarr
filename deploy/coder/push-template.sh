@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR"
 
-CODER_URL="${CODER_URL:-https://code.dev.cauda.dev}"
+CODER_URL="${CODER_URL:-https://coder.ancilla.lol}"
 TEMPLATE_NAME="${1:-${CODER_TEMPLATE_NAME:-lurkarr-dev}}"
 
 # Verify coder CLI is available
