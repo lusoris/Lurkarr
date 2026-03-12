@@ -1,0 +1,2479 @@
+openapi: 3.1.0
+info:
+  title: Lurkarr API
+  description: >-
+    REST API for Lurkarr — an automated media management tool that integrates
+    with Sonarr, Radarr, Lidarr, Readarr, Whisparr, Eros, Prowlarr, SABnzbd,
+    and Seerr.
+  version: 0.1.0
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /
+    description: Current server
+
+tags:
+  - name: Auth
+    description: Authentication and session management
+  - name: User
+    description: User profile management
+  - name: Instances
+    description: App instance CRUD
+  - name: Settings
+    description: General and per-app settings
+  - name: History
+    description: Lurk history
+  - name: Logs
+    description: Log querying and real-time streaming
+  - name: Stats
+    description: Lurk statistics and hourly caps
+  - name: State
+    description: Instance state tracking and reset
+  - name: Schedules
+    description: Task scheduling
+  - name: Prowlarr
+    description: Prowlarr integration
+  - name: SABnzbd
+    description: SABnzbd download client
+  - name: Queue
+    description: Queue cleaner, scoring, download clients
+  - name: Blocklist
+    description: Blocklist sources and rules
+  - name: Notifications
+    description: Notification providers
+  - name: Seerr
+    description: Seerr integration
+  - name: System
+    description: Health and metrics
+
+paths:
+  # ── Auth ──────────────────────────────────────────────────────────────
+  /api/auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Log in
+      description: Authenticate with username/password. Returns session cookie and CSRF token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          description: Invalid credentials or TOTP required
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/TOTPRequiredResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Log out
+      description: Invalidate current session.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+
+  /api/auth/setup:
+    post:
+      operationId: setup
+      tags: [Auth]
+      summary: First-run setup
+      description: Create initial admin user. Only works when no users exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetupRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '409':
+          description: Setup already completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/auth/2fa/enable:
+    post:
+      operationId: enable2FA
+      tags: [Auth]
+      summary: Enable 2FA
+      description: Generate TOTP secret and QR code for the current user.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: TOTP secret generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enable2FAResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/2fa/disable:
+    post:
+      operationId: disable2FA
+      tags: [Auth]
+      summary: Disable 2FA
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/2fa/verify:
+    post:
+      operationId: verify2FA
+      tags: [Auth]
+      summary: Verify TOTP code
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        '200':
+          description: Code verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: verified
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/oidc/info:
+    get:
+      operationId: getOIDCInfo
+      tags: [Auth]
+      summary: Get OIDC status
+      responses:
+        '200':
+          description: OIDC configuration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  oidc_enabled:
+                    type: boolean
+
+  /api/auth/oidc/login:
+    get:
+      operationId: oidcLogin
+      tags: [Auth]
+      summary: Initiate OIDC login
+      description: Redirects to the OIDC provider for authentication.
+      responses:
+        '302':
+          description: Redirect to OIDC provider
+
+  /api/auth/oidc/callback:
+    get:
+      operationId: oidcCallback
+      tags: [Auth]
+      summary: OIDC callback
+      description: Handles the authorization code callback from the OIDC provider.
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to application after successful authentication
+
+  # ── User ──────────────────────────────────────────────────────────────
+  /api/user:
+    get:
+      operationId: getUser
+      tags: [User]
+      summary: Get current user profile
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/username:
+    post:
+      operationId: updateUsername
+      tags: [User]
+      summary: Update username
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/password:
+    post:
+      operationId: updatePassword
+      tags: [User]
+      summary: Update password
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Instances ─────────────────────────────────────────────────────────
+  /api/instances/{app}:
+    get:
+      operationId: listInstances
+      tags: [Instances]
+      summary: List instances for an app type
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: List of instances (API keys masked)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      operationId: createInstance
+      tags: [Instances]
+      summary: Create a new instance
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceRequest'
+      responses:
+        '201':
+          description: Instance created (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instances/{id}:
+    put:
+      operationId: updateInstance
+      tags: [Instances]
+      summary: Update an instance
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstanceRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deleteInstance
+      tags: [Instances]
+      summary: Delete an instance
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instances/test:
+    post:
+      operationId: testInstanceConnection
+      tags: [Instances]
+      summary: Test connection to an arr instance
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestInstanceRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestConnectionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: SSRF protection — private URL blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── Settings ──────────────────────────────────────────────────────────
+  /api/settings/general:
+    get:
+      operationId: getGeneralSettings
+      tags: [Settings]
+      summary: Get general settings
+      description: Secret key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: General settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralSettings'
+    put:
+      operationId: updateGeneralSettings
+      tags: [Settings]
+      summary: Update general settings
+      description: Secret key is always preserved server-side and cannot be changed via API.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneralSettings'
+      responses:
+        '200':
+          description: Updated settings (secret key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/settings/{app}:
+    get:
+      operationId: getAppSettings
+      tags: [Settings]
+      summary: Get per-app settings
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: App settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    put:
+      operationId: updateAppSettings
+      tags: [Settings]
+      summary: Update per-app settings
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppSettings'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── History ───────────────────────────────────────────────────────────
+  /api/history:
+    get:
+      operationId: listHistory
+      tags: [History]
+      summary: List lurk history
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: app
+          in: query
+          schema:
+            $ref: '#/components/schemas/AppType'
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Paginated history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+
+  /api/history/{app}:
+    delete:
+      operationId: deleteHistory
+      tags: [History]
+      summary: Delete history for an app type
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Logs ──────────────────────────────────────────────────────────────
+  /api/logs:
+    get:
+      operationId: getLogs
+      tags: [Logs]
+      summary: Query logs
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: app
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: before
+          in: query
+          description: Cursor — log entry ID to paginate before
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+
+  # ── Stats ─────────────────────────────────────────────────────────────
+  /api/stats:
+    get:
+      operationId: getStats
+      tags: [Stats]
+      summary: Get lurk statistics
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Per-app, per-instance stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LurkStats'
+
+  /api/stats/reset:
+    post:
+      operationId: resetStats
+      tags: [Stats]
+      summary: Reset all statistics
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+
+  /api/stats/hourly-caps:
+    get:
+      operationId: getHourlyCaps
+      tags: [Stats]
+      summary: Get hourly API cap usage
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Hourly cap entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HourlyCap'
+
+  # ── State ─────────────────────────────────────────────────────────────
+  /api/state:
+    get:
+      operationId: getState
+      tags: [State]
+      summary: Get instance state and reset times
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: app
+          in: query
+          schema:
+            $ref: '#/components/schemas/AppType'
+      responses:
+        '200':
+          description: Instance state entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StateEntry'
+
+  /api/state/reset:
+    post:
+      operationId: resetState
+      tags: [State]
+      summary: Reset state for a specific instance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: app
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/AppType'
+        - name: instance_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Schedules ─────────────────────────────────────────────────────────
+  /api/schedules:
+    get:
+      operationId: listSchedules
+      tags: [Schedules]
+      summary: List all schedules
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Schedule'
+
+    post:
+      operationId: createSchedule
+      tags: [Schedules]
+      summary: Create a schedule
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schedule'
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/schedules/{id}:
+    put:
+      operationId: updateSchedule
+      tags: [Schedules]
+      summary: Update a schedule
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schedule'
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      operationId: deleteSchedule
+      tags: [Schedules]
+      summary: Delete a schedule
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/schedules/history:
+    get:
+      operationId: getScheduleHistory
+      tags: [Schedules]
+      summary: Get schedule execution history
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Execution history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduleExecution'
+
+  # ── Prowlarr ──────────────────────────────────────────────────────────
+  /api/prowlarr/settings:
+    get:
+      operationId: getProwlarrSettings
+      tags: [Prowlarr]
+      summary: Get Prowlarr settings
+      description: API key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Prowlarr settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProwlarrSettings'
+
+    put:
+      operationId: updateProwlarrSettings
+      tags: [Prowlarr]
+      summary: Update Prowlarr settings
+      description: Send masked API key to preserve existing value.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProwlarrSettings'
+      responses:
+        '200':
+          description: Updated settings (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProwlarrSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/prowlarr/indexers:
+    get:
+      operationId: getProwlarrIndexers
+      tags: [Prowlarr]
+      summary: Get Prowlarr indexers
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Indexer list (pass-through from Prowlarr API)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/prowlarr/indexers/stats:
+    get:
+      operationId: getProwlarrIndexerStats
+      tags: [Prowlarr]
+      summary: Get Prowlarr indexer statistics
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Indexer statistics (pass-through from Prowlarr API)
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/prowlarr/test:
+    post:
+      operationId: testProwlarrConnection
+      tags: [Prowlarr]
+      summary: Test Prowlarr connection
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestURLAPIKeyRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: SSRF protection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── SABnzbd ───────────────────────────────────────────────────────────
+  /api/sabnzbd/settings:
+    get:
+      operationId: getSABnzbdSettings
+      tags: [SABnzbd]
+      summary: Get SABnzbd settings
+      description: API key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: SABnzbd settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SABnzbdSettings'
+
+    put:
+      operationId: updateSABnzbdSettings
+      tags: [SABnzbd]
+      summary: Update SABnzbd settings
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SABnzbdSettings'
+      responses:
+        '200':
+          description: Updated settings (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SABnzbdSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/sabnzbd/queue:
+    get:
+      operationId: getSABnzbdQueue
+      tags: [SABnzbd]
+      summary: Get SABnzbd download queue
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Queue data (pass-through from SABnzbd API)
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/sabnzbd/history:
+    get:
+      operationId: getSABnzbdHistory
+      tags: [SABnzbd]
+      summary: Get SABnzbd download history
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: History data (pass-through from SABnzbd API)
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/sabnzbd/stats:
+    get:
+      operationId: getSABnzbdStats
+      tags: [SABnzbd]
+      summary: Get SABnzbd server statistics
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Server stats (pass-through from SABnzbd API)
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/sabnzbd/pause:
+    post:
+      operationId: pauseSABnzbd
+      tags: [SABnzbd]
+      summary: Pause SABnzbd downloads
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Paused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: paused
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/sabnzbd/resume:
+    post:
+      operationId: resumeSABnzbd
+      tags: [SABnzbd]
+      summary: Resume SABnzbd downloads
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: resumed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/sabnzbd/test:
+    post:
+      operationId: testSABnzbdConnection
+      tags: [SABnzbd]
+      summary: Test SABnzbd connection
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestURLAPIKeyRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: SSRF protection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── Queue Management ──────────────────────────────────────────────────
+  /api/queue/settings/{app}:
+    get:
+      operationId: getQueueCleanerSettings
+      tags: [Queue]
+      summary: Get queue cleaner settings for an app
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Queue cleaner settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueCleanerSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    put:
+      operationId: updateQueueCleanerSettings
+      tags: [Queue]
+      summary: Update queue cleaner settings
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueCleanerSettings'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/queue/scoring/{app}:
+    get:
+      operationId: getScoringProfile
+      tags: [Queue]
+      summary: Get scoring profile for an app
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Scoring profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoringProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    put:
+      operationId: updateScoringProfile
+      tags: [Queue]
+      summary: Update scoring profile
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoringProfile'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/queue/blocklist/{app}:
+    get:
+      operationId: getBlocklistLog
+      tags: [Queue]
+      summary: Get blocklist log for an app
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Blocklist log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BlocklistLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/queue/imports/{app}:
+    get:
+      operationId: getAutoImportLog
+      tags: [Queue]
+      summary: Get auto-import log for an app
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Auto-import log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AutoImportLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/queue/download-client/{app}:
+    get:
+      operationId: getDownloadClientSettings
+      tags: [Queue]
+      summary: Get download client settings for an app
+      description: Password is masked in the response.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Download client settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadClientSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    put:
+      operationId: updateDownloadClientSettings
+      tags: [Queue]
+      summary: Update download client settings
+      description: Send masked password to preserve existing value.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadClientSettings'
+      responses:
+        '200':
+          description: Updated settings (password masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadClientSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Blocklist ─────────────────────────────────────────────────────────
+  /api/blocklist/sources:
+    get:
+      operationId: listBlocklistSources
+      tags: [Blocklist]
+      summary: List all blocklist sources
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Blocklist sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BlocklistSource'
+
+    post:
+      operationId: createBlocklistSource
+      tags: [Blocklist]
+      summary: Create a blocklist source
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlocklistSource'
+      responses:
+        '201':
+          description: Source created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlocklistSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/blocklist/sources/{id}:
+    get:
+      operationId: getBlocklistSource
+      tags: [Blocklist]
+      summary: Get a blocklist source
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Blocklist source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlocklistSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateBlocklistSource
+      tags: [Blocklist]
+      summary: Update a blocklist source
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlocklistSource'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      operationId: deleteBlocklistSource
+      tags: [Blocklist]
+      summary: Delete a blocklist source
+      description: Also deletes all associated rules.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/blocklist/rules:
+    get:
+      operationId: listBlocklistRules
+      tags: [Blocklist]
+      summary: List all blocklist rules
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Blocklist rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BlocklistRule'
+
+    post:
+      operationId: createBlocklistRule
+      tags: [Blocklist]
+      summary: Create a blocklist rule
+      description: Validates regex patterns for title_regex type.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlocklistRule'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlocklistRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/blocklist/rules/{id}:
+    delete:
+      operationId: deleteBlocklistRule
+      tags: [Blocklist]
+      summary: Delete a blocklist rule
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Notifications ─────────────────────────────────────────────────────
+  /api/notifications/providers:
+    get:
+      operationId: listNotificationProviders
+      tags: [Notifications]
+      summary: List all notification providers
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Notification providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationProvider'
+
+    post:
+      operationId: createNotificationProvider
+      tags: [Notifications]
+      summary: Create a notification provider
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationProvider'
+      responses:
+        '201':
+          description: Provider created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationProvider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/notifications/providers/{id}:
+    get:
+      operationId: getNotificationProvider
+      tags: [Notifications]
+      summary: Get a notification provider
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Notification provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationProvider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateNotificationProvider
+      tags: [Notifications]
+      summary: Update a notification provider
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationProvider'
+      responses:
+        '200':
+          description: Updated provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationProvider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      operationId: deleteNotificationProvider
+      tags: [Notifications]
+      summary: Delete a notification provider
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '204':
+          description: Provider deleted
+
+  /api/notifications/providers/{id}/test:
+    post:
+      operationId: testNotificationProvider
+      tags: [Notifications]
+      summary: Send a test notification
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: Test failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorWithDetails'
+
+  # ── Seerr ─────────────────────────────────────────────────────────────
+  /api/seerr/settings:
+    get:
+      operationId: getSeerrSettings
+      tags: [Seerr]
+      summary: Get Seerr settings
+      description: API key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Seerr settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeerrSettings'
+
+    put:
+      operationId: updateSeerrSettings
+      tags: [Seerr]
+      summary: Update Seerr settings
+      description: Send masked API key to preserve existing value.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSeerrSettingsRequest'
+      responses:
+        '200':
+          description: Updated settings (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeerrSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/seerr/test:
+    post:
+      operationId: testSeerrConnection
+      tags: [Seerr]
+      summary: Test Seerr connection
+      description: Uses saved settings to test.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          description: Connection failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorWithDetails'
+
+  /api/seerr/requests:
+    get:
+      operationId: getSeerrRequests
+      tags: [Seerr]
+      summary: Get Seerr media requests
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [all, approved, available, pending, processing, unavailable]
+      responses:
+        '200':
+          description: Seerr requests (pass-through from Seerr API)
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/seerr/requests/count:
+    get:
+      operationId: getSeerrRequestCount
+      tags: [Seerr]
+      summary: Get Seerr request count
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Request count (pass-through from Seerr API)
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── System ────────────────────────────────────────────────────────────
+  /api/health:
+    get:
+      operationId: healthCheck
+      tags: [System]
+      summary: Health check
+      description: Returns OK if the database is reachable. No auth required.
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+        '503':
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [System]
+      summary: Prometheus metrics
+      description: Prometheus exposition format. No auth required.
+      responses:
+        '200':
+          description: Metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # ── WebSocket ─────────────────────────────────────────────────────────
+  /ws/logs:
+    get:
+      operationId: streamLogs
+      tags: [Logs]
+      summary: Real-time log stream
+      description: WebSocket endpoint for real-time log streaming. Requires session cookie auth.
+      responses:
+        '101':
+          description: WebSocket upgrade
+
+# ═══════════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: lurkarr_session
+
+  parameters:
+    AppTypePath:
+      name: app
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/AppType'
+
+    UUIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    StatusOk:
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                const: ok
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    BadGateway:
+      description: Upstream service error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ── Enums ───────────────────────────────────────────────────────────
+    AppType:
+      type: string
+      enum: [sonarr, radarr, lidarr, readarr, whisparr, eros, prowlarr]
+
+    NotificationProviderType:
+      type: string
+      enum: [discord, telegram, pushover, gotify, ntfy, apprise, email, webhook]
+
+    PatternType:
+      type: string
+      enum: [release_group, title_contains, title_regex, indexer]
+
+    DownloadClientType:
+      type: string
+      enum: [qbittorrent, transmission, deluge, sabnzbd, nzbget]
+
+    # ── Error ───────────────────────────────────────────────────────────
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    ErrorWithDetails:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+    # ── Auth ────────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        totp_code:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        csrf_token:
+          type: string
+
+    TOTPRequiredResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          const: totp_required
+        totp_required:
+          type: boolean
+          const: true
+
+    SetupRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    Enable2FAResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+        qr_base64:
+          type: string
+
+    # ── User ────────────────────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        auth_provider:
+          type: string
+        external_id:
+          type: string
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        has_2fa:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Instances ───────────────────────────────────────────────────────
+    AppInstance:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        name:
+          type: string
+        api_url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses (****XXXX)
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    CreateInstanceRequest:
+      type: object
+      required: [name, api_url, api_key]
+      properties:
+        name:
+          type: string
+        api_url:
+          type: string
+        api_key:
+          type: string
+
+    UpdateInstanceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        api_url:
+          type: string
+        api_key:
+          type: string
+          description: Send masked value (****...) to preserve existing key
+        enabled:
+          type: boolean
+
+    TestInstanceRequest:
+      type: object
+      required: [api_url, api_key, app_type]
+      properties:
+        api_url:
+          type: string
+        api_key:
+          type: string
+        app_type:
+          $ref: '#/components/schemas/AppType'
+
+    TestConnectionResult:
+      type: object
+      properties:
+        status:
+          type: string
+          const: ok
+        app:
+          type: string
+        version:
+          type: string
+
+    TestURLAPIKeyRequest:
+      type: object
+      required: [url, api_key]
+      properties:
+        url:
+          type: string
+        api_key:
+          type: string
+
+    # ── Settings ────────────────────────────────────────────────────────
+    GeneralSettings:
+      type: object
+      properties:
+        secret_key:
+          type: string
+          description: Always masked as "****" in responses. Cannot be changed via API.
+        proxy_auth_bypass:
+          type: boolean
+        ssl_verify:
+          type: boolean
+        api_timeout:
+          type: integer
+          minimum: 1
+        stateful_reset_hours:
+          type: integer
+          minimum: 0
+        command_wait_delay:
+          type: integer
+          minimum: 0
+        command_wait_attempts:
+          type: integer
+          minimum: 0
+        min_download_queue_size:
+          type: integer
+          minimum: 0
+
+    AppSettings:
+      type: object
+      properties:
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        lurk_missing_count:
+          type: integer
+          minimum: 0
+        lurk_upgrade_count:
+          type: integer
+          minimum: 0
+        lurk_missing_mode:
+          type: string
+        upgrade_mode:
+          type: string
+        sleep_duration:
+          type: integer
+          minimum: 0
+        monitored_only:
+          type: boolean
+        skip_future:
+          type: boolean
+        hourly_cap:
+          type: integer
+          minimum: 0
+        random_selection:
+          type: boolean
+        debug_mode:
+          type: boolean
+
+    # ── History ─────────────────────────────────────────────────────────
+    LurkHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+          nullable: true
+        instance_name:
+          type: string
+        media_id:
+          type: integer
+        media_title:
+          type: string
+        operation:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    HistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LurkHistory'
+        total:
+          type: integer
+
+    # ── Logs ────────────────────────────────────────────────────────────
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        app_type:
+          type: string
+        level:
+          type: string
+        message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Stats ───────────────────────────────────────────────────────────
+    LurkStats:
+      type: object
+      properties:
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+        lurked:
+          type: integer
+          format: int64
+        upgraded:
+          type: integer
+          format: int64
+        updated_at:
+          type: string
+          format: date-time
+
+    HourlyCap:
+      type: object
+      properties:
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+        hour_bucket:
+          type: string
+          format: date-time
+        api_hits:
+          type: integer
+
+    # ── State ───────────────────────────────────────────────────────────
+    StateEntry:
+      type: object
+      properties:
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        last_reset:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ── Schedules ───────────────────────────────────────────────────────
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        app_type:
+          type: string
+        action:
+          type: string
+        days:
+          type: array
+          items:
+            type: string
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 59
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    ScheduleExecution:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        schedule_id:
+          type: string
+          format: uuid
+        executed_at:
+          type: string
+          format: date-time
+        result:
+          type: string
+          nullable: true
+
+    # ── Prowlarr ────────────────────────────────────────────────────────
+    ProwlarrSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        enabled:
+          type: boolean
+        sync_indexers:
+          type: boolean
+        timeout:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ── SABnzbd ─────────────────────────────────────────────────────────
+    SABnzbdSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+        category:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ── Queue ───────────────────────────────────────────────────────────
+    QueueCleanerSettings:
+      type: object
+      properties:
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        enabled:
+          type: boolean
+        stalled_threshold_minutes:
+          type: integer
+        slow_threshold_bytes_per_sec:
+          type: integer
+          format: int64
+        max_strikes:
+          type: integer
+        strike_window_hours:
+          type: integer
+        check_interval_seconds:
+          type: integer
+        remove_from_client:
+          type: boolean
+        blocklist_on_remove:
+          type: boolean
+        strike_public:
+          type: boolean
+        strike_private:
+          type: boolean
+        slow_ignore_above_bytes:
+          type: integer
+          format: int64
+        failed_import_remove:
+          type: boolean
+        failed_import_blocklist:
+          type: boolean
+        metadata_stuck_minutes:
+          type: integer
+        seeding_enabled:
+          type: boolean
+        seeding_max_ratio:
+          type: number
+          format: double
+        seeding_max_hours:
+          type: integer
+        seeding_mode:
+          type: string
+          enum: [and, or]
+        seeding_delete_files:
+          type: boolean
+        seeding_skip_private:
+          type: boolean
+        orphan_enabled:
+          type: boolean
+        orphan_grace_minutes:
+          type: integer
+        orphan_delete_files:
+          type: boolean
+        orphan_excluded_categories:
+          type: string
+        hardlink_protection:
+          type: boolean
+        skip_cross_seeds:
+          type: boolean
+        cross_arr_sync:
+          type: boolean
+
+    ScoringProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        name:
+          type: string
+        strategy:
+          type: string
+          enum: [highest, adequate]
+        adequate_threshold:
+          type: integer
+        prefer_higher_quality:
+          type: boolean
+        prefer_larger_size:
+          type: boolean
+        prefer_indexer_flags:
+          type: boolean
+        custom_format_weight:
+          type: integer
+        size_weight:
+          type: integer
+        age_weight:
+          type: integer
+        seeders_weight:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    BlocklistLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+        download_id:
+          type: string
+        title:
+          type: string
+        reason:
+          type: string
+        blocklisted_at:
+          type: string
+          format: date-time
+
+    AutoImportLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+        media_id:
+          type: integer
+        media_title:
+          type: string
+        queue_item_id:
+          type: integer
+        action:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DownloadClientSettings:
+      type: object
+      properties:
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        client_type:
+          $ref: '#/components/schemas/DownloadClientType'
+        url:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+          description: Masked as "****" in responses
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+
+    # ── Blocklist ───────────────────────────────────────────────────────
+    BlocklistSource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        url:
+          type: string
+        enabled:
+          type: boolean
+        sync_interval_hours:
+          type: integer
+        last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        etag:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    BlocklistRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_id:
+          type: string
+          format: uuid
+          nullable: true
+        pattern:
+          type: string
+        pattern_type:
+          $ref: '#/components/schemas/PatternType'
+        reason:
+          type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Notifications ───────────────────────────────────────────────────
+    NotificationProvider:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/NotificationProviderType'
+        name:
+          type: string
+        enabled:
+          type: boolean
+        config:
+          type: object
+          description: Provider-specific configuration (varies by type)
+        events:
+          type: array
+          items:
+            type: string
+          description: Event types to subscribe to
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ── Seerr ───────────────────────────────────────────────────────────
+    SeerrSettings:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        enabled:
+          type: boolean
+        sync_interval_minutes:
+          type: integer
+        auto_approve:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateSeerrSettingsRequest:
+      type: object
+      properties:
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Send masked value to preserve existing key
+        enabled:
+          type: boolean
+        sync_interval_minutes:
+          type: integer
+        auto_approve:
+          type: boolean

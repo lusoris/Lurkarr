@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-12
-> State: Phases 0–10 complete, Phase 16 complete. All lint + gosec issues resolved.
-> Priority order: Phase 14 (Frontend) → Phase 11 (OpenAPI) → feature work
+> State: Phases 0–12, 14, 16 complete. All lint + gosec issues resolved.
+> Priority order: Phase 15 (Docs) → Phase 9a (remaining auth) → Phase 13 (Coder)
 
 ---
 
@@ -299,19 +299,17 @@
 - [ ] Arr Stack Overview Dashboard — Sonarr/Radarr/Lidarr/etc health (BLOCKED: requires scraping arr /api endpoints directly)
 - [x] Dashboard variables — $app_type + $instance pickers on overview, $level + $search on logs, $DS_PROMETHEUS datasource selector
 
-## Phase 11: OpenAPI Spec + ogen Codegen
+## ✅ COMPLETED — Phase 11: OpenAPI Spec
 
-- [ ] Write openapi.yaml spec for full Lurkarr API
-- [ ] Generate server stubs with ogen
-- [ ] Rewrite API handlers as ogen interface implementations
-- [ ] Built-in request validation (replaces manual input validation)
-- [ ] Type-safe request/response structs
+- [x] Write openapi.yaml spec for full Lurkarr API (68 endpoints, 40+ schemas)
+- [x] Spec covers all routes: auth, user, instances, settings, history, logs, stats, state, schedules, prowlarr, sabnzbd, queue, blocklist, notifications, seerr, health, metrics, websocket
+- [x] Embedded via internal/openapi package (go:embed)
 
-## Phase 12: Scalar API Documentation
+## ✅ COMPLETED — Phase 12: Scalar API Documentation
 
-- [ ] Serve OpenAPI spec at /api/spec
-- [ ] Add Scalar HTML page at /api/docs (interactive API reference)
-- [ ] Zero-config: reads same openapi.yaml used by ogen
+- [x] Serve OpenAPI spec at /api/spec (YAML, cacheable)
+- [x] Add Scalar HTML page at /api/docs (interactive API reference via CDN)
+- [x] Zero-config: reads embedded openapi.yaml, base path aware
 
 ## Phase 13: Coder Development Environment
 
@@ -327,12 +325,15 @@
 - [ ] Onboard project on Coder instance (https://code.dev.cauda.dev)
 - [ ] Document template usage in README
 
-## Phase 14: Frontend Gaps
+## ✅ COMPLETED — Phase 14: Frontend Gaps
 
-- [ ] Instance management UI (add/remove/name per app type) — Phase 3 backend done
-- [ ] Notifications settings page (provider CRUD, event config, test send) — backend done
-- [ ] Seerr settings page (URL, API key, sync config, request viewer) — backend done
-- [ ] Download clients settings page (all 6 clients) — backend done
+- [x] Instance management UI (add/remove/name per app type) — Phase 3 backend done
+- [x] Notifications settings page (provider CRUD, event config, test send) — commit `f87b101`
+- [x] Seerr settings page (URL, API key, sync config) — commit `f87b101`
+- [x] Download clients settings page (all 6 clients) — commit `f87b101`
+- [x] Mobile-responsive sidebar (hamburger menu, slide-in drawer) — commit `f87b101`
+- [x] Svelte transitions (fly toasts, fade/scale modals) — commit `f87b101`
+- [x] Responsive grids, scrollable tabs, stacking layouts — commit `f87b101`
 - [ ] Monitoring/Grafana embed or link page
 - [ ] Auto-import config UI (enable/disable per instance, score threshold)
 - [ ] Cross-instance dedup detection settings

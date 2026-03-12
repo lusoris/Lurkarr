@@ -15,6 +15,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/lurking"
 	"github.com/lusoris/lurkarr/internal/notifications"
+	"github.com/lusoris/lurkarr/internal/openapi"
 	"github.com/lusoris/lurkarr/internal/queuecleaner"
 	"github.com/lusoris/lurkarr/internal/scheduler"
 	"github.com/lusoris/lurkarr/internal/seerr"
@@ -185,6 +186,7 @@ func provideServerConfig(cfg *config.Config) server.Config {
 		TrustedProxies:   cfg.TrustedProxies,
 		SecureCookie:     cfg.SecureCookie,
 		BasePath:         cfg.BasePath,
+		OpenAPISpec:      openapi.Spec,
 		OIDCEnabled:      cfg.OIDCEnabled,
 		OIDCIssuerURL:    cfg.OIDCIssuerURL,
 		OIDCClientID:     cfg.OIDCClientID,

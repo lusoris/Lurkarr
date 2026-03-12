@@ -19,6 +19,21 @@ import (
 	"github.com/lusoris/lurkarr/internal/scheduler"
 )
 
+// scalarHTML is the Scalar API reference page.
+var scalarHTML = []byte(`<!doctype html>
+<html>
+<head>
+  <title>Lurkarr API Reference</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="spec"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>
+`)
+
 // Config holds server configuration.
 type Config struct {
 	Addr           string
@@ -29,6 +44,7 @@ type Config struct {
 	TrustedProxies []*net.IPNet
 	SecureCookie   bool
 	BasePath       string
+	OpenAPISpec    []byte
 
 	// OIDC
 	OIDCEnabled      bool
@@ -122,6 +138,19 @@ func New(cfg Config, db *database.DB, logger *logging.Logger, hub *logging.Hub, 
 
 	// --- Metrics (Prometheus) ---
 	mux.Handle("GET /metrics", promhttp.Handler())
+
+	// --- API Documentation ---
+	if len(cfg.OpenAPISpec) > 0 {
+		mux.HandleFunc("GET /api/spec", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/yaml")
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+			_, _ = w.Write(cfg.OpenAPISpec)
+		})
+		mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(scalarHTML)
+		})
+	}
 
 	// --- Protected routes ---
 	protected := http.NewServeMux()
