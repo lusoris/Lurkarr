@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-12
 > State: Phases 0–9b complete, Phase 16 complete. All lint + gosec issues resolved.
-> Priority order: Cross-Arr blocklist sync → Phase 10 (Grafana) → Phase 14 (Frontend) → feature work
+> Priority order: Phase 10 (Grafana) → Phase 14 (Frontend) → feature work
 
 ---
 
@@ -238,7 +238,7 @@
 - [x] Blocklist API: 8 REST endpoints for sources + rules CRUD
 - [x] Migration 003: blocklist_sources + blocklist_rules tables
 - [x] 12 blocklist tests (matcher + parser)
-- [ ] Cross-Arr blocklist sync (propagate across instances of same type)
+- [x] Cross-Arr blocklist sync (propagate across instances of same type) — commit `453b0b6`
 
 ## Phase 9a: Authentication & Reverse Proxy Support
 
