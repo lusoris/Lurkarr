@@ -1,8 +1,8 @@
 # Lurkarr v2 — Master Todo
 
 > Last updated: 2026-03-12
-> State: Phases 0–9b complete, Phase 16 complete. All lint + gosec issues resolved.
-> Priority order: Phase 10 (Grafana) → Phase 14 (Frontend) → feature work
+> State: Phases 0–10 complete, Phase 16 complete. All lint + gosec issues resolved.
+> Priority order: Phase 14 (Frontend) → Phase 11 (OpenAPI) → feature work
 
 ---
 

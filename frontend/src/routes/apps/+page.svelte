@@ -146,8 +146,8 @@
 				{:else}
 					<div class="space-y-2">
 						{#each appInstances as inst}
-							<Card class="flex items-center justify-between">
-								<div class="flex items-center gap-3 min-w-0">
+						<Card class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+							<div class="flex items-center gap-3 min-w-0 flex-wrap">
 									<div class="min-w-0">
 										<span class="font-medium text-surface-100">{inst.name}</span>
 										<span class="text-xs text-surface-500 ml-2 truncate">{inst.api_url}</span>

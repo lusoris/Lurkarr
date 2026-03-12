@@ -35,6 +35,25 @@
 		category: string;
 	}
 
+	interface SeerrSettings {
+		id: string;
+		url: string;
+		api_key: string;
+		enabled: boolean;
+		sync_interval_minutes: number;
+		auto_approve: boolean;
+	}
+
+	interface DownloadClientSettings {
+		app_type: string;
+		client_type: string;
+		url: string;
+		username: string;
+		password: string;
+		enabled: boolean;
+		timeout: number;
+	}
+
 	interface AppSettings {
 		app_type: string;
 		lurk_missing_count: number;
@@ -50,22 +69,27 @@
 	}
 
 	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
-	type Tab = 'general' | 'apps' | 'prowlarr' | 'sabnzbd';
+	const clientTypes = ['qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget'] as const;
+	type Tab = 'general' | 'apps' | 'prowlarr' | 'sabnzbd' | 'seerr' | 'download-clients';
 
 	let activeTab = $state<Tab>('general');
 	let general = $state<GeneralSettings | null>(null);
 	let prowlarr = $state<ProwlarrSettings | null>(null);
 	let sabnzbd = $state<SABnzbdSettings | null>(null);
+	let seerr = $state<SeerrSettings | null>(null);
+	let dlClient = $state<DownloadClientSettings | null>(null);
 	let appSettings = $state<Record<string, AppSettings>>({});
 	let selectedApp = $state<string>('sonarr');
+	let selectedDlApp = $state<string>('sonarr');
 	let saving = $state(false);
 
 	async function load() {
 		try {
-			[general, prowlarr, sabnzbd] = await Promise.all([
+			[general, prowlarr, sabnzbd, seerr] = await Promise.all([
 				api.get<GeneralSettings>('/settings/general'),
 				api.get<ProwlarrSettings>('/prowlarr/settings'),
-				api.get<SABnzbdSettings>('/sabnzbd/settings')
+				api.get<SABnzbdSettings>('/sabnzbd/settings'),
+				api.get<SeerrSettings>('/seerr/settings')
 			]);
 		} catch { /* handled */ }
 	}
@@ -74,6 +98,14 @@
 		try {
 			appSettings[app] = await api.get<AppSettings>(`/settings/${app}`);
 		} catch { /* handled */ }
+	}
+
+	async function loadDlClient(app: string) {
+		try {
+			dlClient = await api.get<DownloadClientSettings>(`/queue/download-client/${app}`);
+		} catch {
+			dlClient = { app_type: app, client_type: 'qbittorrent', url: '', username: '', password: '', enabled: false, timeout: 30 };
+		}
 	}
 
 	async function saveGeneral() {
@@ -145,14 +177,50 @@
 		}
 	}
 
+	async function saveSeerr() {
+		if (!seerr) return;
+		saving = true;
+		try {
+			await api.put('/seerr/settings', seerr);
+			toasts.success('Seerr settings saved');
+		} catch {
+			toasts.error('Failed to save Seerr settings');
+		}
+		saving = false;
+	}
+
+	async function testSeerr() {
+		try {
+			const res = await api.post<{ status: string; version: string }>('/seerr/test');
+			toasts.success(`Seerr connected — v${res.version}`);
+		} catch {
+			toasts.error('Seerr connection failed');
+		}
+	}
+
+	async function saveDlClient() {
+		if (!dlClient) return;
+		saving = true;
+		try {
+			await api.put(`/queue/download-client/${selectedDlApp}`, dlClient);
+			toasts.success('Download client settings saved');
+		} catch {
+			toasts.error('Failed to save download client settings');
+		}
+		saving = false;
+	}
+
 	$effect(() => { load(); });
 	$effect(() => { if (activeTab === 'apps') loadAppSettings(selectedApp); });
+	$effect(() => { if (activeTab === 'download-clients') loadDlClient(selectedDlApp); });
 
 	const tabs: { id: Tab; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'apps', label: 'Lurk Settings' },
 		{ id: 'prowlarr', label: 'Prowlarr' },
-		{ id: 'sabnzbd', label: 'SABnzbd' }
+		{ id: 'sabnzbd', label: 'SABnzbd' },
+		{ id: 'seerr', label: 'Seerr' },
+		{ id: 'download-clients', label: 'Download Clients' }
 	];
 </script>
 
@@ -162,11 +230,11 @@
 	<h1 class="text-2xl font-bold text-surface-50">Settings</h1>
 
 	<!-- Tab navigation -->
-	<div class="flex gap-1 rounded-lg bg-surface-900 border border-surface-800 p-1">
+	<div class="flex gap-1 rounded-lg bg-surface-900 border border-surface-800 p-1 overflow-x-auto">
 		{#each tabs as tab}
 			<button
 				onclick={() => activeTab = tab.id}
-				class="flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors
+				class="shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors
 					{activeTab === tab.id ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'}"
 			>{tab.label}</button>
 		{/each}
@@ -275,6 +343,63 @@
 					<Button variant="secondary" onclick={testSabnzbd}>Test Connection</Button>
 				</div>
 			</div>
+		</Card>
+	{/if}
+
+	<!-- Seerr Settings -->
+	{#if activeTab === 'seerr' && seerr}
+		<Card>
+			<h2 class="text-lg font-semibold text-surface-200 mb-4">Seerr / Overseerr / Jellyseerr</h2>
+			<div class="space-y-4">
+				<Toggle bind:checked={seerr.enabled} label="Enabled" />
+				<Input bind:value={seerr.url} label="URL" placeholder="http://overseerr:5055" />
+				<Input bind:value={seerr.api_key} label="API Key" type="password" />
+				<Input bind:value={seerr.sync_interval_minutes} type="number" label="Sync Interval (minutes)" />
+				<Toggle bind:checked={seerr.auto_approve} label="Auto-Approve Requests" />
+				<div class="flex gap-2">
+					<Button onclick={saveSeerr} loading={saving}>Save</Button>
+					<Button variant="secondary" onclick={testSeerr}>Test Connection</Button>
+				</div>
+			</div>
+		</Card>
+	{/if}
+
+	<!-- Download Client Settings -->
+	{#if activeTab === 'download-clients'}
+		<Card>
+			<h2 class="text-lg font-semibold text-surface-200 mb-4">Download Clients</h2>
+			<div class="flex gap-1 mb-4 rounded-lg bg-surface-800/50 p-1 overflow-x-auto">
+				{#each appTypes as app}
+					<button
+						onclick={() => { selectedDlApp = app; loadDlClient(app); }}
+						class="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors
+							{selectedDlApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700'}"
+					>{app}</button>
+				{/each}
+			</div>
+
+			{#if dlClient}
+				<div class="space-y-4">
+					<Toggle bind:checked={dlClient.enabled} label="Enabled" />
+					<label class="block">
+						<span class="block text-sm font-medium text-surface-300 mb-1.5">Client Type</span>
+						<select bind:value={dlClient.client_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+							{#each clientTypes as ct}
+								<option value={ct}>{ct}</option>
+							{/each}
+						</select>
+					</label>
+					<Input bind:value={dlClient.url} label="URL" placeholder="http://qbittorrent:8080" />
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<Input bind:value={dlClient.username} label="Username" />
+						<Input bind:value={dlClient.password} label="Password" type="password" />
+					</div>
+					<Input bind:value={dlClient.timeout} type="number" label="Timeout (seconds)" />
+					<Button onclick={saveDlClient} loading={saving}>Save</Button>
+				</div>
+			{:else}
+				<p class="text-sm text-surface-500">Loading settings...</p>
+			{/if}
 		</Card>
 	{/if}
 </div>

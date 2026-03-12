@@ -147,8 +147,8 @@
 	{:else}
 		<div class="space-y-2">
 			{#each schedules as sched}
-				<Card class="flex items-center justify-between">
-					<div class="flex items-center gap-4">
+				<Card class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+					<div class="flex items-center gap-4 flex-wrap">
 						<Badge variant={sched.enabled ? 'success' : 'error'}>
 							{sched.enabled ? 'Active' : 'Inactive'}
 						</Badge>

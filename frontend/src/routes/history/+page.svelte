@@ -55,8 +55,8 @@
 			<p class="text-sm text-surface-500 text-center py-4">No history entries</p>
 		</Card>
 	{:else}
-		<div class="rounded-xl border border-surface-800 overflow-hidden">
-			<table class="w-full text-sm">
+		<div class="rounded-xl border border-surface-800 overflow-x-auto">
+			<table class="w-full text-sm min-w-[600px]">
 				<thead class="bg-surface-900 text-surface-400 text-xs uppercase">
 					<tr>
 						<th class="px-4 py-3 text-left">Media</th>

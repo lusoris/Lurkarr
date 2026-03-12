@@ -7,11 +7,11 @@
 	let { children }: { children: Snippet } = $props();
 </script>
 
-<div class="flex h-screen overflow-hidden">
+<div class="flex flex-col md:flex-row h-screen overflow-hidden">
 	<Sidebar />
 
 	<main class="flex-1 overflow-y-auto">
-		<div class="max-w-7xl mx-auto px-6 py-6">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
 			{@render children()}
 		</div>
 	</main>

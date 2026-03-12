@@ -57,7 +57,7 @@
 <svelte:head><title>Downloads - Lurkarr</title></svelte:head>
 
 <div class="space-y-4">
-	<div class="flex items-center justify-between">
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 		<h1 class="text-2xl font-bold text-surface-50">Downloads</h1>
 		{#if queue}
 			<div class="flex items-center gap-3">

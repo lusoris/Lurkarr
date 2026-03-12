@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 
 	interface Props {
 		open: boolean;
@@ -14,10 +16,10 @@
 {#if open}
 	<div class="fixed inset-0 z-50 flex items-center justify-center">
 		<!-- Backdrop -->
-		<button class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick={onclose} aria-label="Close"></button>
+		<button class="absolute inset-0 bg-black/60 backdrop-blur-sm" transition:fade={{ duration: 150 }} onclick={onclose} aria-label="Close"></button>
 
 		<!-- Panel -->
-		<div class="relative z-10 w-full max-w-lg rounded-xl border border-surface-700 bg-surface-900 p-6 shadow-2xl">
+		<div class="relative z-10 w-full max-w-lg rounded-xl border border-surface-700 bg-surface-900 p-6 shadow-2xl" transition:scale={{ start: 0.95, duration: 200, easing: cubicOut }}>
 			{#if title}
 				<div class="flex items-center justify-between mb-4">
 					<h2 class="text-lg font-semibold text-surface-100">{title}</h2>

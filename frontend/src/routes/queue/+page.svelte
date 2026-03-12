@@ -163,22 +163,22 @@
 	<h1 class="text-2xl font-bold text-surface-50">Queue Management</h1>
 
 	<!-- App selector -->
-	<div class="flex gap-1 rounded-lg bg-surface-900 border border-surface-800 p-1">
+	<div class="flex gap-1 rounded-lg bg-surface-900 border border-surface-800 p-1 overflow-x-auto">
 		{#each appTypes as app}
 			<button
 				onclick={() => { selectedApp = app; loadTabData(); }}
-				class="flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors
+				class="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors
 					{selectedApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'}"
 			>{app}</button>
 		{/each}
 	</div>
 
 	<!-- Tab navigation -->
-	<div class="flex gap-1 rounded-lg bg-surface-800/50 p-1">
+	<div class="flex gap-1 rounded-lg bg-surface-800/50 p-1 overflow-x-auto">
 		{#each tabs as tab}
 			<button
 				onclick={() => { activeTab = tab.id; loadTabData(); }}
-				class="flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors
+				class="shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors
 					{activeTab === tab.id ? 'bg-surface-700 text-surface-100' : 'text-surface-400 hover:text-surface-200'}"
 			>{tab.label}</button>
 		{/each}
@@ -193,7 +193,7 @@
 					<Toggle bind:checked={settings.enabled} label="Enable Queue Cleaner" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Stall Detection</h3>
-					<div class="grid grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<Input bind:value={settings.stalled_threshold_minutes} type="number" label="Stalled Threshold (min)" />
 						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow Threshold (bytes/s)" />
 					</div>
@@ -201,7 +201,7 @@
 					<Input bind:value={settings.metadata_stuck_minutes} type="number" label="Metadata Stuck (min, 0 = disabled)" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Strike System</h3>
-					<div class="grid grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" />
 						<Input bind:value={settings.strike_window_hours} type="number" label="Strike Window (hours)" />
 					</div>

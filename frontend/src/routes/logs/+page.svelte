@@ -36,8 +36,8 @@
 
 <svelte:head><title>Logs - Lurkarr</title></svelte:head>
 
-<div class="space-y-4 h-[calc(100vh-6rem)] flex flex-col">
-	<div class="flex items-center justify-between gap-4">
+<div class="space-y-4 h-[calc(100vh-6rem)] md:h-[calc(100vh-6rem)] flex flex-col">
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 		<h1 class="text-2xl font-bold text-surface-50">Live Logs</h1>
 		<div class="flex items-center gap-3">
 			<Badge variant={logs.connected ? 'success' : 'error'}>
@@ -54,11 +54,11 @@
 		class="flex-1 overflow-y-auto rounded-xl border border-surface-800 bg-surface-950 p-4 font-mono text-xs leading-relaxed"
 	>
 		{#each filtered as msg (msg.id)}
-			<div class="flex gap-3 py-0.5 hover:bg-surface-900/50">
+			<div class="flex flex-wrap sm:flex-nowrap gap-1 sm:gap-3 py-1 sm:py-0.5 hover:bg-surface-900/50">
 				<span class="text-surface-600 shrink-0 w-20">{new Date(msg.created_at).toLocaleTimeString()}</span>
 				<span class="shrink-0 w-12 uppercase {levelColors[msg.level] ?? 'text-surface-400'}">{msg.level}</span>
-				<span class="shrink-0 w-16 text-surface-500">{msg.app_type}</span>
-				<span class="text-surface-200">{msg.message}</span>
+				<span class="shrink-0 w-16 text-surface-500 hidden sm:inline">{msg.app_type}</span>
+				<span class="text-surface-200 break-all">{msg.message}</span>
 			</div>
 		{/each}
 		{#if filtered.length === 0}
