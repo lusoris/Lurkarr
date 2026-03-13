@@ -82,7 +82,7 @@
 		try {
 			providers = await api.get<NotificationProvider[]>('/notifications/providers');
 		} catch {
-			toasts.error('Failed to load notification providers');
+			providers = [];
 		}
 		loading = false;
 	}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
+	import { appDisplayName } from '$lib';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
@@ -39,7 +40,7 @@
 
 <svelte:head><title>History - Lurkarr</title></svelte:head>
 
-<div class="space-y-4">
+<div class="space-y-6">
 	<h1 class="text-2xl font-bold text-surface-50">Lurk History</h1>
 
 	<Input bind:value={search} placeholder="Search media titles..." oninput={onSearch} />
@@ -70,7 +71,7 @@
 					{#each items as item}
 						<tr class="hover:bg-surface-800/30 transition-colors">
 							<td class="px-4 py-3 text-surface-100">{item.media_title}</td>
-							<td class="px-4 py-3"><Badge>{item.app_type}</Badge></td>
+							<td class="px-4 py-3"><Badge>{appDisplayName(item.app_type)}</Badge></td>
 							<td class="px-4 py-3 text-surface-400">{item.instance_name}</td>
 							<td class="px-4 py-3">
 								<Badge variant={item.operation === 'missing' ? 'warning' : 'info'}>{item.operation}</Badge>

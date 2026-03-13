@@ -127,6 +127,7 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	blocklistH := &api.BlocklistHandler{DB: db}
 	notificationH := &api.NotificationHandler{DB: db, Manager: notifMgr}
 	seerrH := &api.SeerrHandler{DB: db}
+	dlClientH := &api.DownloadClientHandler{DB: db}
 
 	mux := http.NewServeMux()
 
@@ -135,6 +136,7 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 
 	// --- Public routes (no auth) ---
 	mux.Handle("POST /api/auth/login", middleware.RateLimit(loginRL)(http.HandlerFunc(authH.HandleLogin)))
+	mux.HandleFunc("GET /api/auth/setup", authH.HandleSetupCheck)
 	mux.HandleFunc("POST /api/auth/setup", authH.HandleSetup)
 
 	// --- OIDC routes (public, no auth) ---
@@ -161,14 +163,18 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 		}
 	})
 
-	// --- Health ---
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	// --- Kubernetes health probes ---
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.HealthCheck(r.Context()); err != nil {
-			http.Error(w, `{"status":"unhealthy"}`, http.StatusServiceUnavailable)
+			http.Error(w, `{"status":"not ready"}`, http.StatusServiceUnavailable)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"healthy"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
 	// --- Metrics (Prometheus) ---
@@ -212,6 +218,7 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("POST /api/instances/{app}", appsH.HandleCreateInstance)
 	protected.HandleFunc("PUT /api/instances/{id}", appsH.HandleUpdateInstance)
 	protected.HandleFunc("DELETE /api/instances/{id}", appsH.HandleDeleteInstance)
+	protected.HandleFunc("GET /api/instances/{id}/health", appsH.HandleHealthCheckInstance)
 	protected.HandleFunc("POST /api/instances/test", appsH.HandleTestConnection)
 
 	// History
@@ -278,6 +285,14 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("PUT /api/notifications/providers/{id}", notificationH.HandleUpdateProvider)
 	protected.HandleFunc("DELETE /api/notifications/providers/{id}", notificationH.HandleDeleteProvider)
 	protected.HandleFunc("POST /api/notifications/providers/{id}/test", notificationH.HandleTestProvider)
+
+	// Download Client Instances
+	protected.HandleFunc("GET /api/download-clients", dlClientH.HandleList)
+	protected.HandleFunc("POST /api/download-clients", dlClientH.HandleCreate)
+	protected.HandleFunc("PUT /api/download-clients/{id}", dlClientH.HandleUpdate)
+	protected.HandleFunc("DELETE /api/download-clients/{id}", dlClientH.HandleDelete)
+	protected.HandleFunc("GET /api/download-clients/{id}/health", dlClientH.HandleHealthCheck)
+	protected.HandleFunc("POST /api/download-clients/test", dlClientH.HandleTest)
 
 	// Seerr
 	protected.HandleFunc("GET /api/seerr/settings", seerrH.HandleGetSettings)

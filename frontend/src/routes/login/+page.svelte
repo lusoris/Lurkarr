@@ -13,27 +13,52 @@
 	let loading = $state(false);
 	let showTotp = $state(false);
 	let oidcEnabled = $state(false);
+	let needsSetup = $state(false);
+	let checkingSetup = $state(true);
 
-	async function checkOIDC() {
+	async function checkSetup() {
 		try {
-			const res = await fetch('/api/auth/oidc/info');
-			if (res.ok) {
-				const data = await res.json();
+			const [setupRes, oidcRes] = await Promise.all([
+				fetch('/api/auth/setup'),
+				fetch('/api/auth/oidc/info')
+			]);
+			if (setupRes.ok) {
+				const data = await setupRes.json();
+				needsSetup = data.needs_setup === true;
+			}
+			if (oidcRes.ok) {
+				const data = await oidcRes.json();
 				oidcEnabled = data.enabled === true;
 			}
 		} catch {
-			// Silently ignore — OIDC button just won't show.
+			// Silently ignore
+		} finally {
+			checkingSetup = false;
 		}
 	}
 
-	checkOIDC();
+	checkSetup();
 
 	async function submit() {
 		error = '';
 		loading = true;
 		try {
-			await auth.login(username, password, showTotp ? totp : undefined);
-			goto('/');
+			if (needsSetup) {
+				const res = await fetch('/api/auth/setup', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ username, password })
+				});
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({ error: 'Setup failed' }));
+					throw new Error(data.error || 'Setup failed');
+				}
+				await auth.check();
+				goto('/');
+			} else {
+				await auth.login(username, password, showTotp ? totp : undefined);
+				goto('/');
+			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Login failed';
 			if (msg.includes('2fa') || msg.includes('totp')) {
@@ -50,49 +75,57 @@
 	}
 </script>
 
-<svelte:head><title>Login - Lurkarr</title></svelte:head>
+<svelte:head><title>{needsSetup ? 'Setup' : 'Login'} - Lurkarr</title></svelte:head>
 
 <div class="min-h-screen flex items-center justify-center bg-surface-950">
 	<div class="w-full max-w-sm space-y-6">
 		<div class="text-center">
-			<img src="/logo.png" alt="Lurkarr" class="w-16 h-16 mx-auto rounded-xl" />
-			<h1 class="text-2xl font-bold text-surface-50 mt-3">Lurkarr</h1>
-			<p class="text-sm text-surface-500 mt-1">Sign in to continue</p>
+			<img src="/logo.png" alt="Lurkarr" class="w-24 h-24 mx-auto rounded-xl" />
 		</div>
 
-		<form onsubmit={submit} class="space-y-4 bg-surface-900 border border-surface-800 rounded-xl p-6">
-			{#if error}
-				<div class="rounded-lg bg-red-950/50 border border-red-800 px-4 py-3 text-sm text-red-300">
-					{error}
-				</div>
-			{/if}
-
-			<Input bind:value={username} label="Username" placeholder="admin" />
-			<Input bind:value={password} type="password" label="Password" />
-
-			{#if showTotp}
-				<Input bind:value={totp} label="2FA Code" placeholder="000000" />
-			{/if}
-
-			<Button type="submit" {loading} class="w-full">Sign In</Button>
-		</form>
-
-		{#if oidcEnabled}
-			<div class="relative">
-				<div class="absolute inset-0 flex items-center">
-					<div class="w-full border-t border-surface-700"></div>
-				</div>
-				<div class="relative flex justify-center text-xs">
-					<span class="bg-surface-950 px-2 text-surface-500">or</span>
-				</div>
+		{#if checkingSetup}
+			<div class="flex justify-center">
+				<div class="h-6 w-6 animate-spin rounded-full border-2 border-lurk-500 border-t-transparent"></div>
 			</div>
+		{:else}
+			{#if needsSetup}
+				<p class="text-center text-sm text-surface-400">Create your admin account to get started.</p>
+			{/if}
 
-			<button
-				onclick={loginOIDC}
-				class="w-full rounded-lg bg-surface-800 border border-surface-700 px-4 py-3 text-sm font-medium text-surface-200 hover:bg-surface-700 transition-colors"
-			>
-				Sign in with SSO
-			</button>
+			<form onsubmit={(e: Event) => { e.preventDefault(); submit(); }} class="space-y-4 bg-surface-900 border border-surface-800 rounded-xl p-6">
+				{#if error}
+					<div class="rounded-lg bg-red-950/50 border border-red-800 px-4 py-3 text-sm text-red-300">
+						{error}
+					</div>
+				{/if}
+
+				<Input bind:value={username} label="Username" placeholder="admin" />
+				<Input bind:value={password} type="password" label="Password" />
+
+				{#if showTotp && !needsSetup}
+					<Input bind:value={totp} label="2FA Code" placeholder="000000" />
+				{/if}
+
+				<Button type="submit" {loading} class="w-full">{needsSetup ? 'Create Account' : 'Sign In'}</Button>
+			</form>
+
+			{#if oidcEnabled && !needsSetup}
+				<div class="relative">
+					<div class="absolute inset-0 flex items-center">
+						<div class="w-full border-t border-surface-700"></div>
+					</div>
+					<div class="relative flex justify-center text-xs">
+						<span class="bg-surface-950 px-2 text-surface-500">or</span>
+					</div>
+				</div>
+
+				<button
+					onclick={loginOIDC}
+					class="w-full rounded-lg bg-surface-800 border border-surface-700 px-4 py-3 text-sm font-medium text-surface-200 hover:bg-surface-700 transition-colors"
+				>
+					Sign in with SSO
+				</button>
+			{/if}
 		{/if}
 	</div>
 </div>

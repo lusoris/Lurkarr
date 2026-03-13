@@ -1641,15 +1641,33 @@ paths:
           $ref: '#/components/responses/BadGateway'
 
   # ── System ────────────────────────────────────────────────────────────
-  /api/health:
+  /healthz:
     get:
-      operationId: healthCheck
+      operationId: livenessProbe
       tags: [System]
-      summary: Health check
-      description: Returns OK if the database is reachable. No auth required.
+      summary: Kubernetes liveness probe
+      description: Always returns 200 if the process is running. No dependency checks.
       responses:
         '200':
-          description: Healthy
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+
+  /readyz:
+    get:
+      operationId: readinessProbe
+      tags: [System]
+      summary: Kubernetes readiness probe
+      description: Returns 200 if the database is reachable. Returns 503 otherwise.
+      responses:
+        '200':
+          description: Ready
           content:
             application/json:
               schema:
@@ -1659,7 +1677,7 @@ paths:
                     type: string
                     const: ok
         '503':
-          description: Unhealthy
+          description: Not ready
           content:
             application/json:
               schema:

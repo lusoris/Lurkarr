@@ -11,9 +11,10 @@
 
 	const nav: NavItem[] = [
 		{ href: '/', label: 'Dashboard', icon: 'dashboard' },
-		{ href: '/apps', label: 'Apps', icon: 'apps' },
-		{ href: '/history', label: 'History', icon: 'history' },
+		{ href: '/apps', label: 'Connections', icon: 'apps' },
+		{ href: '/lurk', label: 'Lurk Settings', icon: 'lurk' },
 		{ href: '/scheduling', label: 'Scheduling', icon: 'scheduling' },
+		{ href: '/history', label: 'History', icon: 'history' },
 		{ href: '/downloads', label: 'Downloads', icon: 'downloads' },
 		{ href: '/queue', label: 'Queue', icon: 'queue' },
 		{ href: '/notifications', label: 'Notifications', icon: 'notifications' },
@@ -36,7 +37,8 @@
 		notifications: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0',
 		monitoring: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
 		settings: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
-		profile: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z'
+		profile: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
+		lurk: 'M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.047 8.287 8.287 0 009 9.601a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z M12 18a3.75 3.75 0 00.495-7.468 5.99 5.99 0 00-1.925 3.547 5.975 5.975 0 01-2.133-1.001A3.75 3.75 0 0012 18z'
 	};
 </script>
 
@@ -45,11 +47,8 @@
 		{collapsed ? 'w-16' : 'w-56'}"
 >
 	<!-- Logo -->
-	<div class="flex items-center gap-3 px-4 h-16 border-b border-surface-800">
-		<img src="/logo.png" alt="Lurkarr" class="w-8 h-8 rounded" />
-		{#if !collapsed}
-			<span class="font-bold text-lurk-400 text-lg tracking-tight">Lurkarr</span>
-		{/if}
+	<div class="flex items-center justify-center px-4 h-20 border-b border-surface-800">
+		<img src="/logo.png" alt="Lurkarr" class="{collapsed ? 'w-12 h-12' : 'w-18 h-18'} rounded transition-all" />
 	</div>
 
 	<!-- Navigation -->
@@ -72,6 +71,17 @@
 		{/each}
 	</nav>
 
+	<!-- Footer -->
+	{#if !collapsed}
+		<div class="px-3 py-2 border-t border-surface-800 text-[10px] text-surface-600 leading-relaxed">
+			<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400 transition-colors">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400 transition-colors">AGPL-3.0</a></p>
+			<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-surface-400 transition-colors mt-0.5">
+				<svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
+				Support on Ko-fi
+			</a>
+		</div>
+	{/if}
+
 	<!-- Collapse toggle -->
 	<button
 		onclick={() => collapsed = !collapsed}
@@ -91,8 +101,7 @@
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
 		</svg>
 	</button>
-	<img src="/logo.png" alt="Lurkarr" class="w-7 h-7 rounded" />
-	<span class="font-bold text-lurk-400 text-lg tracking-tight">Lurkarr</span>
+	<img src="/logo.png" alt="Lurkarr" class="w-12 h-12 rounded" />
 </div>
 
 <!-- Mobile overlay -->
@@ -113,8 +122,7 @@
 		>
 			<div class="flex items-center justify-between px-4 h-14 border-b border-surface-800">
 				<div class="flex items-center gap-3">
-					<img src="/logo.png" alt="Lurkarr" class="w-8 h-8 rounded" />
-					<span class="font-bold text-lurk-400 text-lg tracking-tight">Lurkarr</span>
+					<img src="/logo.png" alt="Lurkarr" class="w-14 h-14 rounded" />
 				</div>
 				<button onclick={() => mobileOpen = false} aria-label="Close menu" class="text-surface-400 hover:text-surface-100">
 					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -139,6 +147,14 @@
 						<span>{item.label}</span>
 					</a>
 				{/each}
+			</div>
+
+			<div class="px-4 py-3 border-t border-surface-800 text-[10px] text-surface-600 leading-relaxed">
+				<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400">AGPL-3.0</a></p>
+				<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-surface-400 mt-0.5">
+					<svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
+					Support on Ko-fi
+				</a>
 			</div>
 		</nav>
 	</div>

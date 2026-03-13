@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/arrclient"
@@ -117,6 +118,51 @@ func (h *AppsHandler) HandleDeleteInstance(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// HandleHealthCheckInstance handles GET /api/instances/{id}/health.
+// It tests the connection to a stored instance using its saved credentials.
+func (h *AppsHandler) HandleHealthCheckInstance(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid instance ID"))
+		return
+	}
+
+	inst, err := h.DB.GetInstance(r.Context(), id)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("instance not found"))
+		return
+	}
+
+	genSettings, err := h.DB.GetGeneralSettings(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load settings"))
+		return
+	}
+
+	timeout := time.Duration(genSettings.APITimeout) * time.Second
+	if timeout == 0 {
+		timeout = 15 * time.Second
+	}
+
+	client := arrclient.NewClient(inst.APIURL, inst.APIKey, timeout, genSettings.SSLVerify)
+	apiVersion := arrclient.APIVersionFor(string(inst.AppType))
+
+	status, err := client.TestConnection(r.Context(), apiVersion)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "offline",
+			"version": "",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"app":     status.AppName,
+		"version": status.Version,
+	})
 }
 
 // HandleTestConnection handles POST /api/instances/test.

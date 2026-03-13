@@ -62,14 +62,11 @@ type Store interface {
 	GetBlocklistSource(ctx context.Context, id uuid.UUID) (*database.BlocklistSource, error)
 	CreateBlocklistSource(ctx context.Context, s *database.BlocklistSource) error
 	UpdateBlocklistSource(ctx context.Context, s *database.BlocklistSource) error
-	UpdateBlocklistSourceSync(ctx context.Context, id uuid.UUID, etag string) error
 	DeleteBlocklistSource(ctx context.Context, id uuid.UUID) error
 	ListBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
-	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
 	CreateBlocklistRule(ctx context.Context, r *database.BlocklistRule) error
 	DeleteBlocklistRule(ctx context.Context, id uuid.UUID) error
 	DeleteBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) error
-	CountBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) (int, error)
 
 	// Prowlarr
 	GetProwlarrSettings(ctx context.Context) (*database.ProwlarrSettings, error)
@@ -94,9 +91,17 @@ type Store interface {
 	UpdateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	DeleteNotificationProvider(ctx context.Context, id uuid.UUID) error
 
-	// Download Clients
+	// Download Clients (legacy per-app)
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
 	UpdateDownloadClientSettings(ctx context.Context, s *database.DownloadClientSettings) error
+
+	// Download Client Instances (multi-instance)
+	ListDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error)
+	GetDownloadClientInstance(ctx context.Context, id uuid.UUID) (*database.DownloadClientInstance, error)
+	CreateDownloadClientInstance(ctx context.Context, d *database.DownloadClientInstance) (*database.DownloadClientInstance, error)
+	UpdateDownloadClientInstance(ctx context.Context, d *database.DownloadClientInstance) error
+	DeleteDownloadClientInstance(ctx context.Context, id uuid.UUID) error
+	ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error)
 
 	// Seerr
 	GetSeerrSettings(ctx context.Context) (*database.SeerrSettings, error)

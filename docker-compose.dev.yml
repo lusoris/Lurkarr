@@ -1,16 +1,39 @@
-# Development stack: PostgreSQL + Prometheus + Grafana
-# Run Lurkarr locally with `go run ./cmd/lurkarr`
+# Development stack — real arr services + download clients for Lurkarr.
 #
 # Usage:
-#   docker compose -f docker-compose.dev.yml up -d
-#   go run ./cmd/lurkarr
+#   docker compose -f docker-compose.dev.yml up -d --build
 #
 # Then open:
-#   Lurkarr:   http://localhost:9705
-#   Grafana:   http://localhost:3000  (admin/admin)
-#   Prometheus: http://localhost:9090
+#   Lurkarr:     http://localhost:9705
+#   Grafana:     http://localhost:3000  (admin/admin)
+#   Prometheus:  http://localhost:9090
+#   Sonarr:      http://localhost:8989
+#   Radarr:      http://localhost:7878
+#   Lidarr:      http://localhost:8686
+#   Readarr:     http://localhost:8787
+#   Prowlarr:    http://localhost:9696
+#   Whisparr:    http://localhost:6969
+#   Seerr:       http://localhost:5055
+#   SABnzbd:     http://localhost:8080
+#   qBittorrent: http://localhost:8181
 
 services:
+  # ── Lurkarr ───────────────────────────────────────────────────────────
+  lurkarr:
+    build: .
+    ports:
+      - "9705:9705"
+    environment:
+      DATABASE_URL: postgres://lurkarr:lurkarr@db:5432/lurkarr?sslmode=disable
+      LISTEN_ADDR: ":9705"
+      SECRET_KEY: dev-secret-key-32-bytes-minimum!
+      CSRF_KEY: dev-csrf-key-must-be-32-bytes!
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Infrastructure ────────────────────────────────────────────────────
   db:
     image: postgres:17-alpine
     ports:
@@ -53,5 +76,124 @@ services:
     depends_on:
       - prometheus
 
+  # ── Arr apps (hotio) ──────────────────────────────────────────────────
+  sonarr:
+    image: ghcr.io/hotio/sonarr:release
+    ports:
+      - "8989:8989"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - sonarr-config:/config
+      - downloads:/downloads
+
+  radarr:
+    image: ghcr.io/hotio/radarr:release
+    ports:
+      - "7878:7878"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - radarr-config:/config
+      - downloads:/downloads
+
+  lidarr:
+    image: ghcr.io/hotio/lidarr:release
+    ports:
+      - "8686:8686"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - lidarr-config:/config
+      - downloads:/downloads
+
+  readarr:
+    image: ghcr.io/linuxserver/readarr:0.4.10-nightly
+    ports:
+      - "8787:8787"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - readarr-config:/config
+      - downloads:/downloads
+
+  prowlarr:
+    image: ghcr.io/hotio/prowlarr:release
+    ports:
+      - "9696:9696"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - prowlarr-config:/config
+
+  whisparr:
+    image: ghcr.io/hotio/whisparr:v3
+    ports:
+      - "6969:6969"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - whisparr-config:/config
+      - downloads:/downloads
+
+  # ── Seerr ──────────────────────────────────────────────────────────────
+  seerr:
+    image: fallenbagel/jellyseerr:latest
+    ports:
+      - "5055:5055"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - seerr-config:/app/config
+
+  # ── Download clients ──────────────────────────────────────────────────
+  sabnzbd:
+    image: ghcr.io/hotio/sabnzbd:release
+    ports:
+      - "8080:8080"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - sabnzbd-config:/config
+      - downloads:/downloads
+
+  qbittorrent:
+    image: ghcr.io/hotio/qbittorrent:release
+    ports:
+      - "8181:8080"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - qbittorrent-config:/config
+      - downloads:/downloads
+
 volumes:
   pgdata-dev:
+  sonarr-config:
+  radarr-config:
+  lidarr-config:
+  readarr-config:
+  prowlarr-config:
+  whisparr-config:
+  seerr-config:
+  sabnzbd-config:
+  qbittorrent-config:
+  downloads:

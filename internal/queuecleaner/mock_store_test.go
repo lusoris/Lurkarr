@@ -161,6 +161,21 @@ func (mr *MockStoreMockRecorder) ListEnabledBlocklistRules(ctx any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledBlocklistRules", reflect.TypeOf((*MockStore)(nil).ListEnabledBlocklistRules), ctx)
 }
 
+// ListEnabledDownloadClientInstances mocks base method.
+func (m *MockStore) ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnabledDownloadClientInstances", ctx)
+	ret0, _ := ret[0].([]database.DownloadClientInstance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnabledDownloadClientInstances indicates an expected call of ListEnabledDownloadClientInstances.
+func (mr *MockStoreMockRecorder) ListEnabledDownloadClientInstances(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledDownloadClientInstances", reflect.TypeOf((*MockStore)(nil).ListEnabledDownloadClientInstances), ctx)
+}
+
 // ListEnabledInstances mocks base method.
 func (m *MockStore) ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error) {
 	m.ctrl.T.Helper()

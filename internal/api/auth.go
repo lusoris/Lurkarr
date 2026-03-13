@@ -86,6 +86,16 @@ func (h *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// HandleSetupCheck handles GET /api/auth/setup — returns whether initial setup is needed.
+func (h *AuthHandler) HandleSetupCheck(w http.ResponseWriter, r *http.Request) {
+	count, err := h.DB.UserCount(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("database error"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"needs_setup": count == 0})
+}
+
 // HandleSetup handles POST /api/auth/setup (first-run).
 func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	count, err := h.DB.UserCount(r.Context())
@@ -106,6 +116,10 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Username == "" || req.Password == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("username and password required"))
+		return
+	}
+	if err := auth.ValidatePassword(req.Password); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 

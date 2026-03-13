@@ -30,6 +30,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	if (token) csrfToken = token;
 
 	if (!res.ok) {
+		// Redirect to login on 401 (unless already there).
+		if (res.status === 401 && !window.location.pathname.startsWith('/login')) {
+			window.location.href = '/login';
+		}
 		const data = await res.json().catch(() => ({ error: res.statusText }));
 		throw new APIError(res.status, data.error || res.statusText);
 	}

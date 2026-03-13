@@ -43,21 +43,6 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
-// CountBlocklistRulesBySource mocks base method.
-func (m *MockStore) CountBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) (int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CountBlocklistRulesBySource", ctx, sourceID)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CountBlocklistRulesBySource indicates an expected call of CountBlocklistRulesBySource.
-func (mr *MockStoreMockRecorder) CountBlocklistRulesBySource(ctx, sourceID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountBlocklistRulesBySource", reflect.TypeOf((*MockStore)(nil).CountBlocklistRulesBySource), ctx, sourceID)
-}
-
 // CreateBlocklistRule mocks base method.
 func (m *MockStore) CreateBlocklistRule(ctx context.Context, r *database.BlocklistRule) error {
 	m.ctrl.T.Helper()
@@ -541,21 +526,6 @@ func (mr *MockStoreMockRecorder) ListBlocklistSources(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlocklistSources", reflect.TypeOf((*MockStore)(nil).ListBlocklistSources), ctx)
 }
 
-// ListEnabledBlocklistRules mocks base method.
-func (m *MockStore) ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEnabledBlocklistRules", ctx)
-	ret0, _ := ret[0].([]database.BlocklistRule)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListEnabledBlocklistRules indicates an expected call of ListEnabledBlocklistRules.
-func (mr *MockStoreMockRecorder) ListEnabledBlocklistRules(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledBlocklistRules", reflect.TypeOf((*MockStore)(nil).ListEnabledBlocklistRules), ctx)
-}
-
 // ListEnabledNotificationProviders mocks base method.
 func (m *MockStore) ListEnabledNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error) {
 	m.ctrl.T.Helper()
@@ -717,20 +687,6 @@ func (mr *MockStoreMockRecorder) UpdateBlocklistSource(ctx, s any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBlocklistSource", reflect.TypeOf((*MockStore)(nil).UpdateBlocklistSource), ctx, s)
 }
 
-// UpdateBlocklistSourceSync mocks base method.
-func (m *MockStore) UpdateBlocklistSourceSync(ctx context.Context, id uuid.UUID, etag string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateBlocklistSourceSync", ctx, id, etag)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateBlocklistSourceSync indicates an expected call of UpdateBlocklistSourceSync.
-func (mr *MockStoreMockRecorder) UpdateBlocklistSourceSync(ctx, id, etag any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBlocklistSourceSync", reflect.TypeOf((*MockStore)(nil).UpdateBlocklistSourceSync), ctx, id, etag)
-}
-
 // UpdateDownloadClientSettings mocks base method.
 func (m *MockStore) UpdateDownloadClientSettings(ctx context.Context, s *database.DownloadClientSettings) error {
 	m.ctrl.T.Helper()
@@ -743,6 +699,94 @@ func (m *MockStore) UpdateDownloadClientSettings(ctx context.Context, s *databas
 func (mr *MockStoreMockRecorder) UpdateDownloadClientSettings(ctx, s any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDownloadClientSettings", reflect.TypeOf((*MockStore)(nil).UpdateDownloadClientSettings), ctx, s)
+}
+
+// ListDownloadClientInstances mocks base method.
+func (m *MockStore) ListDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListDownloadClientInstances", ctx)
+	ret0, _ := ret[0].([]database.DownloadClientInstance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListDownloadClientInstances indicates an expected call of ListDownloadClientInstances.
+func (mr *MockStoreMockRecorder) ListDownloadClientInstances(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDownloadClientInstances", reflect.TypeOf((*MockStore)(nil).ListDownloadClientInstances), ctx)
+}
+
+// GetDownloadClientInstance mocks base method.
+func (m *MockStore) GetDownloadClientInstance(ctx context.Context, id uuid.UUID) (*database.DownloadClientInstance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDownloadClientInstance", ctx, id)
+	ret0, _ := ret[0].(*database.DownloadClientInstance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDownloadClientInstance indicates an expected call of GetDownloadClientInstance.
+func (mr *MockStoreMockRecorder) GetDownloadClientInstance(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDownloadClientInstance", reflect.TypeOf((*MockStore)(nil).GetDownloadClientInstance), ctx, id)
+}
+
+// CreateDownloadClientInstance mocks base method.
+func (m *MockStore) CreateDownloadClientInstance(ctx context.Context, d *database.DownloadClientInstance) (*database.DownloadClientInstance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateDownloadClientInstance", ctx, d)
+	ret0, _ := ret[0].(*database.DownloadClientInstance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateDownloadClientInstance indicates an expected call of CreateDownloadClientInstance.
+func (mr *MockStoreMockRecorder) CreateDownloadClientInstance(ctx, d any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDownloadClientInstance", reflect.TypeOf((*MockStore)(nil).CreateDownloadClientInstance), ctx, d)
+}
+
+// UpdateDownloadClientInstance mocks base method.
+func (m *MockStore) UpdateDownloadClientInstance(ctx context.Context, d *database.DownloadClientInstance) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateDownloadClientInstance", ctx, d)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateDownloadClientInstance indicates an expected call of UpdateDownloadClientInstance.
+func (mr *MockStoreMockRecorder) UpdateDownloadClientInstance(ctx, d any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDownloadClientInstance", reflect.TypeOf((*MockStore)(nil).UpdateDownloadClientInstance), ctx, d)
+}
+
+// DeleteDownloadClientInstance mocks base method.
+func (m *MockStore) DeleteDownloadClientInstance(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteDownloadClientInstance", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteDownloadClientInstance indicates an expected call of DeleteDownloadClientInstance.
+func (mr *MockStoreMockRecorder) DeleteDownloadClientInstance(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteDownloadClientInstance", reflect.TypeOf((*MockStore)(nil).DeleteDownloadClientInstance), ctx, id)
+}
+
+// ListEnabledDownloadClientInstances mocks base method.
+func (m *MockStore) ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnabledDownloadClientInstances", ctx)
+	ret0, _ := ret[0].([]database.DownloadClientInstance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnabledDownloadClientInstances indicates an expected call of ListEnabledDownloadClientInstances.
+func (mr *MockStoreMockRecorder) ListEnabledDownloadClientInstances(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledDownloadClientInstances", reflect.TypeOf((*MockStore)(nil).ListEnabledDownloadClientInstances), ctx)
 }
 
 // UpdateInstance mocks base method.

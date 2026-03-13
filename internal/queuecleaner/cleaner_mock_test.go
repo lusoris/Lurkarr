@@ -186,6 +186,7 @@ func TestCleanInstance_StalledItem(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().ListEnabledBlocklistRules(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
+	store.EXPECT().ListEnabledDownloadClientInstances(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().AddStrike(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any(), gomock.Any()).Return(nil)
 	store.EXPECT().CountStrikes(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any()).Return(3, nil)
@@ -228,6 +229,7 @@ func TestCleanInstance_ProgressResetStrikes(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().ListEnabledBlocklistRules(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
+	store.EXPECT().ListEnabledDownloadClientInstances(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().ResetStrikes(gomock.Any(), database.AppSonarr, instID, "dl-good").Return(nil)
 
@@ -273,6 +275,7 @@ func TestCleanInstance_FailedImports(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
 	store.EXPECT().ListEnabledBlocklistRules(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
+	store.EXPECT().ListEnabledDownloadClientInstances(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 	store.EXPECT().LogBlocklist(gomock.Any(), database.AppSonarr, instID, "dl-fail", "Failed.Import", gomock.Any()).Return(nil)
 
@@ -416,6 +419,7 @@ func TestImportFailureReason_Extended(t *testing.T) {
 func TestGetSABnzbdStatuses_Disabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().ListEnabledDownloadClientInstances(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
 
 	logger := newTestLogger()
@@ -431,6 +435,7 @@ func TestGetSABnzbdStatuses_Disabled(t *testing.T) {
 func TestGetSABnzbdStatuses_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().ListEnabledDownloadClientInstances(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, context.DeadlineExceeded)
 
 	logger := newTestLogger()

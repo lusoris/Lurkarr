@@ -363,3 +363,34 @@ func (d *DownloadClientSettings) MaskedPassword() string {
 	}
 	return "****"
 }
+
+// DownloadClientInstance represents a configured download client (multi-instance).
+type DownloadClientInstance struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	ClientType string    `json:"client_type"` // qbittorrent, transmission, deluge, sabnzbd, nzbget
+	URL        string    `json:"url"`
+	APIKey     string    `json:"api_key"`
+	Username   string    `json:"username"`
+	Password   string    `json:"password"`
+	Category   string    `json:"category"`
+	Enabled    bool      `json:"enabled"`
+	Timeout    int       `json:"timeout"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// MaskedAPIKey returns the download client API key masked.
+func (d *DownloadClientInstance) MaskedAPIKey() string {
+	if len(d.APIKey) <= 4 {
+		return "****"
+	}
+	return "****" + d.APIKey[len(d.APIKey)-4:]
+}
+
+// MaskedPassword returns the download client password masked.
+func (d *DownloadClientInstance) MaskedPassword() string {
+	if d.Password == "" {
+		return ""
+	}
+	return "****"
+}

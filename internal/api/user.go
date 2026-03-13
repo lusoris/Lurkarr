@@ -74,6 +74,10 @@ func (h *UserHandler) HandleUpdatePassword(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusUnauthorized, errorResponse("current password incorrect"))
 		return
 	}
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+		return
+	}
 
 	hash, err := auth.HashPassword(req.NewPassword)
 	if err != nil {

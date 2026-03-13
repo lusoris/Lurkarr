@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
+	import { appTypes, appDisplayName, appTabLabel } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
@@ -75,18 +76,17 @@
 		created_at: string;
 	}
 
-	interface DownloadClientSettings {
+	interface BlocklistLog {
+		id: number;
 		app_type: string;
-		client_type: string;
-		url: string;
-		username: string;
-		password: string;
-		enabled: boolean;
-		timeout: number;
+		instance_id: string;
+		download_id: string;
+		title: string;
+		reason: string;
+		blocklisted_at: string;
 	}
 
-	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
-	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports' | 'client';
+	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports';
 
 	let activeTab = $state<Tab>('cleaner');
 	let selectedApp = $state<string>('sonarr');
@@ -94,20 +94,23 @@
 	let scoringProfiles = $state<Record<string, ScoringProfile>>({});
 	let blocklist = $state<BlocklistLog[]>([]);
 	let imports = $state<AutoImportLog[]>([]);
-	let clientSettings = $state<Record<string, DownloadClientSettings>>({});
 	let saving = $state(false);
 	let loading = $state(false);
+	let loadedCleaners = $state<Set<string>>(new Set());
+	let loadedScoring = $state<Set<string>>(new Set());
 
 	async function loadCleaner(app: string) {
 		try {
 			cleanerSettings[app] = await api.get<QueueCleanerSettings>(`/queue/settings/${app}`);
 		} catch { /* first load may 404 */ }
+		loadedCleaners = new Set([...loadedCleaners, app]);
 	}
 
 	async function loadScoring(app: string) {
 		try {
 			scoringProfiles[app] = await api.get<ScoringProfile>(`/queue/scoring/${app}`);
 		} catch { /* handled */ }
+		loadedScoring = new Set([...loadedScoring, app]);
 	}
 
 	async function loadBlocklist(app: string) {
@@ -128,12 +131,6 @@
 			imports = [];
 		}
 		loading = false;
-	}
-
-	async function loadClient(app: string) {
-		try {
-			clientSettings[app] = await api.get<DownloadClientSettings>(`/queue/download-client/${app}`);
-		} catch { /* first load may 404 */ }
 	}
 
 	async function saveCleaner() {
@@ -162,25 +159,11 @@
 		saving = false;
 	}
 
-	async function saveClient() {
-		const settings = clientSettings[selectedApp];
-		if (!settings) return;
-		saving = true;
-		try {
-			await api.put(`/queue/download-client/${selectedApp}`, settings);
-			toasts.success('Download client settings saved');
-		} catch (e) {
-			toasts.error(e instanceof Error ? e.message : 'Failed to save');
-		}
-		saving = false;
-	}
-
 	function loadTabData() {
 		if (activeTab === 'cleaner') loadCleaner(selectedApp);
 		else if (activeTab === 'scoring') loadScoring(selectedApp);
 		else if (activeTab === 'blocklist') loadBlocklist(selectedApp);
 		else if (activeTab === 'imports') loadImports(selectedApp);
-		else if (activeTab === 'client') loadClient(selectedApp);
 	}
 
 	$effect(() => { loadTabData(); });
@@ -196,7 +179,6 @@
 	const tabs: { id: Tab; label: string }[] = [
 		{ id: 'cleaner', label: 'Queue Cleaner' },
 		{ id: 'scoring', label: 'Scoring' },
-		{ id: 'client', label: 'Download Client' },
 		{ id: 'blocklist', label: 'Blocklist' },
 		{ id: 'imports', label: 'Import Log' }
 	];
@@ -204,7 +186,7 @@
 
 <svelte:head><title>Queue Management - Lurkarr</title></svelte:head>
 
-<div class="space-y-6 max-w-3xl">
+<div class="space-y-6">
 	<h1 class="text-2xl font-bold text-surface-50">Queue Management</h1>
 
 	<!-- App selector -->
@@ -212,9 +194,9 @@
 		{#each appTypes as app}
 			<button
 				onclick={() => { selectedApp = app; loadTabData(); }}
-				class="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors
+				class="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium transition-colors
 					{selectedApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'}"
-			>{app}</button>
+			>{appTabLabel(app)}</button>
 		{/each}
 	</div>
 
@@ -235,35 +217,35 @@
 		{#if settings}
 			<Card>
 				<div class="space-y-4">
-					<Toggle bind:checked={settings.enabled} label="Enable Queue Cleaner" />
+					<Toggle bind:checked={settings.enabled} label="Enable Queue Cleaner" hint="Automatically manage stalled, slow, and failed downloads" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Stall Detection</h3>
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<Input bind:value={settings.stalled_threshold_minutes} type="number" label="Stalled Threshold (min)" />
-						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow Threshold (bytes/s)" />
+						<Input bind:value={settings.stalled_threshold_minutes} type="number" label="Stalled Threshold (min)" hint="Minutes with no progress before a download is considered stalled" />
+						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow Threshold (bytes/s)" hint="Downloads below this speed are flagged as slow" />
 					</div>
-					<Input bind:value={settings.slow_ignore_above_bytes} type="number" label="Ignore Slow Above (bytes, 0 = disabled)" />
-					<Input bind:value={settings.metadata_stuck_minutes} type="number" label="Metadata Stuck (min, 0 = disabled)" />
+					<Input bind:value={settings.slow_ignore_above_bytes} type="number" label="Ignore Slow Above (bytes, 0 = disabled)" hint="Skip slow detection for downloads larger than this size" />
+					<Input bind:value={settings.metadata_stuck_minutes} type="number" label="Metadata Stuck (min, 0 = disabled)" hint="Remove downloads stuck importing metadata after this long" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Strike System</h3>
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" />
-						<Input bind:value={settings.strike_window_hours} type="number" label="Strike Window (hours)" />
+						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" hint="Strikes before a download is removed and blocklisted" />
+						<Input bind:value={settings.strike_window_hours} type="number" label="Strike Window (hours)" hint="Strikes expire after this many hours" />
 					</div>
-					<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" />
-					<Toggle bind:checked={settings.strike_private} label="Strike Private Trackers" />
+					<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" hint="Apply strike system to public tracker downloads" />
+					<Toggle bind:checked={settings.strike_private} label="Strike Private Trackers" hint="Apply strike system to private tracker downloads" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Actions</h3>
-					<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" />
-					<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
-					<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" />
+					<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" hint="How often the queue cleaner scans for issues" />
+					<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" hint="Also remove the affected download from the client (qBit, SABnzbd, etc.)" />
+					<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" hint="Add removed releases to the blocklist to prevent re-download" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Failed Imports</h3>
-					<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" />
-					<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" />
+					<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" hint="Automatically remove downloads that failed to import" />
+					<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" hint="Blocklist releases that fail to import" />
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Seeding Rules</h3>
-					<Toggle bind:checked={settings.seeding_enabled} label="Enable Seeding Enforcement" />
+					<Toggle bind:checked={settings.seeding_enabled} label="Enable Seeding Enforcement" hint="Automatically manage completed downloads based on seeding rules" />
 					{#if settings.seeding_enabled}
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							<Input bind:value={settings.seeding_max_ratio} type="number" label="Max Ratio (0 = disabled)" />
@@ -289,12 +271,16 @@
 					{/if}
 
 					<h3 class="text-sm font-semibold text-surface-300 pt-2">Advanced</h3>
-					<Toggle bind:checked={settings.hardlink_protection} label="Hardlink Protection" />
-					<Toggle bind:checked={settings.skip_cross_seeds} label="Skip Cross-Seeded Torrents" />
-					<Toggle bind:checked={settings.cross_arr_sync} label="Cross-Arr Blocklist Sync" />
+					<Toggle bind:checked={settings.hardlink_protection} label="Hardlink Protection" hint="Prevent removal of downloads that have active hardlinks" />
+					<Toggle bind:checked={settings.skip_cross_seeds} label="Skip Cross-Seeded Torrents" hint="Exclude torrents detected as cross-seeds from cleanup" />
+					<Toggle bind:checked={settings.cross_arr_sync} label="Cross-Arr Blocklist Sync" hint="Sync blocklist entries across all connected arr apps" />
 
 					<Button onclick={saveCleaner} loading={saving}>Save Cleaner Settings</Button>
 				</div>
+			</Card>
+		{:else if loadedCleaners.has(selectedApp)}
+			<Card>
+				<p class="text-sm text-surface-500 text-center py-4">No cleaner settings configured for {appDisplayName(selectedApp)}.</p>
 			</Card>
 		{:else}
 			<Card>
@@ -336,6 +322,10 @@
 
 					<Button onclick={saveScoring} loading={saving}>Save Scoring Profile</Button>
 				</div>
+			</Card>
+		{:else if loadedScoring.has(selectedApp)}
+			<Card>
+				<p class="text-sm text-surface-500 text-center py-4">No scoring profile configured for {appDisplayName(selectedApp)}.</p>
 			</Card>
 		{:else}
 			<Card>
@@ -403,42 +393,6 @@
 					</tbody>
 				</table>
 			</div>
-		{/if}
-	{/if}
-
-	<!-- Download Client Settings -->
-	{#if activeTab === 'client'}
-		{@const settings = clientSettings[selectedApp]}
-		{#if settings}
-			<Card>
-				<div class="space-y-4">
-					<Toggle bind:checked={settings.enabled} label="Enable Download Client" />
-
-					<label class="block">
-						<span class="block text-sm font-medium text-surface-300 mb-1.5">Client Type</span>
-						<select bind:value={settings.client_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
-							<option value="qbittorrent">qBittorrent</option>
-							<option value="transmission">Transmission</option>
-							<option value="deluge">Deluge</option>
-							<option value="sabnzbd">SABnzbd</option>
-							<option value="nzbget">NZBGet</option>
-						</select>
-					</label>
-
-					<Input bind:value={settings.url} label="URL" placeholder="http://localhost:8080" />
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<Input bind:value={settings.username} label="Username" />
-						<Input bind:value={settings.password} type="password" label="Password" />
-					</div>
-					<Input bind:value={settings.timeout} type="number" label="Timeout (seconds)" />
-
-					<Button onclick={saveClient} loading={saving}>Save Download Client</Button>
-				</div>
-			</Card>
-		{:else}
-			<Card>
-				<p class="text-sm text-surface-500 text-center py-4">Loading download client settings...</p>
-			</Card>
 		{/if}
 	{/if}
 </div>

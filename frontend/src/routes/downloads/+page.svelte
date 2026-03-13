@@ -56,7 +56,7 @@
 
 <svelte:head><title>Downloads - Lurkarr</title></svelte:head>
 
-<div class="space-y-4">
+<div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 		<h1 class="text-2xl font-bold text-surface-50">Downloads</h1>
 		{#if queue}
@@ -79,8 +79,16 @@
 		</div>
 	{:else if error}
 		<Card>
-			<p class="text-sm text-red-400 text-center py-4">{error}</p>
-			<p class="text-xs text-surface-500 text-center">Make sure SABnzbd is configured in Settings</p>
+			<div class="text-center py-6">
+				<p class="text-sm text-red-400 mb-2">Could not connect to SABnzbd</p>
+				<p class="text-xs text-surface-500 mb-4">Make sure SABnzbd is configured with a valid URL and API key.</p>
+				<a href="/settings" class="inline-flex items-center gap-1.5 text-sm font-medium text-lurk-400 hover:text-lurk-300 transition-colors">
+					Go to Settings
+					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+					</svg>
+				</a>
+			</div>
 		</Card>
 	{:else if queue && queue.slots.length === 0}
 		<Card>

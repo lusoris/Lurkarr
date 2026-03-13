@@ -38,6 +38,7 @@ type Store interface {
 	CountStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string, windowHours int) (int, error)
 	GetSABnzbdSettings(ctx context.Context) (*database.SABnzbdSettings, error)
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
+	ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error)
 	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
 }
 
@@ -883,10 +884,37 @@ func parseExcludedCategories(s string) map[string]bool {
 	return cats
 }
 
-// getSABnzbdStatuses fetches the SABnzbd queue and returns a map of downloadID -> status.
+// getSABnzbdStatuses fetches the SABnzbd queue from all enabled SABnzbd download
+// client instances and returns a combined map of downloadID -> status.
 func (c *Cleaner) getSABnzbdStatuses(ctx context.Context) map[string]string {
 	statuses := make(map[string]string)
 
+	// Try new multi-instance download clients first.
+	instances, err := c.db.ListEnabledDownloadClientInstances(ctx)
+	if err == nil {
+		for _, inst := range instances {
+			if inst.ClientType != "sabnzbd" || inst.URL == "" {
+				continue
+			}
+			timeout := time.Duration(inst.Timeout) * time.Second
+			if timeout == 0 {
+				timeout = 30 * time.Second
+			}
+			sabClient := sabnzbd.NewClient(inst.URL, inst.APIKey, timeout)
+			queue, err := sabClient.GetQueue(ctx)
+			if err != nil {
+				continue
+			}
+			for _, slot := range queue.Slots {
+				statuses[slot.NzoID] = slot.Status
+			}
+		}
+		if len(statuses) > 0 {
+			return statuses
+		}
+	}
+
+	// Fallback to legacy singleton SABnzbd settings.
 	sabSettings, err := c.db.GetSABnzbdSettings(ctx)
 	if err != nil || !sabSettings.Enabled {
 		return statuses

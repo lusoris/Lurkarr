@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
+	import { appTypes, appDisplayName } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
@@ -27,7 +28,6 @@
 		result: string | null;
 	}
 
-	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
 	const actions = ['lurk_missing', 'lurk_upgrade', 'lurk_all', 'clean_queue'] as const;
 	const dayOptions = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
@@ -125,7 +125,7 @@
 
 <svelte:head><title>Scheduling - Lurkarr</title></svelte:head>
 
-<div class="space-y-4">
+<div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold text-surface-50">Schedules</h1>
 		<div class="flex gap-2">
@@ -153,7 +153,7 @@
 							{sched.enabled ? 'Active' : 'Inactive'}
 						</Badge>
 						<div>
-							<span class="font-medium text-surface-100 capitalize">{sched.app_type}</span>
+							<span class="font-medium text-surface-100">{appDisplayName(sched.app_type)}</span>
 							<span class="text-surface-500 mx-2">&middot;</span>
 							<span class="text-surface-300">{formatAction(sched.action)}</span>
 						</div>
@@ -179,12 +179,12 @@
 
 <!-- Add/Edit Schedule Modal -->
 <Modal bind:open={showModal} title={editing ? 'Edit Schedule' : 'Add Schedule'} onclose={() => showModal = false}>
-	<form onsubmit={saveSchedule} class="space-y-4">
+	<form onsubmit={(e: Event) => { e.preventDefault(); saveSchedule(); }} class="space-y-4">
 		<label class="block">
 			<span class="block text-sm font-medium text-surface-300 mb-1.5">App Type</span>
 			<select bind:value={form.app_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
 				{#each appTypes as app}
-					<option value={app} class="capitalize">{app}</option>
+					<option value={app}>{appDisplayName(app)}</option>
 				{/each}
 			</select>
 		</label>

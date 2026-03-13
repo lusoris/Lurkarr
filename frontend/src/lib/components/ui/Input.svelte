@@ -4,6 +4,7 @@
 		type?: string;
 		placeholder?: string;
 		label?: string;
+		hint?: string;
 		error?: string;
 		disabled?: boolean;
 		class?: string;
@@ -15,6 +16,7 @@
 		type = 'text',
 		placeholder = '',
 		label = '',
+		hint = '',
 		error = '',
 		disabled = false,
 		class: className = '',
@@ -39,5 +41,7 @@
 	/>
 	{#if error}
 		<p class="text-xs text-red-400">{error}</p>
+	{:else if hint}
+		<p class="text-xs text-surface-500">{hint}</p>
 	{/if}
 </label>

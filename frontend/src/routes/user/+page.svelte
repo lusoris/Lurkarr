@@ -60,7 +60,7 @@
 
 <svelte:head><title>Profile - Lurkarr</title></svelte:head>
 
-<div class="space-y-6 max-w-lg">
+<div class="space-y-6">
 	<h1 class="text-2xl font-bold text-surface-50">Profile</h1>
 
 	{#if user}
@@ -85,6 +85,10 @@
 			<p class="text-xs text-surface-500">
 				Account created: {new Date(user.created_at).toLocaleDateString()}
 			</p>
+		</Card>
+	{:else}
+		<Card>
+			<p class="text-sm text-surface-500 text-center py-4">Loading profile...</p>
 		</Card>
 	{/if}
 </div>

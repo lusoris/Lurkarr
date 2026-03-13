@@ -7,16 +7,25 @@
 		status: string;
 	}
 
-	let health = $state<HealthStatus | null>(null);
-	let healthError = $state(false);
+	let liveness = $state<HealthStatus | null>(null);
+	let readiness = $state<HealthStatus | null>(null);
+	let livenessError = $state(false);
+	let readinessError = $state(false);
 
 	async function checkHealth() {
 		try {
-			const res = await fetch('/api/health');
-			health = await res.json();
-			healthError = !res.ok;
+			const res = await fetch('/healthz');
+			liveness = await res.json();
+			livenessError = !res.ok;
 		} catch {
-			healthError = true;
+			livenessError = true;
+		}
+		try {
+			const res = await fetch('/readyz');
+			readiness = await res.json();
+			readinessError = !res.ok;
+		} catch {
+			readinessError = true;
 		}
 	}
 
@@ -25,20 +34,36 @@
 
 <svelte:head><title>Monitoring - Lurkarr</title></svelte:head>
 
-<div class="space-y-6 max-w-3xl">
+<div class="space-y-6">
 	<h1 class="text-2xl font-bold text-surface-50">Monitoring</h1>
 
 	<!-- Health Status -->
 	<Card>
 		<h2 class="text-sm font-semibold text-surface-300 mb-3">Health</h2>
-		{#if health}
-			<div class="flex items-center gap-2">
-				<Badge variant={healthError ? 'error' : 'success'}>{health.status}</Badge>
-				<span class="text-sm text-surface-400">Application health check</span>
+		<div class="space-y-3">
+			<div class="flex items-center justify-between p-3 rounded-lg bg-surface-800/50">
+				<div class="flex items-center gap-2">
+					{#if liveness}
+						<Badge variant={livenessError ? 'error' : 'success'}>{liveness.status}</Badge>
+					{:else}
+						<Badge variant="secondary">...</Badge>
+					{/if}
+					<span class="text-sm text-surface-200">Liveness</span>
+				</div>
+				<span class="text-xs font-mono text-surface-500">/healthz</span>
 			</div>
-		{:else}
-			<p class="text-sm text-surface-500">Checking...</p>
-		{/if}
+			<div class="flex items-center justify-between p-3 rounded-lg bg-surface-800/50">
+				<div class="flex items-center gap-2">
+					{#if readiness}
+						<Badge variant={readinessError ? 'error' : 'success'}>{readiness.status}</Badge>
+					{:else}
+						<Badge variant="secondary">...</Badge>
+					{/if}
+					<span class="text-sm text-surface-200">Readiness</span>
+				</div>
+				<span class="text-xs font-mono text-surface-500">/readyz</span>
+			</div>
+		</div>
 	</Card>
 
 	<!-- Endpoints -->
@@ -68,10 +93,17 @@
 			</div>
 			<div class="flex items-center justify-between p-3 rounded-lg bg-surface-800/50">
 				<div>
-					<p class="text-sm font-medium text-surface-100">Health Check</p>
-					<p class="text-xs text-surface-500">Load balancer probe endpoint</p>
+					<p class="text-sm font-medium text-surface-100">Liveness Probe</p>
+					<p class="text-xs text-surface-500">Kubernetes liveness check</p>
 				</div>
-				<a href="/api/health" target="_blank" rel="noopener" class="text-sm text-lurk-400 hover:text-lurk-300 font-mono">/api/health</a>
+				<a href="/healthz" target="_blank" rel="noopener" class="text-sm text-lurk-400 hover:text-lurk-300 font-mono">/healthz</a>
+			</div>
+			<div class="flex items-center justify-between p-3 rounded-lg bg-surface-800/50">
+				<div>
+					<p class="text-sm font-medium text-surface-100">Readiness Probe</p>
+					<p class="text-xs text-surface-500">Kubernetes readiness check (includes DB)</p>
+				</div>
+				<a href="/readyz" target="_blank" rel="noopener" class="text-sm text-lurk-400 hover:text-lurk-300 font-mono">/readyz</a>
 			</div>
 		</div>
 	</Card>

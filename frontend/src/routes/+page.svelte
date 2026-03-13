@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
+	import { appTypes, appDisplayName, appColor } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
@@ -31,28 +32,6 @@
 	let caps = $state<HourlyCap[]>([]);
 	let instances = $state<Record<string, AppInstance[]>>({});
 	let loading = $state(true);
-
-	const appLabels: Record<string, string> = {
-		sonarr: 'Sonarr',
-		radarr: 'Radarr',
-		lidarr: 'Lidarr',
-		readarr: 'Readarr',
-		whisparr: 'Whisparr',
-		eros: 'Eros',
-		prowlarr: 'Prowlarr'
-	};
-
-	const appColors: Record<string, string> = {
-		sonarr: 'text-sky-400',
-		radarr: 'text-amber-400',
-		lidarr: 'text-emerald-400',
-		readarr: 'text-rose-400',
-		whisparr: 'text-pink-400',
-		eros: 'text-purple-400',
-		prowlarr: 'text-orange-400'
-	};
-
-	const appTypes = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'eros'] as const;
 
 	async function load() {
 		loading = true;
@@ -139,8 +118,8 @@
 			{#each Object.entries(appTotals()) as [appType, totals]}
 				<Card>
 					<div class="flex items-center justify-between mb-3">
-						<span class="text-sm font-medium {appColors[appType] ?? 'text-surface-300'}">
-							{appLabels[appType] ?? appType}
+						<span class="text-sm font-medium {appColor(appType)}">
+							{appDisplayName(appType)}
 						</span>
 						<Badge variant="default">{(groupedStats()[appType] ?? []).length} instance{(groupedStats()[appType] ?? []).length !== 1 ? 's' : ''}</Badge>
 					</div>
@@ -183,8 +162,8 @@
 					<Card>
 						<div class="flex items-center justify-between">
 							<div>
-								<span class="text-sm {appColors[cap.app_type] ?? 'text-surface-300'}">
-									{appLabels[cap.app_type] ?? cap.app_type}
+						<span class="text-sm {appColor(cap.app_type)}">
+								{appDisplayName(cap.app_type)}
 								</span>
 								<span class="text-xs text-surface-500 ml-2">{instanceName(cap.app_type, cap.instance_id)}</span>
 							</div>
