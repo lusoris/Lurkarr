@@ -45,6 +45,135 @@
 	let confirmRevokeSession = $state<string | null>(null);
 	let confirmRevokeAll = $state(false);
 
+	// Passkey state
+	interface Passkey {
+		id: string;
+		name: string;
+		created_at: string;
+	}
+	let passkeys = $state<Passkey[]>([]);
+	let passkeyRegistering = $state(false);
+	let passkeyEnabled = $state(false);
+	let confirmDeletePasskey = $state<string | null>(null);
+	let renamingPasskey = $state<string | null>(null);
+	let renameValue = $state('');
+
+	async function checkPasskeySupport() {
+		try {
+			const res = await fetch('/api/auth/passkey/info');
+			if (res.ok) {
+				const data = await res.json();
+				passkeyEnabled = data.enabled === true;
+			}
+		} catch { /* ignore */ }
+	}
+
+	async function loadPasskeys() {
+		if (!passkeyEnabled) return;
+		try {
+			passkeys = await api.get<Passkey[]>('/passkeys');
+		} catch { /* handled */ }
+	}
+
+	function bufferToBase64url(buffer: ArrayBuffer): string {
+		const bytes = new Uint8Array(buffer);
+		let str = '';
+		for (const b of bytes) str += String.fromCharCode(b);
+		return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+	}
+
+	function base64urlToBuffer(base64url: string): ArrayBuffer {
+		const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+		const pad = base64.length % 4;
+		const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
+		const binary = atob(padded);
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+		return bytes.buffer;
+	}
+
+	async function registerPasskey() {
+		passkeyRegistering = true;
+		try {
+			const options = await api.post<any>('/passkeys/register/begin');
+
+			// Convert base64url fields for the browser API.
+			options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
+			options.publicKey.user.id = base64urlToBuffer(options.publicKey.user.id);
+			if (options.publicKey.excludeCredentials) {
+				for (const c of options.publicKey.excludeCredentials) {
+					c.id = base64urlToBuffer(c.id);
+				}
+			}
+
+			const credential = await navigator.credentials.create({ publicKey: options.publicKey }) as PublicKeyCredential;
+			if (!credential) throw new Error('Registration cancelled');
+
+			const response = credential.response as AuthenticatorAttestationResponse;
+
+			const name = prompt('Name this passkey (e.g. "MacBook Touch ID")') || 'Passkey';
+
+			const body = {
+				id: bufferToBase64url(credential.rawId),
+				rawId: bufferToBase64url(credential.rawId),
+				type: credential.type,
+				response: {
+					attestationObject: bufferToBase64url(response.attestationObject),
+					clientDataJSON: bufferToBase64url(response.clientDataJSON)
+				}
+			};
+
+			// Send as raw fetch since the server reads the body as an http.Request
+			const res = await fetch(`/api/passkeys/register/finish?name=${encodeURIComponent(name)}`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRF-Token': api.getCsrfToken()
+				},
+				credentials: 'same-origin',
+				body: JSON.stringify(body)
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({ error: 'Registration failed' }));
+				throw new Error(data.error || 'Registration failed');
+			}
+
+			toasts.success('Passkey registered!');
+			await loadPasskeys();
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : 'Failed to register passkey';
+			if (!msg.includes('cancelled') && !msg.includes('abort')) {
+				toasts.error(msg);
+			}
+		}
+		passkeyRegistering = false;
+	}
+
+	async function deletePasskey(id: string) {
+		try {
+			await api.del(`/passkeys/${id}`);
+			toasts.success('Passkey deleted');
+			confirmDeletePasskey = null;
+			await loadPasskeys();
+		} catch {
+			toasts.error('Failed to delete passkey');
+		}
+	}
+
+	async function renamePasskey(id: string) {
+		if (!renameValue.trim()) return;
+		try {
+			await api.post(`/passkeys/${id}/rename`, { name: renameValue.trim() });
+			toasts.success('Passkey renamed');
+			renamingPasskey = null;
+			renameValue = '';
+			await loadPasskeys();
+		} catch {
+			toasts.error('Failed to rename passkey');
+		}
+	}
+
 	async function load() {
 		try {
 			user = await api.get<User>('/user');
@@ -179,7 +308,7 @@
 		return ua.slice(0, 40);
 	}
 
-	$effect(() => { load(); loadSessions(); });
+	$effect(() => { load(); loadSessions(); checkPasskeySupport().then(() => loadPasskeys()); });
 </script>
 
 <svelte:head><title>Profile - Lurkarr</title></svelte:head>
@@ -239,6 +368,58 @@
 				</div>
 			{/if}
 		</Card>
+
+		<!-- Passkeys -->
+		{#if passkeyEnabled}
+			<Card>
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="text-lg font-semibold text-surface-200">Passkeys</h2>
+					<Button size="sm" onclick={registerPasskey} loading={passkeyRegistering}>
+						<svg class="w-4 h-4 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+						Add Passkey
+					</Button>
+				</div>
+				<p class="text-sm text-surface-400 mb-4">Sign in without a password using your device's biometrics, security key, or platform authenticator.</p>
+				{#if passkeys.length > 0}
+					<div class="space-y-2">
+						{#each passkeys as pk}
+							<div class="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/50">
+								<div class="min-w-0 flex items-center gap-3">
+									<svg class="w-5 h-5 text-surface-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a48.667 48.667 0 00-1.298 8.568M5.742 6.364L3 4.5M5.742 6.364l2.121 2.121m0 0A7.465 7.465 0 0110.5 7.5c1.56 0 3.03.476 4.243 1.293M7.864 8.485l2.121 2.121m0 0a7.465 7.465 0 014.53-1.606c.896 0 1.76.157 2.56.442M10 10.5l2.121 2.121M12.121 12.621A48.578 48.578 0 0120.25 18.4M12.121 12.621L10.5 14.242"/></svg>
+									<div>
+										{#if renamingPasskey === pk.id}
+											<form onsubmit={(e: Event) => { e.preventDefault(); renamePasskey(pk.id); }} class="flex items-center gap-2">
+												<input bind:value={renameValue} class="bg-surface-700 border border-surface-600 rounded px-2 py-1 text-sm text-surface-200 w-40" />
+												<button type="submit" class="text-xs text-lurk-400 hover:text-lurk-300">Save</button>
+												<button type="button" onclick={() => renamingPasskey = null} class="text-xs text-surface-400 hover:text-surface-200">Cancel</button>
+											</form>
+										{:else}
+											<span class="text-sm font-medium text-surface-200">{pk.name}</span>
+											<button onclick={() => { renamingPasskey = pk.id; renameValue = pk.name; }} class="ml-2 text-xs text-surface-500 hover:text-surface-300" title="Rename">
+												<svg class="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"/></svg>
+											</button>
+										{/if}
+										<p class="text-xs text-surface-500 mt-0.5">Added {formatDate(pk.created_at)}</p>
+									</div>
+								</div>
+								<div class="shrink-0">
+									{#if confirmDeletePasskey === pk.id}
+										<span class="flex items-center gap-1">
+											<button onclick={() => deletePasskey(pk.id)} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
+											<button onclick={() => confirmDeletePasskey = null} class="rounded px-1.5 py-0.5 bg-surface-700 text-surface-300 text-[10px] hover:bg-surface-600">No</button>
+										</span>
+									{:else}
+										<Button variant="ghost" size="sm" onclick={() => confirmDeletePasskey = pk.id}>Delete</Button>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-sm text-surface-500 text-center py-2">No passkeys registered yet</p>
+				{/if}
+			</Card>
+		{/if}
 
 		<!-- Active Sessions -->
 		<Card>

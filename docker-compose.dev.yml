@@ -28,6 +28,9 @@ services:
       LISTEN_ADDR: ":9705"
       SECRET_KEY: dev-secret-key-32-bytes-minimum!
       CSRF_KEY: dev-csrf-key-must-be-32-bytes!
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_NAME: Lurkarr
+      WEBAUTHN_RP_ORIGINS: http://localhost:9705
     depends_on:
       db:
         condition: service_healthy

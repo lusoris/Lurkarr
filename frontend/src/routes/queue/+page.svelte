@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
-	import { appTypes, appDisplayName, appTabLabel } from '$lib';
+	import { appTypes, appDisplayName, appTabLabel, appLogo, appColor } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
@@ -300,26 +300,33 @@
 
 <svelte:head><title>Queue Management - Lurkarr</title></svelte:head>
 
-<div class="space-y-6">
-	<h1 class="text-2xl font-bold text-surface-50">Queue Management</h1>
+<div class="space-y-4">
+	<h1 class="text-xl font-bold text-surface-50">Queue Management</h1>
 
 	<!-- App selector -->
-	<div class="flex gap-1 rounded-lg bg-surface-900 border border-surface-800 p-1 overflow-x-auto">
+	<div class="flex gap-0.5 rounded-lg bg-surface-900 border border-surface-800 p-0.5 overflow-x-auto">
 		{#each appTypes as app}
+			{@const logo = appLogo(app)}
 			<button
 				onclick={() => { selectedApp = app; loadTabData(); }}
-				class="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium transition-colors
+				class="shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors
 					{selectedApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'}"
-			>{appTabLabel(app)}</button>
+			>
+				{#if logo}
+					<img src={logo} alt="" class="w-4 h-4 rounded-sm shrink-0" />
+				{/if}
+				<span class="hidden sm:inline">{appTabLabel(app)}</span>
+				<span class="sm:hidden">{appTabLabel(app).replace('Whisparr ', 'W')}</span>
+			</button>
 		{/each}
 	</div>
 
 	<!-- Tab navigation -->
-	<div class="flex gap-1 rounded-lg bg-surface-800/50 p-1 overflow-x-auto">
+	<div class="flex gap-0.5 rounded-lg bg-surface-800/50 p-0.5 overflow-x-auto">
 		{#each tabs as tab}
 			<button
 				onclick={() => { activeTab = tab.id; loadTabData(); }}
-				class="shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors
+				class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors
 					{activeTab === tab.id ? 'bg-surface-700 text-surface-100' : 'text-surface-400 hover:text-surface-200'}"
 			>{tab.label}</button>
 		{/each}
@@ -329,69 +336,95 @@
 	{#if activeTab === 'cleaner'}
 		{@const settings = cleanerSettings[selectedApp]}
 		{#if settings}
-			<Card>
-				<div class="space-y-4">
+			<div class="space-y-3">
+				<Card>
 					<Toggle bind:checked={settings.enabled} label="Enable Queue Cleaner" hint="Automatically manage stalled, slow, and failed downloads" />
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Stall Detection</h3>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<Input bind:value={settings.stalled_threshold_minutes} type="number" label="Stalled Threshold (min)" hint="Minutes with no progress before a download is considered stalled" />
-						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow Threshold (bytes/s)" hint="Downloads below this speed are flagged as slow" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Stall Detection</h3>
+					<div class="grid grid-cols-2 gap-3">
+						<Input bind:value={settings.stalled_threshold_minutes} type="number" label="Stalled (min)" hint="No progress threshold" />
+						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow (bytes/s)" hint="Below this = slow" />
+						<Input bind:value={settings.slow_ignore_above_bytes} type="number" label="Ignore Slow Above" hint="0 = disabled" />
+						<Input bind:value={settings.metadata_stuck_minutes} type="number" label="Metadata Stuck (min)" hint="0 = disabled" />
 					</div>
-					<Input bind:value={settings.slow_ignore_above_bytes} type="number" label="Ignore Slow Above (bytes, 0 = disabled)" hint="Skip slow detection for downloads larger than this size" />
-					<Input bind:value={settings.metadata_stuck_minutes} type="number" label="Metadata Stuck (min, 0 = disabled)" hint="Remove downloads stuck importing metadata after this long" />
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Strike System</h3>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" hint="Strikes before a download is removed and blocklisted" />
-						<Input bind:value={settings.strike_window_hours} type="number" label="Strike Window (hours)" hint="Strikes expire after this many hours" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Strike System</h3>
+					<div class="grid grid-cols-2 gap-3 mb-3">
+						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" hint="Before removal" />
+						<Input bind:value={settings.strike_window_hours} type="number" label="Window (hours)" hint="Expiry time" />
 					</div>
-					<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" hint="Apply strike system to public tracker downloads" />
-					<Toggle bind:checked={settings.strike_private} label="Strike Private Trackers" hint="Apply strike system to private tracker downloads" />
+					<div class="space-y-2">
+						<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" />
+						<Toggle bind:checked={settings.strike_private} label="Strike Private Trackers" />
+					</div>
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Actions</h3>
-					<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" hint="How often the queue cleaner scans for issues" />
-					<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" hint="Also remove the affected download from the client (qBit, SABnzbd, etc.)" />
-					<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" hint="Add removed releases to the blocklist to prevent re-download" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Actions</h3>
+					<div class="space-y-2">
+						<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" />
+						<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
+						<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" />
+					</div>
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Failed Imports</h3>
-					<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" hint="Automatically remove downloads that failed to import" />
-					<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" hint="Blocklist releases that fail to import" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Failed Imports</h3>
+					<div class="space-y-2">
+						<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" />
+						<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" />
+					</div>
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Seeding Rules</h3>
-					<Toggle bind:checked={settings.seeding_enabled} label="Enable Seeding Enforcement" hint="Automatically manage completed downloads based on seeding rules" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Seeding Rules</h3>
+					<Toggle bind:checked={settings.seeding_enabled} label="Enable Seeding Enforcement" />
 					{#if settings.seeding_enabled}
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<Input bind:value={settings.seeding_max_ratio} type="number" label="Max Ratio (0 = disabled)" />
-							<Input bind:value={settings.seeding_max_hours} type="number" label="Max Hours (0 = disabled)" />
+						<div class="grid grid-cols-2 gap-3 mt-3">
+							<Input bind:value={settings.seeding_max_ratio} type="number" label="Max Ratio" hint="0 = disabled" />
+							<Input bind:value={settings.seeding_max_hours} type="number" label="Max Hours" hint="0 = disabled" />
 						</div>
-						<label class="block">
-							<span class="block text-sm font-medium text-surface-300 mb-1.5">Mode</span>
-							<select bind:value={settings.seeding_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+						<label class="block mt-2">
+							<span class="block text-xs font-medium text-surface-300 mb-1">Mode</span>
+							<select bind:value={settings.seeding_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
 								<option value="or">Either condition (OR)</option>
 								<option value="and">Both conditions (AND)</option>
 							</select>
 						</label>
-						<Toggle bind:checked={settings.seeding_delete_files} label="Delete Files on Seeding Removal" />
-						<Toggle bind:checked={settings.seeding_skip_private} label="Skip Private Trackers" />
+						<div class="space-y-2 mt-2">
+							<Toggle bind:checked={settings.seeding_delete_files} label="Delete Files on Removal" />
+							<Toggle bind:checked={settings.seeding_skip_private} label="Skip Private Trackers" />
+						</div>
 					{/if}
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Orphan Cleanup</h3>
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Orphan Cleanup</h3>
 					<Toggle bind:checked={settings.orphan_enabled} label="Enable Orphan Detection" />
 					{#if settings.orphan_enabled}
-						<Input bind:value={settings.orphan_grace_minutes} type="number" label="Grace Period (minutes)" />
-						<Toggle bind:checked={settings.orphan_delete_files} label="Delete Orphan Files" />
-						<Input bind:value={settings.orphan_excluded_categories} label="Excluded Categories (comma-separated)" />
+						<div class="space-y-2 mt-3">
+							<Input bind:value={settings.orphan_grace_minutes} type="number" label="Grace Period (minutes)" />
+							<Toggle bind:checked={settings.orphan_delete_files} label="Delete Orphan Files" />
+							<Input bind:value={settings.orphan_excluded_categories} label="Excluded Categories" hint="Comma-separated" />
+						</div>
 					{/if}
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Advanced</h3>
-					<Toggle bind:checked={settings.hardlink_protection} label="Hardlink Protection" hint="Prevent removal of downloads that have active hardlinks" />
-					<Toggle bind:checked={settings.skip_cross_seeds} label="Skip Cross-Seeded Torrents" hint="Exclude torrents detected as cross-seeds from cleanup" />
-					<Toggle bind:checked={settings.cross_arr_sync} label="Cross-Arr Blocklist Sync" hint="Sync blocklist entries across all connected arr apps" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Advanced</h3>
+					<div class="space-y-2">
+						<Toggle bind:checked={settings.hardlink_protection} label="Hardlink Protection" />
+						<Toggle bind:checked={settings.skip_cross_seeds} label="Skip Cross-Seeded Torrents" />
+						<Toggle bind:checked={settings.cross_arr_sync} label="Cross-Arr Blocklist Sync" />
+					</div>
+				</Card>
 
-					<Button onclick={saveCleaner} loading={saving}>Save Cleaner Settings</Button>
-				</div>
-			</Card>
+				<Button onclick={saveCleaner} loading={saving}>Save Cleaner Settings</Button>
+			</div>
 		{:else if loadedCleaners.has(selectedApp)}
 			<Card>
 				<p class="text-sm text-surface-500 text-center py-4">No cleaner settings configured for {appDisplayName(selectedApp)}.</p>
@@ -407,36 +440,44 @@
 	{#if activeTab === 'scoring'}
 		{@const profile = scoringProfiles[selectedApp]}
 		{#if profile}
-			<Card>
-				<div class="space-y-4">
-					<Input bind:value={profile.name} label="Profile Name" />
-					<label class="block">
-						<span class="block text-sm font-medium text-surface-300 mb-1.5">Strategy</span>
-						<select bind:value={profile.strategy} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
-							<option value="highest">Highest Score</option>
-							<option value="adequate">Adequate Threshold</option>
-						</select>
-					</label>
+			<div class="space-y-3">
+				<Card>
+					<div class="grid grid-cols-2 gap-3">
+						<Input bind:value={profile.name} label="Profile Name" />
+						<label class="block">
+							<span class="block text-xs font-medium text-surface-300 mb-1">Strategy</span>
+							<select bind:value={profile.strategy} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+								<option value="highest">Highest Score</option>
+								<option value="adequate">Adequate Threshold</option>
+							</select>
+						</label>
+					</div>
 					{#if profile.strategy === 'adequate'}
 						<Input bind:value={profile.adequate_threshold} type="number" label="Adequate Threshold" />
 					{/if}
+				</Card>
 
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Preferences</h3>
-					<Toggle bind:checked={profile.prefer_higher_quality} label="Prefer Higher Quality" />
-					<Toggle bind:checked={profile.prefer_larger_size} label="Prefer Larger Size" />
-					<Toggle bind:checked={profile.prefer_indexer_flags} label="Prefer Indexer Flags" />
-
-					<h3 class="text-sm font-semibold text-surface-300 pt-2">Weights</h3>
-					<div class="grid grid-cols-2 gap-4">
-						<Input bind:value={profile.custom_format_weight} type="number" label="Custom Format Weight" />
-						<Input bind:value={profile.size_weight} type="number" label="Size Weight" />
-						<Input bind:value={profile.age_weight} type="number" label="Age Weight" />
-						<Input bind:value={profile.seeders_weight} type="number" label="Seeders Weight" />
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Preferences</h3>
+					<div class="space-y-2">
+						<Toggle bind:checked={profile.prefer_higher_quality} label="Prefer Higher Quality" />
+						<Toggle bind:checked={profile.prefer_larger_size} label="Prefer Larger Size" />
+						<Toggle bind:checked={profile.prefer_indexer_flags} label="Prefer Indexer Flags" />
 					</div>
+				</Card>
 
-					<Button onclick={saveScoring} loading={saving}>Save Scoring Profile</Button>
-				</div>
-			</Card>
+				<Card>
+					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Weights</h3>
+					<div class="grid grid-cols-2 gap-3">
+						<Input bind:value={profile.custom_format_weight} type="number" label="Custom Format" />
+						<Input bind:value={profile.size_weight} type="number" label="Size" />
+						<Input bind:value={profile.age_weight} type="number" label="Age" />
+						<Input bind:value={profile.seeders_weight} type="number" label="Seeders" />
+					</div>
+				</Card>
+
+				<Button onclick={saveScoring} loading={saving}>Save Scoring Profile</Button>
+			</div>
 		{:else if loadedScoring.has(selectedApp)}
 			<Card>
 				<p class="text-sm text-surface-500 text-center py-4">No scoring profile configured for {appDisplayName(selectedApp)}.</p>
@@ -529,9 +570,9 @@
 	<!-- ──────────────────────────────────────────── -->
 	<!-- Global Blocklist Management                  -->
 	<!-- ──────────────────────────────────────────── -->
-	<div class="border-t border-surface-800 pt-8 mt-8 space-y-6">
-		<h2 class="text-lg font-semibold text-surface-200">Global Blocklist Management</h2>
-		<p class="text-sm text-surface-400">Manage community blocklist sources and custom rules that apply across all apps.</p>
+	<div class="border-t border-surface-800 pt-6 mt-6 space-y-4">
+		<h2 class="text-base font-semibold text-surface-200">Global Blocklist Management</h2>
+		<p class="text-xs text-surface-400">Manage community blocklist sources and custom rules that apply across all apps.</p>
 
 		<!-- Sources -->
 		<Card>

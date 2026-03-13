@@ -172,6 +172,16 @@ All configuration is done via environment variables.
 | `OIDC_AUTO_CREATE_USER` | `true` | Auto-create local user on first OIDC login |
 | `OIDC_ADMIN_GROUP` | — | OIDC group claim that maps to admin role |
 
+### WebAuthn / Passkeys
+
+| Variable | Default | Description |
+|---|---|---|
+| `WEBAUTHN_RP_ID` | — | Relying Party ID (your domain, e.g. `localhost` or `lurkarr.example.com`) |
+| `WEBAUTHN_RP_NAME` | `Lurkarr` | Display name shown in passkey prompts |
+| `WEBAUTHN_RP_ORIGINS` | — | Allowed origins (comma-separated, e.g. `https://lurkarr.example.com`) |
+
+> **Note:** Passkeys are disabled when `WEBAUTHN_RP_ID` is not set.
+
 ## Reverse Proxy Examples
 
 ### Traefik

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/gorilla/csrf"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
@@ -58,6 +60,11 @@ type Config struct {
 	OIDCScopes       []string
 	OIDCAutoCreate   bool
 	OIDCAdminGroup   string
+
+	// WebAuthn / Passkeys
+	WebAuthnRPID          string // e.g. "localhost" or "lurkarr.example.com"
+	WebAuthnRPDisplayName string // e.g. "Lurkarr"
+	WebAuthnRPOrigins     []string // e.g. ["http://localhost:9705"]
 }
 
 // Server is the main HTTP server.
@@ -131,6 +138,27 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	sessionH := &api.SessionHandler{DB: db}
 	adminH := &api.AdminHandler{DB: db}
 
+	// WebAuthn / Passkeys
+	var passkeyH *api.PasskeyHandler
+	if cfg.WebAuthnRPID != "" {
+		waConfig := &webauthn.Config{
+			RPID:          cfg.WebAuthnRPID,
+			RPDisplayName: cfg.WebAuthnRPDisplayName,
+			RPOrigins:     cfg.WebAuthnRPOrigins,
+			AuthenticatorSelection: protocol.AuthenticatorSelection{
+				RequireResidentKey: protocol.ResidentKeyRequired(),
+				ResidentKey:        protocol.ResidentKeyRequirementRequired,
+				UserVerification:   protocol.VerificationPreferred,
+			},
+		}
+		wa, waErr := webauthn.New(waConfig)
+		if waErr != nil {
+			slog.Error("failed to create WebAuthn", "error", waErr)
+		} else {
+			passkeyH = api.NewPasskeyHandler(db, authMw, wa)
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	// Rate limiter for login: 5 attempts per minute per IP (burst 5).
@@ -140,6 +168,12 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	mux.Handle("POST /api/auth/login", middleware.RateLimit(loginRL)(http.HandlerFunc(authH.HandleLogin)))
 	mux.HandleFunc("GET /api/auth/setup", authH.HandleSetupCheck)
 	mux.HandleFunc("POST /api/auth/setup", authH.HandleSetup)
+
+	// Passkey login (public, no auth required)
+	if passkeyH != nil {
+		mux.Handle("POST /api/auth/passkey/login/begin", middleware.RateLimit(loginRL)(http.HandlerFunc(passkeyH.HandleBeginLogin)))
+		mux.Handle("POST /api/auth/passkey/login/finish", middleware.RateLimit(loginRL)(http.HandlerFunc(passkeyH.HandleFinishLogin)))
+	}
 
 	// --- OIDC routes (public, no auth) ---
 	if cfg.OIDCEnabled {
@@ -159,6 +193,15 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	mux.HandleFunc("GET /api/auth/oidc/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if cfg.OIDCEnabled {
+			_, _ = w.Write([]byte(`{"enabled":true}`))
+		} else {
+			_, _ = w.Write([]byte(`{"enabled":false}`))
+		}
+	})
+
+	mux.HandleFunc("GET /api/auth/passkey/info", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if passkeyH != nil {
 			_, _ = w.Write([]byte(`{"enabled":true}`))
 		} else {
 			_, _ = w.Write([]byte(`{"enabled":false}`))
@@ -214,6 +257,15 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("GET /api/sessions", sessionH.HandleListSessions)
 	protected.HandleFunc("DELETE /api/sessions/{id}", sessionH.HandleRevokeSession)
 	protected.HandleFunc("DELETE /api/sessions", sessionH.HandleRevokeAllSessions)
+
+	// Passkeys (protected)
+	if passkeyH != nil {
+		protected.HandleFunc("GET /api/passkeys", passkeyH.HandleList)
+		protected.HandleFunc("POST /api/passkeys/register/begin", passkeyH.HandleBeginRegistration)
+		protected.HandleFunc("POST /api/passkeys/register/finish", passkeyH.HandleFinishRegistration)
+		protected.HandleFunc("DELETE /api/passkeys/{id}", passkeyH.HandleDelete)
+		protected.HandleFunc("POST /api/passkeys/{id}/rename", passkeyH.HandleRename)
+	}
 
 	// Admin User Management
 	protected.HandleFunc("GET /api/admin/users", adminH.HandleListUsers)

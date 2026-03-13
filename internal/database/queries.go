@@ -738,6 +738,69 @@ func (db *DB) PruneLogs(ctx context.Context, retentionDays int) (int64, error) {
 	return ct.RowsAffected(), nil
 }
 
+// --- WebAuthn Credentials ---
+
+func (db *DB) CreateWebAuthnCredential(ctx context.Context, c *WebAuthnCredential) error {
+	_, err := db.Pool.Exec(ctx,
+		`INSERT INTO webauthn_credentials (user_id, name, credential_id, public_key, attestation_type, transport, aaguid, sign_count)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		c.UserID, c.Name, c.CredentialID, c.PublicKey, c.AttestationType, c.Transport, c.AAGUID, c.SignCount,
+	)
+	return err
+}
+
+func (db *DB) ListWebAuthnCredentials(ctx context.Context, userID uuid.UUID) ([]WebAuthnCredential, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, user_id, name, credential_id, public_key, attestation_type, transport, aaguid, sign_count, created_at
+		 FROM webauthn_credentials WHERE user_id = $1 ORDER BY created_at`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var creds []WebAuthnCredential
+	for rows.Next() {
+		var c WebAuthnCredential
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Name, &c.CredentialID, &c.PublicKey,
+			&c.AttestationType, &c.Transport, &c.AAGUID, &c.SignCount, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		creds = append(creds, c)
+	}
+	return creds, rows.Err()
+}
+
+func (db *DB) GetWebAuthnCredentialByID(ctx context.Context, credID []byte) (*WebAuthnCredential, error) {
+	var c WebAuthnCredential
+	err := db.Pool.QueryRow(ctx,
+		`SELECT id, user_id, name, credential_id, public_key, attestation_type, transport, aaguid, sign_count, created_at
+		 FROM webauthn_credentials WHERE credential_id = $1`, credID,
+	).Scan(&c.ID, &c.UserID, &c.Name, &c.CredentialID, &c.PublicKey,
+		&c.AttestationType, &c.Transport, &c.AAGUID, &c.SignCount, &c.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (db *DB) DeleteWebAuthnCredential(ctx context.Context, id uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM webauthn_credentials WHERE id = $1`, id)
+	return err
+}
+
+func (db *DB) UpdateWebAuthnSignCount(ctx context.Context, credentialID []byte, signCount int64) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE webauthn_credentials SET sign_count = $1 WHERE credential_id = $2`,
+		signCount, credentialID)
+	return err
+}
+
+func (db *DB) RenameWebAuthnCredential(ctx context.Context, id uuid.UUID, name string) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE webauthn_credentials SET name = $1 WHERE id = $2`,
+		name, id)
+	return err
+}
+
 // --- Cleanup ---
 
 func (db *DB) AutoResetExpiredStates(ctx context.Context, resetHours int) (int64, error) {

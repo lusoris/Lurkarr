@@ -64,6 +64,8 @@ type WebAuthnCredential struct {
 	CredentialID    []byte    `json:"-"`
 	PublicKey       []byte    `json:"-"`
 	AttestationType string    `json:"-"`
+	Transport       []string  `json:"-"`
+	AAGUID          []byte    `json:"-"`
 	SignCount       int64     `json:"-"`
 	CreatedAt       time.Time `json:"created_at"`
 }

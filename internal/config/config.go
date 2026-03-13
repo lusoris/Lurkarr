@@ -33,6 +33,11 @@ type Config struct {
 	OIDCScopes       []string
 	OIDCAutoCreate   bool
 	OIDCAdminGroup   string
+
+	// WebAuthn / Passkeys
+	WebAuthnRPID          string
+	WebAuthnRPDisplayName string
+	WebAuthnRPOrigins     []string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -56,6 +61,10 @@ func Load() (*Config, error) {
 		OIDCRedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
 		OIDCAutoCreate:   getEnvBool("OIDC_AUTO_CREATE_USER", true),
 		OIDCAdminGroup:   getEnv("OIDC_ADMIN_GROUP", ""),
+
+		// WebAuthn / Passkeys
+		WebAuthnRPID:          getEnv("WEBAUTHN_RP_ID", ""),
+		WebAuthnRPDisplayName: getEnv("WEBAUTHN_RP_NAME", "Lurkarr"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -107,6 +116,16 @@ func Load() (*Config, error) {
 		}
 		if cfg.OIDCRedirectURL == "" {
 			return nil, fmt.Errorf("OIDC_REDIRECT_URL is required when OIDC_ENABLED=true")
+		}
+	}
+
+	// Parse WebAuthn origins.
+	waOrigins := getEnv("WEBAUTHN_RP_ORIGINS", "")
+	if waOrigins != "" {
+		for _, o := range splitAndTrim(waOrigins) {
+			if o != "" {
+				cfg.WebAuthnRPOrigins = append(cfg.WebAuthnRPOrigins, o)
+			}
 		}
 	}
 

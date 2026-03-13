@@ -181,6 +181,11 @@ func provideServerConfig(cfg *config.Config) server.Config {
 		OIDCScopes:       cfg.OIDCScopes,
 		OIDCAutoCreate:   cfg.OIDCAutoCreate,
 		OIDCAdminGroup:   cfg.OIDCAdminGroup,
+
+		// WebAuthn
+		WebAuthnRPID:          cfg.WebAuthnRPID,
+		WebAuthnRPDisplayName: cfg.WebAuthnRPDisplayName,
+		WebAuthnRPOrigins:     cfg.WebAuthnRPOrigins,
 	}
 }
 

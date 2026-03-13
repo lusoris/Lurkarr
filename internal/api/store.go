@@ -113,4 +113,15 @@ type Store interface {
 	// Seerr
 	GetSeerrSettings(ctx context.Context) (*database.SeerrSettings, error)
 	UpdateSeerrSettings(ctx context.Context, s *database.SeerrSettings) error
+
+	// WebAuthn Credentials
+	CreateWebAuthnCredential(ctx context.Context, c *database.WebAuthnCredential) error
+	ListWebAuthnCredentials(ctx context.Context, userID uuid.UUID) ([]database.WebAuthnCredential, error)
+	GetWebAuthnCredentialByID(ctx context.Context, credID []byte) (*database.WebAuthnCredential, error)
+	DeleteWebAuthnCredential(ctx context.Context, id uuid.UUID) error
+	UpdateWebAuthnSignCount(ctx context.Context, credentialID []byte, signCount int64) error
+	RenameWebAuthnCredential(ctx context.Context, id uuid.UUID, name string) error
+
+	// User by ID (for WebAuthn discoverable login)
+	GetUserByID(ctx context.Context, id uuid.UUID) (*database.User, error)
 }
