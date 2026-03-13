@@ -99,6 +99,120 @@
 	let loadedCleaners = $state<Set<string>>(new Set());
 	let loadedScoring = $state<Set<string>>(new Set());
 
+	// --- Global Blocklist Management ---
+	interface BlocklistSource {
+		id: string;
+		name: string;
+		url: string;
+		enabled: boolean;
+		sync_interval_hours: number;
+		last_synced_at: string | null;
+		created_at: string;
+	}
+
+	interface BlocklistRule {
+		id: string;
+		source_id: string | null;
+		pattern: string;
+		pattern_type: string;
+		reason: string;
+		enabled: boolean;
+		created_at: string;
+	}
+
+	let sources = $state<BlocklistSource[]>([]);
+	let rules = $state<BlocklistRule[]>([]);
+	let sourcesLoaded = $state(false);
+	let rulesLoaded = $state(false);
+	let showAddSource = $state(false);
+	let showAddRule = $state(false);
+	let editingSource = $state<BlocklistSource | null>(null);
+	let newSource = $state({ name: '', url: '', enabled: true, sync_interval_hours: 24 });
+	let newRule = $state({ pattern: '', pattern_type: 'title_contains', reason: '' });
+	let savingSource = $state(false);
+	let savingRule = $state(false);
+	let confirmDeleteSource = $state<string | null>(null);
+	let confirmDeleteRule = $state<string | null>(null);
+
+	async function loadSources() {
+		try {
+			sources = await api.get<BlocklistSource[]>('/blocklist/sources');
+		} catch { sources = []; }
+		sourcesLoaded = true;
+	}
+
+	async function loadRules() {
+		try {
+			rules = await api.get<BlocklistRule[]>('/blocklist/rules');
+		} catch { rules = []; }
+		rulesLoaded = true;
+	}
+
+	async function createSource() {
+		savingSource = true;
+		try {
+			await api.post('/blocklist/sources', newSource);
+			toasts.success('Source added');
+			newSource = { name: '', url: '', enabled: true, sync_interval_hours: 24 };
+			showAddSource = false;
+			await loadSources();
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to create source');
+		}
+		savingSource = false;
+	}
+
+	async function updateSource(src: BlocklistSource) {
+		try {
+			await api.put(`/blocklist/sources/${src.id}`, src);
+			toasts.success('Source updated');
+			editingSource = null;
+			await loadSources();
+		} catch {
+			toasts.error('Failed to update source');
+		}
+	}
+
+	async function deleteSource(id: string) {
+		try {
+			await api.del(`/blocklist/sources/${id}`);
+			toasts.success('Source deleted');
+			await Promise.all([loadSources(), loadRules()]);
+		} catch {
+			toasts.error('Failed to delete source');
+		}
+	}
+
+	async function createRule() {
+		savingRule = true;
+		try {
+			await api.post('/blocklist/rules', { ...newRule, enabled: true });
+			toasts.success('Rule added');
+			newRule = { pattern: '', pattern_type: 'title_contains', reason: '' };
+			showAddRule = false;
+			await loadRules();
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to create rule');
+		}
+		savingRule = false;
+	}
+
+	async function deleteRule(id: string) {
+		try {
+			await api.del(`/blocklist/rules/${id}`);
+			toasts.success('Rule deleted');
+			await loadRules();
+		} catch {
+			toasts.error('Failed to delete rule');
+		}
+	}
+
+	// Load global blocklist data once on mount
+	$effect(() => {
+		if (!sourcesLoaded) loadSources();
+		if (!rulesLoaded) loadRules();
+	});
+
 	async function loadCleaner(app: string) {
 		try {
 			cleanerSettings[app] = await api.get<QueueCleanerSettings>(`/queue/settings/${app}`);
@@ -329,7 +443,11 @@
 			</Card>
 		{:else}
 			<Card>
-				<p class="text-sm text-surface-500 text-center py-4">Loading scoring profile...</p>
+				<div class="space-y-3 py-2">
+					{#each Array(4) as _}
+						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+					{/each}
+				</div>
 			</Card>
 		{/if}
 	{/if}
@@ -337,7 +455,13 @@
 	<!-- Blocklist Log -->
 	{#if activeTab === 'blocklist'}
 		{#if loading}
-			<Card><p class="text-sm text-surface-500 text-center py-4">Loading...</p></Card>
+			<Card>
+				<div class="space-y-3 py-2">
+					{#each Array(4) as _}
+						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+					{/each}
+				</div>
+			</Card>
 		{:else if blocklist.length === 0}
 			<Card><p class="text-sm text-surface-500 text-center py-4">No blocklist entries</p></Card>
 		{:else}
@@ -367,7 +491,13 @@
 	<!-- Auto-Import Log -->
 	{#if activeTab === 'imports'}
 		{#if loading}
-			<Card><p class="text-sm text-surface-500 text-center py-4">Loading...</p></Card>
+			<Card>
+				<div class="space-y-3 py-2">
+					{#each Array(4) as _}
+						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+					{/each}
+				</div>
+			</Card>
 		{:else if imports.length === 0}
 			<Card><p class="text-sm text-surface-500 text-center py-4">No import entries</p></Card>
 		{:else}
@@ -395,4 +525,176 @@
 			</div>
 		{/if}
 	{/if}
+
+	<!-- ──────────────────────────────────────────── -->
+	<!-- Global Blocklist Management                  -->
+	<!-- ──────────────────────────────────────────── -->
+	<div class="border-t border-surface-800 pt-8 mt-8 space-y-6">
+		<h2 class="text-lg font-semibold text-surface-200">Global Blocklist Management</h2>
+		<p class="text-sm text-surface-400">Manage community blocklist sources and custom rules that apply across all apps.</p>
+
+		<!-- Sources -->
+		<Card>
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-sm font-semibold text-surface-300">Blocklist Sources</h3>
+				<Button size="sm" onclick={() => { showAddSource = !showAddSource; }}>
+					{showAddSource ? 'Cancel' : '+ Add Source'}
+				</Button>
+			</div>
+
+			{#if showAddSource}
+				<div class="mb-4 p-4 rounded-lg bg-surface-800/50 border border-surface-700 space-y-3">
+					<Input bind:value={newSource.name} label="Name" placeholder="e.g. Trash Guides blocklist" />
+					<Input bind:value={newSource.url} label="URL" placeholder="https://example.com/blocklist.txt" />
+					<Input bind:value={newSource.sync_interval_hours} type="number" label="Sync Interval (hours)" />
+					<div class="flex justify-end">
+						<Button size="sm" onclick={createSource} loading={savingSource}>Add Source</Button>
+					</div>
+				</div>
+			{/if}
+
+			{#if !sourcesLoaded}
+				<div class="space-y-2 py-2">
+					{#each Array(3) as _}
+						<div class="h-16 rounded-lg bg-surface-800/50 animate-pulse"></div>
+					{/each}
+				</div>
+			{:else if sources.length === 0}
+				<p class="text-sm text-surface-500 py-4 text-center">No blocklist sources configured</p>
+			{:else}
+				<div class="space-y-2">
+					{#each sources as src}
+						{#if editingSource?.id === src.id}
+							<div class="p-3 rounded-lg bg-surface-800/50 border border-surface-700 space-y-3">
+								<Input bind:value={editingSource.name} label="Name" />
+								<Input bind:value={editingSource.url} label="URL" />
+								<Input bind:value={editingSource.sync_interval_hours} type="number" label="Sync Interval (hours)" />
+								<Toggle bind:checked={editingSource.enabled} label="Enabled" />
+								<div class="flex justify-end gap-2">
+									<Button size="sm" variant="ghost" onclick={() => { editingSource = null; }}>Cancel</Button>
+									<Button size="sm" onclick={() => updateSource(editingSource!)}>Save</Button>
+								</div>
+							</div>
+						{:else}
+							<div class="flex items-center justify-between p-3 rounded-lg bg-surface-900 border border-surface-800">
+								<div class="min-w-0 flex-1">
+									<div class="flex items-center gap-2">
+										<span class="text-sm font-medium text-surface-100 truncate">{src.name}</span>
+										{#if !src.enabled}
+											<Badge variant="default">Disabled</Badge>
+										{/if}
+									</div>
+									<p class="text-xs text-surface-500 mt-0.5 truncate">{src.url}</p>
+									{#if src.last_synced_at}
+										<p class="text-xs text-surface-600 mt-0.5">Last synced: {new Date(src.last_synced_at).toLocaleString()}</p>
+									{/if}
+								</div>
+								<div class="flex items-center gap-1.5 ml-3 shrink-0">
+									<button onclick={() => { editingSource = { ...src }; }} class="text-surface-400 hover:text-surface-200 transition-colors" title="Edit">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+									</button>
+									{#if confirmDeleteSource === src.id}
+										<span class="flex items-center gap-1">
+											<button onclick={() => { deleteSource(src.id); confirmDeleteSource = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
+											<button onclick={() => confirmDeleteSource = null} class="rounded px-1.5 py-0.5 bg-surface-700 text-surface-300 text-[10px] hover:bg-surface-600">No</button>
+										</span>
+							{:else}
+										<button onclick={() => confirmDeleteSource = src.id} class="text-surface-400 hover:text-red-400 transition-colors" title="Delete">
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+										</button>
+							{/if}
+								</div>
+							</div>
+						{/if}
+					{/each}
+				</div>
+			{/if}
+		</Card>
+
+		<!-- Rules -->
+		<Card>
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-sm font-semibold text-surface-300">Custom Rules</h3>
+				<Button size="sm" onclick={() => { showAddRule = !showAddRule; }}>
+					{showAddRule ? 'Cancel' : '+ Add Rule'}
+				</Button>
+			</div>
+
+			{#if showAddRule}
+				<div class="mb-4 p-4 rounded-lg bg-surface-800/50 border border-surface-700 space-y-3">
+					<label class="block">
+						<span class="block text-sm font-medium text-surface-300 mb-1.5">Pattern Type</span>
+						<select bind:value={newRule.pattern_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+							<option value="title_contains">Title Contains</option>
+							<option value="title_regex">Title Regex</option>
+							<option value="release_group">Release Group</option>
+							<option value="indexer">Indexer</option>
+						</select>
+					</label>
+					<Input bind:value={newRule.pattern} label="Pattern" placeholder={newRule.pattern_type === 'title_regex' ? '.*YIFY.*' : newRule.pattern_type === 'release_group' ? 'YTS' : 'pattern'} />
+					<Input bind:value={newRule.reason} label="Reason (optional)" placeholder="Why this pattern is blocked" />
+					<div class="flex justify-end">
+						<Button size="sm" onclick={createRule} loading={savingRule}>Add Rule</Button>
+					</div>
+				</div>
+			{/if}
+
+			{#if !rulesLoaded}
+				<div class="space-y-2 py-2">
+					{#each Array(3) as _}
+						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+					{/each}
+				</div>
+			{:else if rules.length === 0}
+				<p class="text-sm text-surface-500 py-4 text-center">No custom rules</p>
+			{:else}
+				<div class="rounded-xl border border-surface-800 overflow-hidden">
+					<table class="w-full text-sm">
+						<thead class="bg-surface-900 text-surface-400 text-xs uppercase">
+							<tr>
+								<th class="px-4 py-3 text-left">Pattern</th>
+								<th class="px-4 py-3 text-left">Type</th>
+								<th class="px-4 py-3 text-left">Reason</th>
+								<th class="px-4 py-3 text-left">Source</th>
+								<th class="px-4 py-3 text-right">Actions</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-surface-800">
+							{#each rules as rule}
+								<tr class="hover:bg-surface-800/30 transition-colors">
+									<td class="px-4 py-3 text-surface-100 font-mono text-xs max-w-xs truncate">{rule.pattern}</td>
+									<td class="px-4 py-3"><Badge variant="default">{rule.pattern_type.replace('_', ' ')}</Badge></td>
+									<td class="px-4 py-3 text-surface-400 text-xs max-w-xs truncate">{rule.reason || '—'}</td>
+									<td class="px-4 py-3 text-surface-500 text-xs">
+										{#if rule.source_id}
+											{@const srcName = sources.find(s => s.id === rule.source_id)?.name}
+											<Badge variant="info">{srcName ?? 'synced'}</Badge>
+										{:else}
+											<Badge variant="warning">manual</Badge>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-right">
+										{#if !rule.source_id}
+											{#if confirmDeleteRule === rule.id}
+												<span class="flex items-center gap-1">
+													<button onclick={() => { deleteRule(rule.id); confirmDeleteRule = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
+													<button onclick={() => confirmDeleteRule = null} class="rounded px-1.5 py-0.5 bg-surface-700 text-surface-300 text-[10px] hover:bg-surface-600">No</button>
+												</span>
+											{:else}
+												<button onclick={() => confirmDeleteRule = rule.id} class="text-surface-400 hover:text-red-400 transition-colors" title="Delete">
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+												</button>
+											{/if}
+										{:else}
+											<span class="text-surface-600 text-xs">synced</span>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+		</Card>
+	</div>
 </div>

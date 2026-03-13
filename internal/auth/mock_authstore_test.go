@@ -58,6 +58,21 @@ func (mr *MockAuthStoreMockRecorder) CreateSession(ctx, userID, duration any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSession", reflect.TypeOf((*MockAuthStore)(nil).CreateSession), ctx, userID, duration)
 }
 
+// CreateSessionWithMeta mocks base method.
+func (m *MockAuthStore) CreateSessionWithMeta(ctx context.Context, userID uuid.UUID, duration time.Duration, ipAddress, userAgent string) (*database.Session, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSessionWithMeta", ctx, userID, duration, ipAddress, userAgent)
+	ret0, _ := ret[0].(*database.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSessionWithMeta indicates an expected call of CreateSessionWithMeta.
+func (mr *MockAuthStoreMockRecorder) CreateSessionWithMeta(ctx, userID, duration, ipAddress, userAgent any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSessionWithMeta", reflect.TypeOf((*MockAuthStore)(nil).CreateSessionWithMeta), ctx, userID, duration, ipAddress, userAgent)
+}
+
 // CreateUser mocks base method.
 func (m *MockAuthStore) CreateUser(ctx context.Context, username, passwordHash string) (*database.User, error) {
 	m.ctrl.T.Helper()

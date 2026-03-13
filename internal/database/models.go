@@ -36,15 +36,16 @@ func ValidAppType(s string) bool {
 }
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	Password     string    `json:"-"`
-	TOTPSecret   *string   `json:"-"`
-	AuthProvider string    `json:"auth_provider"` // "local", "oidc", "proxy"
-	ExternalID   string    `json:"external_id,omitempty"`
-	IsAdmin      bool      `json:"is_admin"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            uuid.UUID `json:"id"`
+	Username      string    `json:"username"`
+	Password      string    `json:"-"`
+	TOTPSecret    *string   `json:"-"`
+	RecoveryCodes []string  `json:"-"`
+	AuthProvider  string    `json:"auth_provider"` // "local", "oidc", "proxy"
+	ExternalID    string    `json:"external_id,omitempty"`
+	IsAdmin       bool      `json:"is_admin"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type Session struct {
@@ -52,6 +53,19 @@ type Session struct {
 	UserID    uuid.UUID `json:"user_id"`
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
+	IPAddress string    `json:"ip_address"`
+	UserAgent string    `json:"user_agent"`
+}
+
+type WebAuthnCredential struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Name            string    `json:"name"`
+	CredentialID    []byte    `json:"-"`
+	PublicKey       []byte    `json:"-"`
+	AttestationType string    `json:"-"`
+	SignCount       int64     `json:"-"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type AppInstance struct {

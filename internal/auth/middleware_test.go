@@ -292,7 +292,7 @@ func TestSetSessionCookie_XForwardedProto(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockAuthStore(ctrl)
 	userID := uuid.New()
-	store.EXPECT().CreateSession(gomock.Any(), userID, gomock.Any()).Return(&database.Session{
+	store.EXPECT().CreateSessionWithMeta(gomock.Any(), userID, gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.Session{
 		ID: uuid.New(), UserID: userID, ExpiresAt: time.Now().Add(time.Hour), CreatedAt: time.Now(),
 	}, nil)
 	m := &Middleware{DB: store, SecureCookie: false} // SecureCookie=false but XFP=https
@@ -319,7 +319,7 @@ func TestSetSessionCookie(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockAuthStore(ctrl)
 	userID := uuid.New()
-	store.EXPECT().CreateSession(gomock.Any(), userID, gomock.Any()).Return(&database.Session{
+	store.EXPECT().CreateSessionWithMeta(gomock.Any(), userID, gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.Session{
 		ID:        uuid.New(),
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -358,7 +358,7 @@ func TestSetSessionCookie(t *testing.T) {
 func TestSetSessionCookie_CreateError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockAuthStore(ctrl)
-	store.EXPECT().CreateSession(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("db error"))
+	store.EXPECT().CreateSessionWithMeta(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("db error"))
 	m := &Middleware{DB: store}
 
 	rec := httptest.NewRecorder()

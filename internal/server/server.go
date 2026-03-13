@@ -128,6 +128,8 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	notificationH := &api.NotificationHandler{DB: db, Manager: notifMgr}
 	seerrH := &api.SeerrHandler{DB: db}
 	dlClientH := &api.DownloadClientHandler{DB: db}
+	sessionH := &api.SessionHandler{DB: db}
+	adminH := &api.AdminHandler{DB: db}
 
 	mux := http.NewServeMux()
 
@@ -201,11 +203,24 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("POST /api/auth/2fa/enable", authH.Handle2FAEnable)
 	protected.HandleFunc("POST /api/auth/2fa/disable", authH.Handle2FADisable)
 	protected.HandleFunc("POST /api/auth/2fa/verify", authH.Handle2FAVerify)
+	protected.HandleFunc("POST /api/auth/2fa/recovery-codes", authH.HandleRegenerateRecoveryCodes)
 
 	// User
 	protected.HandleFunc("GET /api/user", userH.HandleGetUser)
 	protected.HandleFunc("POST /api/user/username", userH.HandleUpdateUsername)
 	protected.HandleFunc("POST /api/user/password", userH.HandleUpdatePassword)
+
+	// Sessions
+	protected.HandleFunc("GET /api/sessions", sessionH.HandleListSessions)
+	protected.HandleFunc("DELETE /api/sessions/{id}", sessionH.HandleRevokeSession)
+	protected.HandleFunc("DELETE /api/sessions", sessionH.HandleRevokeAllSessions)
+
+	// Admin User Management
+	protected.HandleFunc("GET /api/admin/users", adminH.HandleListUsers)
+	protected.HandleFunc("POST /api/admin/users", adminH.HandleCreateUser)
+	protected.HandleFunc("DELETE /api/admin/users/{id}", adminH.HandleDeleteUser)
+	protected.HandleFunc("POST /api/admin/users/{id}/reset-password", adminH.HandleResetUserPassword)
+	protected.HandleFunc("POST /api/admin/users/{id}/toggle-admin", adminH.HandleToggleAdmin)
 
 	// Settings
 	protected.HandleFunc("GET /api/settings/general", settingsH.HandleGetGeneralSettings)

@@ -15,9 +15,9 @@ func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*U
 	var u User
 	err := db.Pool.QueryRow(ctx,
 		`INSERT INTO users (username, password) VALUES ($1, $2)
-		 RETURNING id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at`,
+		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at`,
 		username, passwordHash,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -27,9 +27,9 @@ func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*U
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE username = $1`,
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user by username: %w", err)
 	}
@@ -39,9 +39,9 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, er
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE id = $1`,
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
@@ -90,10 +90,10 @@ func (db *DB) UserCount(ctx context.Context) (int, error) {
 func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID, username string) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at
 		 FROM users WHERE auth_provider = $1 AND external_id = $2`,
 		provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err == nil {
 		// Update username if changed at the provider.
 		if u.Username != username {
@@ -110,9 +110,9 @@ func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID,
 	err = db.Pool.QueryRow(ctx,
 		`INSERT INTO users (username, password, auth_provider, external_id)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, username, password, totp_secret, auth_provider, external_id, is_admin, created_at, updated_at`,
+		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at`,
 		username, "!oidc-no-local-password", provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create external user: %w", err)
 	}
@@ -122,12 +122,16 @@ func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID,
 // --- Sessions ---
 
 func (db *DB) CreateSession(ctx context.Context, userID uuid.UUID, duration time.Duration) (*Session, error) {
+	return db.CreateSessionWithMeta(ctx, userID, duration, "", "")
+}
+
+func (db *DB) CreateSessionWithMeta(ctx context.Context, userID uuid.UUID, duration time.Duration, ipAddress, userAgent string) (*Session, error) {
 	var s Session
 	err := db.Pool.QueryRow(ctx,
-		`INSERT INTO sessions (user_id, expires_at) VALUES ($1, $2)
-		 RETURNING id, user_id, expires_at, created_at`,
-		userID, time.Now().Add(duration),
-	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt)
+		`INSERT INTO sessions (user_id, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, expires_at, created_at, ip_address, user_agent`,
+		userID, time.Now().Add(duration), ipAddress, userAgent,
+	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent)
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
@@ -137,9 +141,9 @@ func (db *DB) CreateSession(ctx context.Context, userID uuid.UUID, duration time
 func (db *DB) GetSession(ctx context.Context, id uuid.UUID) (*Session, error) {
 	var s Session
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, user_id, expires_at, created_at FROM sessions WHERE id = $1 AND expires_at > now()`,
+		`SELECT id, user_id, expires_at, created_at, ip_address, user_agent FROM sessions WHERE id = $1 AND expires_at > now()`,
 		id,
-	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt)
+	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
@@ -157,6 +161,60 @@ func (db *DB) CleanExpiredSessions(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return ct.RowsAffected(), nil
+}
+
+// ListUserSessions returns all active sessions for a user.
+func (db *DB) ListUserSessions(ctx context.Context, userID uuid.UUID) ([]Session, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, user_id, expires_at, created_at, ip_address, user_agent
+		 FROM sessions WHERE user_id = $1 AND expires_at > now() ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[Session])
+}
+
+// DeleteUserSessions deletes all sessions for a user.
+func (db *DB) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
+	return err
+}
+
+// DeleteUserSessionsExcept deletes all sessions for a user except the given session.
+func (db *DB) DeleteUserSessionsExcept(ctx context.Context, userID uuid.UUID, keep uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND id != $2`, userID, keep)
+	return err
+}
+
+// --- User Admin ---
+
+// ListUsers returns all users.
+func (db *DB) ListUsers(ctx context.Context) ([]User, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at
+		 FROM users ORDER BY created_at`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[User])
+}
+
+// DeleteUser deletes a user by ID.
+func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	return err
+}
+
+// SetRecoveryCodes stores hashed recovery codes for a user.
+func (db *DB) SetRecoveryCodes(ctx context.Context, id uuid.UUID, codes []string) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE users SET recovery_codes = $1, updated_at = now() WHERE id = $2`,
+		codes, id,
+	)
+	return err
 }
 
 // --- App Instances ---

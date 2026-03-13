@@ -88,6 +88,23 @@
 	let editingDl = $state<DownloadClientInstance | null>(null);
 	let dlForm = $state({ name: '', client_type: 'sabnzbd' as string, url: '', api_key: '', username: '', password: '', category: '', timeout: 30, enabled: true });
 
+	// ── Add dropdown state ──────────────────────────────────
+	let showAddDropdown = $state(false);
+
+	// ── Derived: which app types actually have instances ────
+	const populatedArrApps = $derived(
+		visibleAppTypes.filter(app => {
+			if (app === 'whisparr') {
+				return (instances['whisparr']?.length ?? 0) + (instances['eros']?.length ?? 0) > 0;
+			}
+			return (instances[app]?.length ?? 0) > 0;
+		})
+	);
+
+	const hasAnyArrApps = $derived(populatedArrApps.length > 0);
+	const hasAnyDlClients = $derived(dlClients.length > 0);
+	const hasAnything = $derived(hasAnyArrApps || hasAnyDlClients);
+
 	// ── Loaders ─────────────────────────────────────────────
 	async function loadAll() {
 		loading = true;
@@ -149,6 +166,7 @@
 
 	// ── Arr instance actions ────────────────────────────────
 	function openAddArr(app: (typeof visibleAppTypes)[number]) {
+		showAddDropdown = false;
 		editingInstance = null;
 		modalApp = app;
 		if (app === 'whisparr') whisparrVersion = 'eros';
@@ -212,6 +230,7 @@
 			await api.del(`/instances/${id}`);
 			toasts.success('Instance deleted');
 			deleteConfirm = null;
+			showArrModal = false;
 			await loadAll();
 		} catch (e) {
 			toasts.error(e instanceof Error ? e.message : 'Failed to delete');
@@ -255,9 +274,10 @@
 	}
 
 	// ── Download client actions ─────────────────────────────
-	function openAddDl() {
+	function openAddDl(clientType?: string) {
+		showAddDropdown = false;
 		editingDl = null;
-		dlForm = { name: '', client_type: 'sabnzbd', url: '', api_key: '', username: '', password: '', category: '', timeout: 30, enabled: true };
+		dlForm = { name: '', client_type: clientType ?? 'sabnzbd', url: '', api_key: '', username: '', password: '', category: '', timeout: 30, enabled: true };
 		showDlModal = true;
 	}
 
@@ -326,10 +346,16 @@
 			await api.del(`/download-clients/${id}`);
 			toasts.success('Download client deleted');
 			deleteConfirm = null;
+			showDlModal = false;
 			await loadDlClients();
 		} catch (e) {
 			toasts.error(e instanceof Error ? e.message : 'Failed to delete');
 		}
+	}
+
+	// ── Close dropdown on outside click ─────────────────────
+	function handleWindowClick() {
+		if (showAddDropdown) showAddDropdown = false;
 	}
 
 	// ── Effects ─────────────────────────────────────────────
@@ -337,31 +363,125 @@
 </script>
 
 <svelte:head><title>Connections - Lurkarr</title></svelte:head>
+<svelte:window onclick={handleWindowClick} />
 
 <div class="space-y-8">
-	<h1 class="text-2xl font-bold text-surface-50">Connections</h1>
+	<!-- ── Header with Add Dropdown ──────────────────────── -->
+	<div class="flex items-center justify-between">
+		<h1 class="text-2xl font-bold text-surface-50">Connections</h1>
+		<div class="relative">
+			<Button size="sm" onclick={(e) => { e.stopPropagation(); showAddDropdown = !showAddDropdown; }}>
+				<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+				Add Connection
+			</Button>
+			{#if showAddDropdown}
+				<div
+					class="absolute right-0 top-full mt-2 w-56 rounded-xl border border-surface-700 bg-surface-800 shadow-xl shadow-black/30 z-50 overflow-hidden"
+					role="menu"
+					onclick={(e) => e.stopPropagation()}
+				>
+					<!-- Arr Apps -->
+					<div class="px-3 pt-3 pb-1">
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Arr Apps</span>
+					</div>
+					{#each visibleAppTypes as app}
+						{@const logo = appLogo(app)}
+						<button
+							class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+							onclick={() => openAddArr(app)}
+							role="menuitem"
+						>
+							{#if logo}
+								<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />
+							{/if}
+							<span>{appDisplayName(app)}</span>
+						</button>
+					{/each}
 
-	<!-- ── Arr Apps ───────────────────────────────────────── -->
-	<section>
-		<div class="flex items-center justify-between mb-4">
-			<h2 class="text-lg font-semibold text-surface-200">Arr Apps</h2>
+					<div class="mx-3 border-t border-surface-700"></div>
+
+					<!-- Download Clients -->
+					<div class="px-3 pt-3 pb-1">
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Download Clients</span>
+					</div>
+					{#each clientTypes as ct}
+						{@const logo = appLogo(ct)}
+						<button
+							class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+							onclick={() => openAddDl(ct)}
+							role="menuitem"
+						>
+							{#if logo}
+								<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />
+							{/if}
+							<span>{appDisplayName(ct)}</span>
+						</button>
+					{/each}
+
+					<div class="mx-3 border-t border-surface-700"></div>
+
+					<!-- Services -->
+					<div class="px-3 pt-3 pb-1">
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Services</span>
+					</div>
+					<button
+						class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+						onclick={() => { showAddDropdown = false; showProwlarrModal = true; }}
+						role="menuitem"
+					>
+						<img src={appLogo('prowlarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+						<span>Prowlarr</span>
+					</button>
+					<button
+						class="flex items-center gap-2.5 w-full px-3 py-2 pb-3 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+						onclick={() => { showAddDropdown = false; showSeerrModal = true; }}
+						role="menuitem"
+					>
+						<img src={appLogo('seerr')} alt="" class="w-4 h-4 rounded shrink-0" />
+						<span>Seerr</span>
+					</button>
+				</div>
+			{/if}
 		</div>
-		{#if loading}
+	</div>
+
+	{#if loading}
+		<!-- ── Skeleton loader ──────────────────────────────── -->
+		<div class="space-y-6">
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 				{#each Array(6) as _}
 					<div class="h-28 rounded-xl bg-surface-800/50 animate-pulse"></div>
 				{/each}
 			</div>
-		{:else}
-			{#each visibleAppTypes as app}
-				{@const appInstances = app === 'whisparr'
-					? [...(instances['whisparr'] ?? []), ...(instances['eros'] ?? [])]
-					: (instances[app] ?? [])}
-				{@const logo = appLogo(app)}
-				{@const website = appWebsite(app)}
-				<div class="mb-5">
-					<div class="flex items-center justify-between mb-2">
-						<div class="flex items-center gap-2">
+		</div>
+	{:else if !hasAnything}
+		<!-- ── Empty state ──────────────────────────────────── -->
+		<div class="flex flex-col items-center justify-center py-20 text-center">
+			<div class="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
+				<svg class="w-8 h-8 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+				</svg>
+			</div>
+			<h2 class="text-lg font-semibold text-surface-200 mb-1">No connections yet</h2>
+			<p class="text-sm text-surface-500 max-w-sm mb-6">Add your first Arr app, download client, or service to get started with Lurkarr.</p>
+			<Button onclick={(e) => { e.stopPropagation(); showAddDropdown = !showAddDropdown; }}>
+				<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+				Add Connection
+			</Button>
+		</div>
+	{:else}
+		<!-- ── Arr Apps (only populated) ────────────────────── -->
+		{#if hasAnyArrApps}
+			<section>
+				<h2 class="text-lg font-semibold text-surface-200 mb-4">Arr Apps</h2>
+				{#each populatedArrApps as app}
+					{@const appInstances = app === 'whisparr'
+						? [...(instances['whisparr'] ?? []), ...(instances['eros'] ?? [])]
+						: (instances[app] ?? [])}
+					{@const logo = appLogo(app)}
+					{@const website = appWebsite(app)}
+					<div class="mb-5">
+						<div class="flex items-center gap-2 mb-2">
 							{#if logo}
 								<img src={logo} alt={appDisplayName(app)} class="w-5 h-5 rounded" />
 							{/if}
@@ -372,12 +492,8 @@
 							{:else}
 								<span class="text-sm font-semibold text-surface-300">{appDisplayName(app)}</span>
 							{/if}
+							<span class="text-xs text-surface-600">({appInstances.length})</span>
 						</div>
-						<Button size="sm" onclick={() => openAddArr(app)}>+ Add</Button>
-					</div>
-					{#if appInstances.length === 0}
-						<p class="text-xs text-surface-600 ml-7">No instances configured</p>
-					{:else}
 						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 							{#each appInstances as inst}
 								{@const instLogo = appLogo(inst.app_type)}
@@ -415,65 +531,60 @@
 								</Card>
 							{/each}
 						</div>
-					{/if}
-				</div>
-			{/each}
-		{/if}
-	</section>
-
-	<!-- ── Download Clients ──────────────────────────────── -->
-	<section>
-		<div class="flex items-center justify-between mb-4">
-			<h2 class="text-lg font-semibold text-surface-200">Download Clients</h2>
-			<Button size="sm" onclick={openAddDl}>+ Add</Button>
-		</div>
-		{#if dlClients.length === 0}
-			<p class="text-sm text-surface-500">No download clients configured</p>
-		{:else}
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-				{#each dlClients as dl}
-					{@const logo = appLogo(dl.client_type)}
-					<Card class="!p-4 cursor-pointer hover:border-surface-600 transition-colors" onclick={() => openEditDl(dl)}>
-						<div class="flex items-start justify-between gap-2 mb-2">
-							<div class="flex items-center gap-2 min-w-0">
-								{#if logo}
-									<img src={logo} alt="" class="w-5 h-5 rounded shrink-0" />
-								{/if}
-								<span class="font-medium text-sm text-surface-100 truncate">{dl.name}</span>
-							</div>
-							{#if dl.enabled && dlHealthStatus[dl.id]}
-								{#if dlHealthStatus[dl.id].status === 'ok'}
-									<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400 shrink-0">
-										<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-										{dlHealthStatus[dl.id].version ? `v${dlHealthStatus[dl.id].version}` : 'online'}
-									</span>
-								{:else}
-									<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-400 shrink-0">
-										<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
-										offline
-									</span>
-								{/if}
-							{:else if dl.enabled}
-								<span class="w-3 h-3 rounded-full border-2 border-surface-600 border-t-surface-400 animate-spin shrink-0"></span>
-							{/if}
-						</div>
-						<div class="flex items-center gap-2 mb-1">
-							<Badge variant="info">{appDisplayName(dl.client_type)}</Badge>
-							{#if dl.category}
-								<span class="text-[10px] text-surface-500">cat: {dl.category}</span>
-							{/if}
-						</div>
-						<p class="text-xs text-surface-500 truncate mb-1">{dl.url}</p>
-						<Badge variant={dl.enabled ? 'success' : 'error'}>
-							{dl.enabled ? 'Enabled' : 'Disabled'}
-						</Badge>
-					</Card>
+					</div>
 				{/each}
-			</div>
+			</section>
 		{/if}
-	</section>
 
-	<!-- ── Services (Prowlarr & Seerr) ───────────────────── -->
+		<!-- ── Download Clients (only if populated) ─────────── -->
+		{#if hasAnyDlClients}
+			<section>
+				<h2 class="text-lg font-semibold text-surface-200 mb-4">Download Clients</h2>
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+					{#each dlClients as dl}
+						{@const logo = appLogo(dl.client_type)}
+						<Card class="!p-4 cursor-pointer hover:border-surface-600 transition-colors" onclick={() => openEditDl(dl)}>
+							<div class="flex items-start justify-between gap-2 mb-2">
+								<div class="flex items-center gap-2 min-w-0">
+									{#if logo}
+										<img src={logo} alt="" class="w-5 h-5 rounded shrink-0" />
+									{/if}
+									<span class="font-medium text-sm text-surface-100 truncate">{dl.name}</span>
+								</div>
+								{#if dl.enabled && dlHealthStatus[dl.id]}
+									{#if dlHealthStatus[dl.id].status === 'ok'}
+										<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400 shrink-0">
+											<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+											{dlHealthStatus[dl.id].version ? `v${dlHealthStatus[dl.id].version}` : 'online'}
+										</span>
+									{:else}
+										<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-400 shrink-0">
+											<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+											offline
+										</span>
+									{/if}
+								{:else if dl.enabled}
+									<span class="w-3 h-3 rounded-full border-2 border-surface-600 border-t-surface-400 animate-spin shrink-0"></span>
+								{/if}
+							</div>
+							<div class="flex items-center gap-2 mb-1">
+								<Badge variant="info">{appDisplayName(dl.client_type)}</Badge>
+								{#if dl.category}
+									<span class="text-[10px] text-surface-500">cat: {dl.category}</span>
+								{/if}
+							</div>
+							<p class="text-xs text-surface-500 truncate mb-1">{dl.url}</p>
+							<Badge variant={dl.enabled ? 'success' : 'error'}>
+								{dl.enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						</Card>
+					{/each}
+				</div>
+			</section>
+		{/if}
+	{/if}
+
+	<!-- ── Services (always shown) ───────────────────────── -->
 	<section>
 		<h2 class="text-lg font-semibold text-surface-200 mb-4">Services</h2>
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -561,7 +672,7 @@
 			<span class="block text-sm font-medium text-surface-300 mb-1.5">Client Type</span>
 			<select bind:value={dlForm.client_type} disabled={!!editingDl} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500 disabled:opacity-50">
 				{#each clientTypes as ct}
-					<option value={ct}>{ct}</option>
+					<option value={ct}>{appDisplayName(ct)}</option>
 				{/each}
 			</select>
 		</label>

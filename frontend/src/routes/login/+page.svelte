@@ -9,9 +9,11 @@
 	let username = $state('');
 	let password = $state('');
 	let totp = $state('');
+	let recoveryCode = $state('');
 	let error = $state('');
 	let loading = $state(false);
 	let showTotp = $state(false);
+	let useRecovery = $state(false);
 	let oidcEnabled = $state(false);
 	let needsSetup = $state(false);
 	let checkingSetup = $state(true);
@@ -56,7 +58,7 @@
 				await auth.check();
 				goto('/');
 			} else {
-				await auth.login(username, password, showTotp ? totp : undefined);
+				await auth.login(username, password, showTotp ? totp : undefined, useRecovery ? recoveryCode : undefined);
 				goto('/');
 			}
 		} catch (e) {
@@ -80,7 +82,7 @@
 <div class="min-h-screen flex items-center justify-center bg-surface-950">
 	<div class="w-full max-w-sm space-y-6">
 		<div class="text-center">
-			<img src="/logo.png" alt="Lurkarr" class="w-24 h-24 mx-auto rounded-xl" />
+			<img src="/banner.png" alt="Lurkarr" class="max-w-[16rem] w-full h-auto mx-auto object-contain" />
 		</div>
 
 		{#if checkingSetup}
@@ -103,7 +105,13 @@
 				<Input bind:value={password} type="password" label="Password" />
 
 				{#if showTotp && !needsSetup}
-					<Input bind:value={totp} label="2FA Code" placeholder="000000" />
+					{#if useRecovery}
+						<Input bind:value={recoveryCode} label="Recovery Code" placeholder="xxxx-xxxx" />
+						<button type="button" onclick={() => useRecovery = false} class="text-xs text-surface-400 hover:text-surface-200 transition-colors">Use authenticator code instead</button>
+					{:else}
+						<Input bind:value={totp} label="2FA Code" placeholder="000000" />
+						<button type="button" onclick={() => useRecovery = true} class="text-xs text-surface-400 hover:text-surface-200 transition-colors">Lost your authenticator? Use a recovery code</button>
+					{/if}
 				{/if}
 
 				<Button type="submit" {loading} class="w-full">{needsSetup ? 'Create Account' : 'Sign In'}</Button>

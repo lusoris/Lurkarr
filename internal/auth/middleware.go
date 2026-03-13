@@ -27,6 +27,7 @@ type AuthStore interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*database.User, error)
 	GetSession(ctx context.Context, id uuid.UUID) (*database.Session, error)
 	CreateSession(ctx context.Context, userID uuid.UUID, duration time.Duration) (*database.Session, error)
+	CreateSessionWithMeta(ctx context.Context, userID uuid.UUID, duration time.Duration, ipAddress, userAgent string) (*database.Session, error)
 	DeleteSession(ctx context.Context, id uuid.UUID) error
 	CreateUser(ctx context.Context, username, passwordHash string) (*database.User, error)
 }
@@ -152,7 +153,13 @@ func (m *Middleware) CSRFProtect() func(http.Handler) http.Handler {
 
 // SetSessionCookie creates a session and sets the cookie.
 func (m *Middleware) SetSessionCookie(ctx context.Context, w http.ResponseWriter, r *http.Request, userID uuid.UUID) error {
-	session, err := m.DB.CreateSession(ctx, userID, sessionDuration)
+	ipAddress := extractRemoteIP(r)
+	userAgent := r.UserAgent()
+	if len(userAgent) > 512 {
+		userAgent = userAgent[:512]
+	}
+
+	session, err := m.DB.CreateSessionWithMeta(ctx, userID, sessionDuration, ipAddress, userAgent)
 	if err != nil {
 		return err
 	}

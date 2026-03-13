@@ -105,7 +105,11 @@
 				<Button onclick={saveAppSettings} loading={saving}>Save {appDisplayName(selectedApp)} Settings</Button>
 			</div>
 		{:else}
-			<p class="text-sm text-surface-500">Loading settings...</p>
+			<div class="space-y-4">
+				{#each Array(6) as _}
+					<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+				{/each}
+			</div>
 		{/if}
 	</Card>
 </div>

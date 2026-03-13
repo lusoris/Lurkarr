@@ -2,14 +2,18 @@
 	import { page } from '$app/state';
 	import { fly } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
+	import { getAuth } from '$lib/stores/auth.svelte';
+
+	const auth = getAuth();
 
 	interface NavItem {
 		href: string;
 		label: string;
 		icon: string;
+		adminOnly?: boolean;
 	}
 
-	const nav: NavItem[] = [
+	const allNav: NavItem[] = [
 		{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 		{ href: '/apps', label: 'Connections', icon: 'apps' },
 		{ href: '/lurk', label: 'Lurk Settings', icon: 'lurk' },
@@ -20,8 +24,11 @@
 		{ href: '/notifications', label: 'Notifications', icon: 'notifications' },
 		{ href: '/monitoring', label: 'Monitoring', icon: 'monitoring' },
 		{ href: '/settings', label: 'Settings', icon: 'settings' },
+		{ href: '/admin/users', label: 'Users', icon: 'users', adminOnly: true },
 		{ href: '/user', label: 'Profile', icon: 'profile' }
 	];
+
+	const nav = $derived(allNav.filter(item => !item.adminOnly || auth.user?.is_admin));
 
 	let collapsed = $state(false);
 	let mobileOpen = $state(false);
@@ -38,6 +45,7 @@
 		monitoring: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
 		settings: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
 		profile: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
+		users: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z',
 		lurk: 'M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.047 8.287 8.287 0 009 9.601a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z M12 18a3.75 3.75 0 00.495-7.468 5.99 5.99 0 00-1.925 3.547 5.975 5.975 0 01-2.133-1.001A3.75 3.75 0 0012 18z'
 	};
 </script>
@@ -46,9 +54,13 @@
 	class="hidden md:flex flex-col h-screen bg-surface-900 border-r border-surface-800 transition-all duration-200
 		{collapsed ? 'w-16' : 'w-56'}"
 >
-	<!-- Logo -->
-	<div class="flex items-center justify-center px-4 h-20 border-b border-surface-800">
-		<img src="/logo.png" alt="Lurkarr" class="{collapsed ? 'w-12 h-12' : 'w-18 h-18'} rounded transition-all" />
+	<!-- Logo / Banner -->
+	<div class="flex items-center justify-center px-2 py-3 border-b border-surface-800 overflow-hidden">
+		{#if collapsed}
+			<img src="/logo.png" alt="Lurkarr" class="w-10 h-10 rounded transition-all" />
+		{:else}
+			<img src="/banner.png" alt="Lurkarr" class="w-full h-auto max-h-16 object-contain transition-all" />
+		{/if}
 	</div>
 
 	<!-- Navigation -->
@@ -72,15 +84,21 @@
 	</nav>
 
 	<!-- Footer -->
-	{#if !collapsed}
-		<div class="px-3 py-2 border-t border-surface-800 text-[10px] text-surface-600 leading-relaxed">
-			<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400 transition-colors">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400 transition-colors">AGPL-3.0</a></p>
-			<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-surface-400 transition-colors mt-0.5">
+	<div class="border-t border-surface-800 text-surface-500 transition-all
+		{collapsed ? 'flex flex-col items-center gap-1.5 py-2' : 'px-3 py-2 text-center text-[10px] leading-relaxed'}">
+		{#if collapsed}
+			<a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" title="© lusoris · AGPL-3.0" class="hover:text-surface-200 transition-colors text-xs">©</a>
+			<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" title="Support on Ko-fi" class="hover:text-lurk-400 transition-colors">
+				<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
+			</a>
+		{:else}
+			<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-surface-200 transition-colors">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-surface-200 transition-colors">AGPL-3.0</a></p>
+			<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1 hover:text-lurk-400 transition-colors mt-0.5">
 				<svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
 				Support on Ko-fi
 			</a>
-		</div>
-	{/if}
+		{/if}
+	</div>
 
 	<!-- Collapse toggle -->
 	<button
@@ -101,7 +119,7 @@
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
 		</svg>
 	</button>
-	<img src="/logo.png" alt="Lurkarr" class="w-12 h-12 rounded" />
+	<img src="/banner.png" alt="Lurkarr" class="h-8 w-auto object-contain" />
 </div>
 
 <!-- Mobile overlay -->
@@ -120,9 +138,9 @@
 			class="absolute inset-y-0 left-0 w-64 bg-surface-900 border-r border-surface-800 flex flex-col"
 			transition:fly={{ x: -256, duration: 200, easing: cubicOut }}
 		>
-			<div class="flex items-center justify-between px-4 h-14 border-b border-surface-800">
-				<div class="flex items-center gap-3">
-					<img src="/logo.png" alt="Lurkarr" class="w-14 h-14 rounded" />
+			<div class="flex items-center justify-between px-4 py-3 border-b border-surface-800">
+				<div class="flex items-center">
+					<img src="/banner.png" alt="Lurkarr" class="h-8 w-auto object-contain" />
 				</div>
 				<button onclick={() => mobileOpen = false} aria-label="Close menu" class="text-surface-400 hover:text-surface-100">
 					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -149,9 +167,9 @@
 				{/each}
 			</div>
 
-			<div class="px-4 py-3 border-t border-surface-800 text-[10px] text-surface-600 leading-relaxed">
-				<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-surface-400">AGPL-3.0</a></p>
-				<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-surface-400 mt-0.5">
+			<div class="px-4 py-3 border-t border-surface-800 text-[10px] text-surface-500 leading-relaxed text-center">
+				<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-surface-200">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-surface-200">AGPL-3.0</a></p>
+				<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1 hover:text-lurk-400 mt-0.5">
 					<svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
 					Support on Ko-fi
 				</a>

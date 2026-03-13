@@ -3,6 +3,7 @@ import { api } from '$lib/api';
 interface User {
 	id: string;
 	username: string;
+	is_admin: boolean;
 	created_at: string;
 }
 
@@ -21,9 +22,10 @@ export function getAuth() {
 		}
 	}
 
-	async function login(username: string, password: string, totp?: string) {
+	async function login(username: string, password: string, totp?: string, recoveryCode?: string) {
 		const body: Record<string, string> = { username, password };
 		if (totp) body.totp_code = totp;
+		if (recoveryCode) body.recovery_code = recoveryCode;
 		await api.post('/auth/login', body);
 		await check();
 	}

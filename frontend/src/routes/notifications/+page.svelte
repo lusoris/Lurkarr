@@ -39,6 +39,13 @@
 		'system.startup', 'system.shutdown'
 	];
 
+	const eventGroups = [
+		{ label: 'Lurking', events: ['lurk.started', 'lurk.completed', 'lurk.error'] },
+		{ label: 'Queue', events: ['queue.blocklisted', 'queue.stalled', 'queue.imported'] },
+		{ label: 'Health', events: ['health.degraded', 'health.restored'] },
+		{ label: 'System', events: ['system.startup', 'system.shutdown'] }
+	] as const;
+
 	let providers = $state<NotificationProvider[]>([]);
 	let loading = $state(true);
 	let showModal = $state(false);
@@ -264,14 +271,30 @@
 			<div class="border-t border-surface-800 pt-4">
 				<h3 class="text-sm font-medium text-surface-300 mb-3">Configuration</h3>
 				<div class="space-y-3">
-					{#each selectedProvider.fields as field}
-						<Input
-							bind:value={formConfig[field]}
-							label={fieldLabels[field] ?? field}
-							type={sensitiveFields.has(field) ? 'password' : 'text'}
-							placeholder={field === 'method' ? 'POST' : ''}
-						/>
-					{/each}
+					{#if formType === 'email'}
+						<!-- Email: group SMTP connection and addresses -->
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<Input bind:value={formConfig['smtp_host']} label="SMTP Host" />
+							<Input bind:value={formConfig['smtp_port']} label="SMTP Port" />
+						</div>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<Input bind:value={formConfig['username']} label="Username" />
+							<Input bind:value={formConfig['password']} label="Password" type="password" />
+						</div>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<Input bind:value={formConfig['from']} label="From Address" />
+							<Input bind:value={formConfig['to']} label="To Address" />
+						</div>
+					{:else}
+						{#each selectedProvider.fields as field}
+							<Input
+								bind:value={formConfig[field]}
+								label={fieldLabels[field] ?? field}
+								type={sensitiveFields.has(field) ? 'password' : 'text'}
+								placeholder={field === 'method' ? 'POST' : ''}
+							/>
+						{/each}
+					{/if}
 				</div>
 			</div>
 		{/if}
@@ -287,12 +310,19 @@
 					{formEvents.length === allEvents.length ? 'Deselect all' : 'Select all'}
 				</button>
 			</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-				{#each allEvents as event}
-					<label class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors hover:bg-surface-800 {formEvents.includes(event) ? 'text-surface-100' : 'text-surface-500'}">
-						<input type="checkbox" checked={formEvents.includes(event)} onchange={() => toggleEvent(event)} class="rounded border-surface-600 text-lurk-600 focus:ring-lurk-500 bg-surface-800" />
-						<span class="font-mono text-xs">{event}</span>
-					</label>
+			<div class="space-y-3">
+				{#each eventGroups as group}
+					<div>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500 mb-1 block">{group.label}</span>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
+							{#each group.events as event}
+								<label class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors hover:bg-surface-800 {formEvents.includes(event) ? 'text-surface-100' : 'text-surface-500'}">
+									<input type="checkbox" checked={formEvents.includes(event)} onchange={() => toggleEvent(event)} class="rounded border-surface-600 text-lurk-600 focus:ring-lurk-500 bg-surface-800" />
+									<span class="font-mono text-xs">{event}</span>
+								</label>
+							{/each}
+						</div>
+					</div>
 				{/each}
 			</div>
 		</div>

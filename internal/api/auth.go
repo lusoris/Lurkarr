@@ -11,9 +11,10 @@ import (
 )
 
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	TOTPCode string `json:"totp_code,omitempty"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	TOTPCode     string `json:"totp_code,omitempty"`
+	RecoveryCode string `json:"recovery_code,omitempty"`
 }
 
 type setupRequest struct {
@@ -49,14 +50,26 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Check TOTP if enabled
 	if user.TOTPSecret != nil && *user.TOTPSecret != "" {
-		if req.TOTPCode == "" {
+		if req.TOTPCode == "" && req.RecoveryCode == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
 				"error":         "totp_required",
 				"totp_required": true,
 			})
 			return
 		}
-		if !auth.ValidateTOTP(req.TOTPCode, *user.TOTPSecret) {
+		if req.RecoveryCode != "" {
+			// Try recovery code
+			idx := auth.ValidateRecoveryCode(req.RecoveryCode, user.RecoveryCodes)
+			if idx < 0 {
+				writeJSON(w, http.StatusUnauthorized, errorResponse("invalid recovery code"))
+				return
+			}
+			// Consume the used recovery code
+			remaining := make([]string, 0, len(user.RecoveryCodes)-1)
+			remaining = append(remaining, user.RecoveryCodes[:idx]...)
+			remaining = append(remaining, user.RecoveryCodes[idx+1:]...)
+			_ = h.DB.SetRecoveryCodes(r.Context(), user.ID, remaining)
+		} else if !auth.ValidateTOTP(req.TOTPCode, *user.TOTPSecret) {
 			writeJSON(w, http.StatusUnauthorized, errorResponse("invalid TOTP code"))
 			return
 		}
@@ -184,9 +197,21 @@ func (h *AuthHandler) Handle2FAEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate recovery codes
+	plainCodes, hashedCodes, err := auth.GenerateRecoveryCodes()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to generate recovery codes"))
+		return
+	}
+	if err := h.DB.SetRecoveryCodes(r.Context(), user.ID, hashedCodes); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save recovery codes"))
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"secret":    secret,
-		"qr_base64": qrBase64,
+		"secret":         secret,
+		"qr_base64":      qrBase64,
+		"recovery_codes": plainCodes,
 	})
 }
 
@@ -200,6 +225,12 @@ func (h *AuthHandler) Handle2FADisable(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.DB.SetTOTPSecret(r.Context(), user.ID, nil); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to disable 2FA"))
+		return
+	}
+
+	// Clear recovery codes
+	if err := h.DB.SetRecoveryCodes(r.Context(), user.ID, nil); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to clear recovery codes"))
 		return
 	}
 
@@ -234,4 +265,32 @@ func (h *AuthHandler) Handle2FAVerify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "verified"})
+}
+
+// HandleRegenerateRecoveryCodes handles POST /api/auth/2fa/recovery-codes.
+func (h *AuthHandler) HandleRegenerateRecoveryCodes(w http.ResponseWriter, r *http.Request) {
+	user := auth.UserFromContext(r.Context())
+	if user == nil {
+		writeJSON(w, http.StatusUnauthorized, errorResponse("unauthorized"))
+		return
+	}
+
+	if user.TOTPSecret == nil || *user.TOTPSecret == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("2FA not enabled"))
+		return
+	}
+
+	plainCodes, hashedCodes, err := auth.GenerateRecoveryCodes()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to generate recovery codes"))
+		return
+	}
+	if err := h.DB.SetRecoveryCodes(r.Context(), user.ID, hashedCodes); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save recovery codes"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"recovery_codes": plainCodes,
+	})
 }

@@ -20,10 +20,12 @@ func (h *UserHandler) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":         user.ID,
-		"username":   user.Username,
-		"has_2fa":    user.TOTPSecret != nil && *user.TOTPSecret != "",
-		"created_at": user.CreatedAt,
+		"id":            user.ID,
+		"username":      user.Username,
+		"has_2fa":       user.TOTPSecret != nil && *user.TOTPSecret != "",
+		"is_admin":      user.IsAdmin,
+		"auth_provider": user.AuthProvider,
+		"created_at":    user.CreatedAt,
 	})
 }
 

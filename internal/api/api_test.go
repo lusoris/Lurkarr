@@ -1524,7 +1524,7 @@ func TestHandleUpdatePassword_Success(t *testing.T) {
 	user := &database.User{ID: uuid.New(), Username: "admin", Password: hash}
 	store.EXPECT().UpdatePassword(gomock.Any(), user.ID, gomock.Any()).Return(nil)
 	h := &UserHandler{DB: store}
-	body, _ := json.Marshal(map[string]string{"current_password": "correct", "new_password": "newpass"})
+	body, _ := json.Marshal(map[string]string{"current_password": "correct", "new_password": "Newpass1"})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/user/password", bytes.NewReader(body))
 	r = reqWithUserCtx(r, user)
@@ -1541,7 +1541,7 @@ func TestHandleUpdatePassword_SaveError(t *testing.T) {
 	user := &database.User{ID: uuid.New(), Username: "admin", Password: hash}
 	store.EXPECT().UpdatePassword(gomock.Any(), user.ID, gomock.Any()).Return(errors.New("fail"))
 	h := &UserHandler{DB: store}
-	body, _ := json.Marshal(map[string]string{"current_password": "correct", "new_password": "newpass"})
+	body, _ := json.Marshal(map[string]string{"current_password": "correct", "new_password": "Newpass1"})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/user/password", bytes.NewReader(body))
 	r = reqWithUserCtx(r, user)
@@ -1803,7 +1803,7 @@ func TestHandleSetup_CreateUserError(t *testing.T) {
 	store.EXPECT().UserCount(gomock.Any()).Return(0, nil)
 	store.EXPECT().CreateUser(gomock.Any(), "admin", gomock.Any()).Return(nil, errors.New("fail"))
 	h := &AuthHandler{DB: store}
-	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "testpass123"})
+	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "Testpass1"})
 	w := httptest.NewRecorder()
 	h.HandleSetup(w, httptest.NewRequest("POST", "/api/auth/setup", bytes.NewReader(body)))
 	if w.Code != 500 {
@@ -1824,7 +1824,7 @@ func TestHandleSetup_Success(t *testing.T) {
 	store.EXPECT().UpsertGeneralSettings(gomock.Any(), gomock.Any()).Return(nil)
 	// Setup calls Auth.SetSessionCookie which will panic since Auth is nil.
 	h := &AuthHandler{DB: store, Auth: nil}
-	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "testpass123"})
+	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "Testpass1"})
 	w := httptest.NewRecorder()
 	func() {
 		defer func() { recover() }()
@@ -1937,6 +1937,7 @@ func TestHandle2FAEnable_Success(t *testing.T) {
 	store := NewMockStore(ctrl)
 	user := &database.User{ID: uuid.New(), Username: "admin"}
 	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Any()).Return(nil)
+	store.EXPECT().SetRecoveryCodes(gomock.Any(), user.ID, gomock.Any()).Return(nil)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", http.NoBody)
@@ -1983,6 +1984,7 @@ func TestHandle2FADisable_Success(t *testing.T) {
 	store := NewMockStore(ctrl)
 	user := &database.User{ID: uuid.New(), Username: "admin"}
 	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Nil()).Return(nil)
+	store.EXPECT().SetRecoveryCodes(gomock.Any(), user.ID, gomock.Nil()).Return(nil)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/auth/2fa/disable", http.NoBody)
@@ -2061,5 +2063,464 @@ func TestHandle2FAVerify_InvalidCode(t *testing.T) {
 	h.Handle2FAVerify(w, r)
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// SessionHandler tests
+// =============================================================================
+
+func TestHandleListSessions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	sessionID := uuid.New()
+	sessions := []database.Session{
+		{ID: sessionID, UserID: user.ID, CreatedAt: time.Now(), ExpiresAt: time.Now().Add(7 * 24 * time.Hour), IPAddress: "127.0.0.1", UserAgent: "Test"},
+	}
+	store.EXPECT().ListUserSessions(gomock.Any(), user.ID).Return(sessions, nil)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/sessions", http.NoBody)
+	r = reqWithUserCtx(r, user)
+	r.AddCookie(&http.Cookie{Name: "lurkarr_session", Value: sessionID.String()})
+	h.HandleListSessions(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var result []map[string]any
+	json.NewDecoder(w.Body).Decode(&result)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(result))
+	}
+	if result[0]["current"] != true {
+		t.Fatal("expected current session to be marked")
+	}
+}
+
+func TestHandleListSessions_NoUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListSessions(w, httptest.NewRequest("GET", "/api/sessions", http.NoBody))
+	if w.Code != 401 {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestHandleListSessions_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	store.EXPECT().ListUserSessions(gomock.Any(), user.ID).Return(nil, errors.New("db error"))
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/sessions", http.NoBody)
+	r = reqWithUserCtx(r, user)
+	h.HandleListSessions(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeSession(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	sessionID := uuid.New()
+	sessions := []database.Session{{ID: sessionID, UserID: user.ID}}
+	store.EXPECT().ListUserSessions(gomock.Any(), user.ID).Return(sessions, nil)
+	store.EXPECT().DeleteSession(gomock.Any(), sessionID).Return(nil)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/sessions/"+sessionID.String(), nil, "id", sessionID.String())
+	r = reqWithUserCtx(r, user)
+	h.HandleRevokeSession(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeSession_NoUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleRevokeSession(w, httptest.NewRequest("DELETE", "/api/sessions/"+uuid.New().String(), http.NoBody))
+	if w.Code != 401 {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeSession_InvalidID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/sessions/bad", nil, "id", "bad")
+	r = reqWithUserCtx(r, user)
+	h.HandleRevokeSession(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeSession_NotOwned(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	otherSessionID := uuid.New()
+	sessions := []database.Session{{ID: uuid.New(), UserID: user.ID}} // different ID
+	store.EXPECT().ListUserSessions(gomock.Any(), user.ID).Return(sessions, nil)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/sessions/"+otherSessionID.String(), nil, "id", otherSessionID.String())
+	r = reqWithUserCtx(r, user)
+	h.HandleRevokeSession(w, r)
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeAllSessions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	currentSID := uuid.New()
+	store.EXPECT().DeleteUserSessionsExcept(gomock.Any(), user.ID, currentSID).Return(nil)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api/sessions", http.NoBody)
+	r = reqWithUserCtx(r, user)
+	r.AddCookie(&http.Cookie{Name: "lurkarr_session", Value: currentSID.String()})
+	h.HandleRevokeAllSessions(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeAllSessions_NoUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleRevokeAllSessions(w, httptest.NewRequest("DELETE", "/api/sessions", http.NoBody))
+	if w.Code != 401 {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeAllSessions_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "admin"}
+	store.EXPECT().DeleteUserSessionsExcept(gomock.Any(), user.ID, gomock.Any()).Return(errors.New("db error"))
+	h := &SessionHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api/sessions", http.NoBody)
+	r = reqWithUserCtx(r, user)
+	h.HandleRevokeAllSessions(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// AdminHandler tests
+// =============================================================================
+
+func TestHandleListUsers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	users := []database.User{{ID: uuid.New(), Username: "user1", AuthProvider: "local", IsAdmin: false, CreatedAt: time.Now()}}
+	store.EXPECT().ListUsers(gomock.Any()).Return(users, nil)
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/admin/users", http.NoBody)
+	r = reqWithUserCtx(r, admin)
+	h.HandleListUsers(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListUsers_NonAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "user", IsAdmin: false}
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/admin/users", http.NoBody)
+	r = reqWithUserCtx(r, user)
+	h.HandleListUsers(w, r)
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandleListUsers_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	store.EXPECT().ListUsers(gomock.Any()).Return(nil, errors.New("db error"))
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/admin/users", http.NoBody)
+	r = reqWithUserCtx(r, admin)
+	h.HandleListUsers(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	newUser := &database.User{ID: uuid.New(), Username: "newuser"}
+	store.EXPECT().CreateUser(gomock.Any(), "newuser", gomock.Any()).Return(newUser, nil)
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]any{"username": "newuser", "password": "StrongPass1!"})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader(body))
+	r = reqWithUserCtx(r, admin)
+	h.HandleCreateUser(w, r)
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateUser_NonAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "user", IsAdmin: false}
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/admin/users", http.NoBody)
+	r = reqWithUserCtx(r, user)
+	h.HandleCreateUser(w, r)
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateUser_EmptyFields(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]any{"username": "", "password": ""})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader(body))
+	r = reqWithUserCtx(r, admin)
+	h.HandleCreateUser(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateUser_WeakPassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]any{"username": "newuser", "password": "short"})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader(body))
+	r = reqWithUserCtx(r, admin)
+	h.HandleCreateUser(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateUser_WithAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	newUser := &database.User{ID: uuid.New(), Username: "admin2"}
+	store.EXPECT().CreateUser(gomock.Any(), "admin2", gomock.Any()).Return(newUser, nil)
+	store.EXPECT().UpdateUserAdmin(gomock.Any(), newUser.ID, true).Return(nil)
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]any{"username": "admin2", "password": "StrongPass1!", "is_admin": true})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader(body))
+	r = reqWithUserCtx(r, admin)
+	h.HandleCreateUser(w, r)
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateUser_Duplicate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	store.EXPECT().CreateUser(gomock.Any(), "existing", gomock.Any()).Return(nil, errors.New("duplicate"))
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]any{"username": "existing", "password": "StrongPass1!"})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader(body))
+	r = reqWithUserCtx(r, admin)
+	h.HandleCreateUser(w, r)
+	if w.Code != 409 {
+		t.Fatalf("expected 409, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	targetID := uuid.New()
+	store.EXPECT().DeleteUser(gomock.Any(), targetID).Return(nil)
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/admin/users/"+targetID.String(), nil, "id", targetID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleDeleteUser(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteUser_SelfDelete(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/admin/users/"+admin.ID.String(), nil, "id", admin.ID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleDeleteUser(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteUser_NonAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "user", IsAdmin: false}
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/admin/users/"+uuid.New().String(), nil, "id", uuid.New().String())
+	r = reqWithUserCtx(r, user)
+	h.HandleDeleteUser(w, r)
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandleResetUserPassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	targetID := uuid.New()
+	store.EXPECT().UpdatePassword(gomock.Any(), targetID, gomock.Any()).Return(nil)
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{"password": "NewStrongPass1!"})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+targetID.String()+"/reset-password", body, "id", targetID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleResetUserPassword(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleResetUserPassword_NonAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "user", IsAdmin: false}
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+uuid.New().String()+"/reset-password", nil, "id", uuid.New().String())
+	r = reqWithUserCtx(r, user)
+	h.HandleResetUserPassword(w, r)
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandleResetUserPassword_WeakPassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	targetID := uuid.New()
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{"password": "weak"})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+targetID.String()+"/reset-password", body, "id", targetID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleResetUserPassword(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleToggleAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	targetID := uuid.New()
+	store.EXPECT().UpdateUserAdmin(gomock.Any(), targetID, true).Return(nil)
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]bool{"is_admin": true})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+targetID.String()+"/toggle-admin", body, "id", targetID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleToggleAdmin(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleToggleAdmin_SelfDemotion(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]bool{"is_admin": false})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+admin.ID.String()+"/toggle-admin", body, "id", admin.ID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleToggleAdmin(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleToggleAdmin_NonAdmin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	user := &database.User{ID: uuid.New(), Username: "user", IsAdmin: false}
+	h := &AdminHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+uuid.New().String()+"/toggle-admin", nil, "id", uuid.New().String())
+	r = reqWithUserCtx(r, user)
+	h.HandleToggleAdmin(w, r)
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandleToggleAdmin_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	admin := &database.User{ID: uuid.New(), Username: "admin", IsAdmin: true}
+	targetID := uuid.New()
+	store.EXPECT().UpdateUserAdmin(gomock.Any(), targetID, true).Return(errors.New("db error"))
+	h := &AdminHandler{DB: store}
+	body, _ := json.Marshal(map[string]bool{"is_admin": true})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("POST", "/api/admin/users/"+targetID.String()+"/toggle-admin", body, "id", targetID.String())
+	r = reqWithUserCtx(r, admin)
+	h.HandleToggleAdmin(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
 	}
 }

@@ -82,6 +82,45 @@ func (c *MockAuthStoreCreateSessionCall) DoAndReturn(f func(context.Context, uui
 	return c
 }
 
+// CreateSessionWithMeta mocks base method.
+func (m *MockAuthStore) CreateSessionWithMeta(ctx context.Context, userID uuid.UUID, duration time.Duration, ipAddress, userAgent string) (*database.Session, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSessionWithMeta", ctx, userID, duration, ipAddress, userAgent)
+	ret0, _ := ret[0].(*database.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSessionWithMeta indicates an expected call of CreateSessionWithMeta.
+func (mr *MockAuthStoreMockRecorder) CreateSessionWithMeta(ctx, userID, duration, ipAddress, userAgent any) *MockAuthStoreCreateSessionWithMetaCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSessionWithMeta", reflect.TypeOf((*MockAuthStore)(nil).CreateSessionWithMeta), ctx, userID, duration, ipAddress, userAgent)
+	return &MockAuthStoreCreateSessionWithMetaCall{Call: call}
+}
+
+// MockAuthStoreCreateSessionWithMetaCall wrap *gomock.Call
+type MockAuthStoreCreateSessionWithMetaCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthStoreCreateSessionWithMetaCall) Return(arg0 *database.Session, arg1 error) *MockAuthStoreCreateSessionWithMetaCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthStoreCreateSessionWithMetaCall) Do(f func(context.Context, uuid.UUID, time.Duration, string, string) (*database.Session, error)) *MockAuthStoreCreateSessionWithMetaCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthStoreCreateSessionWithMetaCall) DoAndReturn(f func(context.Context, uuid.UUID, time.Duration, string, string) (*database.Session, error)) *MockAuthStoreCreateSessionWithMetaCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateUser mocks base method.
 func (m *MockAuthStore) CreateUser(ctx context.Context, username, passwordHash string) (*database.User, error) {
 	m.ctrl.T.Helper()

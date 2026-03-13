@@ -19,9 +19,16 @@ type Store interface {
 	UpdateUsername(ctx context.Context, id uuid.UUID, username string) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	SetTOTPSecret(ctx context.Context, id uuid.UUID, secret *string) error
+	SetRecoveryCodes(ctx context.Context, id uuid.UUID, codes []string) error
+	ListUsers(ctx context.Context) ([]database.User, error)
+	DeleteUser(ctx context.Context, id uuid.UUID) error
+	UpdateUserAdmin(ctx context.Context, id uuid.UUID, isAdmin bool) error
 
 	// Sessions
 	DeleteSession(ctx context.Context, id uuid.UUID) error
+	ListUserSessions(ctx context.Context, userID uuid.UUID) ([]database.Session, error)
+	DeleteUserSessions(ctx context.Context, userID uuid.UUID) error
+	DeleteUserSessionsExcept(ctx context.Context, userID uuid.UUID, keep uuid.UUID) error
 
 	// Instances
 	ListInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)

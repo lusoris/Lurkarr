@@ -130,3 +130,86 @@ func TestContainsGroup(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Recovery code tests
+// =============================================================================
+
+func TestGenerateRecoveryCodes(t *testing.T) {
+	plain, hashed, err := GenerateRecoveryCodes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(plain) != 10 {
+		t.Fatalf("expected 10 plain codes, got %d", len(plain))
+	}
+	if len(hashed) != 10 {
+		t.Fatalf("expected 10 hashed codes, got %d", len(hashed))
+	}
+	// Each plain code should be 9 chars (4-4 with dash)
+	for i, code := range plain {
+		if len(code) != 9 {
+			t.Errorf("code %d: expected 9 chars, got %d (%q)", i, len(code), code)
+		}
+		if code[4] != '-' {
+			t.Errorf("code %d: expected dash at position 4, got %q", i, code)
+		}
+	}
+}
+
+func TestGenerateRecoveryCodes_Uniqueness(t *testing.T) {
+	plain, _, err := GenerateRecoveryCodes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	seen := make(map[string]bool, len(plain))
+	for _, code := range plain {
+		if seen[code] {
+			t.Fatalf("duplicate recovery code: %s", code)
+		}
+		seen[code] = true
+	}
+}
+
+func TestValidateRecoveryCode_Valid(t *testing.T) {
+	plain, hashed, err := GenerateRecoveryCodes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Each plain code should match its corresponding hash
+	for i, code := range plain {
+		idx := ValidateRecoveryCode(code, hashed)
+		if idx != i {
+			t.Errorf("expected code %d to match at index %d, got %d", i, i, idx)
+		}
+	}
+}
+
+func TestValidateRecoveryCode_Invalid(t *testing.T) {
+	_, hashed, err := GenerateRecoveryCodes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	idx := ValidateRecoveryCode("0000-0000", hashed)
+	if idx != -1 {
+		t.Fatalf("expected -1 for invalid code, got %d", idx)
+	}
+}
+
+func TestValidateRecoveryCode_EmptyHashes(t *testing.T) {
+	idx := ValidateRecoveryCode("abcd-ef01", nil)
+	if idx != -1 {
+		t.Fatalf("expected -1 for empty hashes, got %d", idx)
+	}
+}
+
+func TestValidateRecoveryCode_EmptyCode(t *testing.T) {
+	_, hashed, err := GenerateRecoveryCodes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	idx := ValidateRecoveryCode("", hashed)
+	if idx != -1 {
+		t.Fatalf("expected -1 for empty code, got %d", idx)
+	}
+}
