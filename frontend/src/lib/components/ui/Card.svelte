@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { cn } from '$lib/lib/utils';
 
 	interface Props {
 		children: Snippet;
@@ -10,6 +11,27 @@
 	let { children, class: className = '', onclick }: Props = $props();
 </script>
 
-<div class="rounded-xl border border-surface-800 bg-surface-900/50 backdrop-blur-sm p-5 {className}" role={onclick ? 'button' : undefined} tabindex={onclick ? 0 : undefined} onclick={onclick} onkeydown={onclick ? (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onclick(); } } : undefined}>
-	{@render children()}
-</div>
+{#if onclick}
+	<div
+		class={cn(
+			'rounded-xl border border-border bg-card text-card-foreground shadow-sm p-5',
+			'cursor-pointer hover:bg-accent/50 transition-colors',
+			className
+		)}
+		role="button"
+		tabindex="0"
+		onclick={onclick}
+		onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onclick(); } }}
+	>
+		{@render children()}
+	</div>
+{:else}
+	<div
+		class={cn(
+			'rounded-xl border border-border bg-card text-card-foreground shadow-sm p-5',
+			className
+		)}
+	>
+		{@render children()}
+	</div>
+{/if}

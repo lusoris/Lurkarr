@@ -3,6 +3,8 @@
 	import { getAuth } from '$lib/stores/auth.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import Separator from '$lib/components/ui/Separator.svelte';
+	import { Loader2, Fingerprint } from 'lucide-svelte';
 
 	const auth = getAuth();
 
@@ -158,7 +160,7 @@
 
 <svelte:head><title>{needsSetup ? 'Setup' : 'Login'} - Lurkarr</title></svelte:head>
 
-<div class="min-h-screen flex items-center justify-center bg-surface-950">
+<div class="min-h-screen flex items-center justify-center bg-background">
 	<div class="w-full max-w-sm space-y-6">
 		<div class="text-center">
 			<img src="/banner.png" alt="Lurkarr" class="max-w-[16rem] w-full h-auto mx-auto object-contain" />
@@ -166,16 +168,16 @@
 
 		{#if checkingSetup}
 			<div class="flex justify-center">
-				<div class="h-6 w-6 animate-spin rounded-full border-2 border-lurk-500 border-t-transparent"></div>
+				<Loader2 class="h-6 w-6 animate-spin text-primary" />
 			</div>
 		{:else}
 			{#if needsSetup}
-				<p class="text-center text-sm text-surface-400">Create your admin account to get started.</p>
+				<p class="text-center text-sm text-muted-foreground">Create your admin account to get started.</p>
 			{/if}
 
-			<form onsubmit={(e: Event) => { e.preventDefault(); submit(); }} class="space-y-4 bg-surface-900 border border-surface-800 rounded-xl p-6">
+			<form onsubmit={(e: Event) => { e.preventDefault(); submit(); }} class="space-y-4 border border-border bg-card rounded-xl p-6 shadow-lg">
 				{#if error}
-					<div class="rounded-lg bg-red-950/50 border border-red-800 px-4 py-3 text-sm text-red-300">
+					<div class="rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
 						{error}
 					</div>
 				{/if}
@@ -186,10 +188,10 @@
 				{#if showTotp && !needsSetup}
 					{#if useRecovery}
 						<Input bind:value={recoveryCode} label="Recovery Code" placeholder="xxxx-xxxx" />
-						<button type="button" onclick={() => useRecovery = false} class="text-xs text-surface-400 hover:text-surface-200 transition-colors">Use authenticator code instead</button>
+						<button type="button" onclick={() => useRecovery = false} class="text-xs text-muted-foreground hover:text-foreground transition-colors">Use authenticator code instead</button>
 					{:else}
 						<Input bind:value={totp} label="2FA Code" placeholder="000000" />
-						<button type="button" onclick={() => useRecovery = true} class="text-xs text-surface-400 hover:text-surface-200 transition-colors">Lost your authenticator? Use a recovery code</button>
+						<button type="button" onclick={() => useRecovery = true} class="text-xs text-muted-foreground hover:text-foreground transition-colors">Lost your authenticator? Use a recovery code</button>
 					{/if}
 				{/if}
 
@@ -199,31 +201,24 @@
 			{#if (oidcEnabled || passkeyEnabled) && !needsSetup}
 				<div class="relative">
 					<div class="absolute inset-0 flex items-center">
-						<div class="w-full border-t border-surface-700"></div>
+						<Separator />
 					</div>
 					<div class="relative flex justify-center text-xs">
-						<span class="bg-surface-950 px-2 text-surface-500">or</span>
+						<span class="bg-background px-2 text-muted-foreground">or</span>
 					</div>
 				</div>
 
 				{#if passkeyEnabled}
-					<button
-						onclick={loginPasskey}
-						disabled={loading}
-						class="w-full rounded-lg bg-surface-800 border border-surface-700 px-4 py-3 text-sm font-medium text-surface-200 hover:bg-surface-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-					>
-						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a48.667 48.667 0 00-1.298 8.568M5.742 6.364L3 4.5M5.742 6.364l2.121 2.121m0 0A7.465 7.465 0 0110.5 7.5c1.56 0 3.03.476 4.243 1.293M7.864 8.485l2.121 2.121m0 0a7.465 7.465 0 014.53-1.606c.896 0 1.76.157 2.56.442M10 10.5l2.121 2.121M12.121 12.621A48.578 48.578 0 0120.25 18.4M12.121 12.621L10.5 14.242"/></svg>
+					<Button variant="outline" onclick={loginPasskey} disabled={loading} class="w-full h-11">
+						<Fingerprint class="h-5 w-5" />
 						Sign in with Passkey
-					</button>
+					</Button>
 				{/if}
 
 				{#if oidcEnabled}
-					<button
-						onclick={loginOIDC}
-						class="w-full rounded-lg bg-surface-800 border border-surface-700 px-4 py-3 text-sm font-medium text-surface-200 hover:bg-surface-700 transition-colors"
-					>
+					<Button variant="outline" onclick={loginOIDC} class="w-full h-11">
 						Sign in with SSO
-					</button>
+					</Button>
 				{/if}
 			{/if}
 		{/if}

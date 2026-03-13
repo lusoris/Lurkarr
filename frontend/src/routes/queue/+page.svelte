@@ -301,16 +301,16 @@
 <svelte:head><title>Queue Management - Lurkarr</title></svelte:head>
 
 <div class="space-y-4">
-	<h1 class="text-xl font-bold text-surface-50">Queue Management</h1>
+	<h1 class="text-xl font-bold text-foreground">Queue Management</h1>
 
 	<!-- App selector -->
-	<div class="flex gap-0.5 rounded-lg bg-surface-900 border border-surface-800 p-0.5 overflow-x-auto">
+	<div class="flex gap-0.5 rounded-lg bg-card border border-border p-0.5 overflow-x-auto">
 		{#each appTypes as app}
 			{@const logo = appLogo(app)}
 			<button
 				onclick={() => { selectedApp = app; loadTabData(); }}
 				class="shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors
-					{selectedApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'}"
+					{selectedApp === app ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
 			>
 				{#if logo}
 					<img src={logo} alt="" class="w-4 h-4 rounded-sm shrink-0" />
@@ -322,12 +322,12 @@
 	</div>
 
 	<!-- Tab navigation -->
-	<div class="flex gap-0.5 rounded-lg bg-surface-800/50 p-0.5 overflow-x-auto">
+	<div class="flex gap-0.5 rounded-lg bg-muted/50 p-0.5 overflow-x-auto">
 		{#each tabs as tab}
 			<button
 				onclick={() => { activeTab = tab.id; loadTabData(); }}
 				class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors
-					{activeTab === tab.id ? 'bg-surface-700 text-surface-100' : 'text-surface-400 hover:text-surface-200'}"
+					{activeTab === tab.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
 			>{tab.label}</button>
 		{/each}
 	</div>
@@ -342,7 +342,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Stall Detection</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stall Detection</h3>
 					<div class="grid grid-cols-2 gap-3">
 						<Input bind:value={settings.stalled_threshold_minutes} type="number" label="Stalled (min)" hint="No progress threshold" />
 						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow (bytes/s)" hint="Below this = slow" />
@@ -352,7 +352,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Strike System</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Strike System</h3>
 					<div class="grid grid-cols-2 gap-3 mb-3">
 						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" hint="Before removal" />
 						<Input bind:value={settings.strike_window_hours} type="number" label="Window (hours)" hint="Expiry time" />
@@ -364,7 +364,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Actions</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Actions</h3>
 					<div class="space-y-2">
 						<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" />
 						<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
@@ -373,7 +373,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Failed Imports</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Failed Imports</h3>
 					<div class="space-y-2">
 						<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" />
 						<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" />
@@ -381,7 +381,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Seeding Rules</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Seeding Rules</h3>
 					<Toggle bind:checked={settings.seeding_enabled} label="Enable Seeding Enforcement" />
 					{#if settings.seeding_enabled}
 						<div class="grid grid-cols-2 gap-3 mt-3">
@@ -389,8 +389,8 @@
 							<Input bind:value={settings.seeding_max_hours} type="number" label="Max Hours" hint="0 = disabled" />
 						</div>
 						<label class="block mt-2">
-							<span class="block text-xs font-medium text-surface-300 mb-1">Mode</span>
-							<select bind:value={settings.seeding_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+						<span class="block text-xs font-medium text-muted-foreground mb-1">Mode</span>
+						<select bind:value={settings.seeding_mode} class="w-full rounded-lg border border-input bg-card text-foreground px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 								<option value="or">Either condition (OR)</option>
 								<option value="and">Both conditions (AND)</option>
 							</select>
@@ -403,7 +403,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Orphan Cleanup</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Orphan Cleanup</h3>
 					<Toggle bind:checked={settings.orphan_enabled} label="Enable Orphan Detection" />
 					{#if settings.orphan_enabled}
 						<div class="space-y-2 mt-3">
@@ -415,7 +415,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Advanced</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Advanced</h3>
 					<div class="space-y-2">
 						<Toggle bind:checked={settings.hardlink_protection} label="Hardlink Protection" />
 						<Toggle bind:checked={settings.skip_cross_seeds} label="Skip Cross-Seeded Torrents" />
@@ -427,11 +427,11 @@
 			</div>
 		{:else if loadedCleaners.has(selectedApp)}
 			<Card>
-				<p class="text-sm text-surface-500 text-center py-4">No cleaner settings configured for {appDisplayName(selectedApp)}.</p>
+				<p class="text-sm text-muted-foreground text-center py-4">No cleaner settings configured for {appDisplayName(selectedApp)}.</p>
 			</Card>
 		{:else}
 			<Card>
-				<p class="text-sm text-surface-500 text-center py-4">Loading cleaner settings...</p>
+				<p class="text-sm text-muted-foreground text-center py-4">Loading cleaner settings...</p>
 			</Card>
 		{/if}
 	{/if}
@@ -445,8 +445,8 @@
 					<div class="grid grid-cols-2 gap-3">
 						<Input bind:value={profile.name} label="Profile Name" />
 						<label class="block">
-							<span class="block text-xs font-medium text-surface-300 mb-1">Strategy</span>
-							<select bind:value={profile.strategy} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+						<span class="block text-xs font-medium text-muted-foreground mb-1">Strategy</span>
+						<select bind:value={profile.strategy} class="w-full rounded-lg border border-input bg-card text-foreground px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 								<option value="highest">Highest Score</option>
 								<option value="adequate">Adequate Threshold</option>
 							</select>
@@ -458,7 +458,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Preferences</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Preferences</h3>
 					<div class="space-y-2">
 						<Toggle bind:checked={profile.prefer_higher_quality} label="Prefer Higher Quality" />
 						<Toggle bind:checked={profile.prefer_larger_size} label="Prefer Larger Size" />
@@ -467,7 +467,7 @@
 				</Card>
 
 				<Card>
-					<h3 class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Weights</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Weights</h3>
 					<div class="grid grid-cols-2 gap-3">
 						<Input bind:value={profile.custom_format_weight} type="number" label="Custom Format" />
 						<Input bind:value={profile.size_weight} type="number" label="Size" />
@@ -480,13 +480,13 @@
 			</div>
 		{:else if loadedScoring.has(selectedApp)}
 			<Card>
-				<p class="text-sm text-surface-500 text-center py-4">No scoring profile configured for {appDisplayName(selectedApp)}.</p>
+				<p class="text-sm text-muted-foreground text-center py-4">No scoring profile configured for {appDisplayName(selectedApp)}.</p>
 			</Card>
 		{:else}
 			<Card>
 				<div class="space-y-3 py-2">
 					{#each Array(4) as _}
-						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
 					{/each}
 				</div>
 			</Card>
@@ -499,28 +499,28 @@
 			<Card>
 				<div class="space-y-3 py-2">
 					{#each Array(4) as _}
-						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
 					{/each}
 				</div>
 			</Card>
 		{:else if blocklist.length === 0}
-			<Card><p class="text-sm text-surface-500 text-center py-4">No blocklist entries</p></Card>
+			<Card><p class="text-sm text-muted-foreground text-center py-4">No blocklist entries</p></Card>
 		{:else}
-			<div class="rounded-xl border border-surface-800 overflow-hidden">
+			<div class="rounded-xl border border-border overflow-hidden">
 				<table class="w-full text-sm">
-					<thead class="bg-surface-900 text-surface-400 text-xs uppercase">
+					<thead class="bg-card text-muted-foreground text-xs uppercase">
 						<tr>
 							<th class="px-4 py-3 text-left">Title</th>
 							<th class="px-4 py-3 text-left">Reason</th>
 							<th class="px-4 py-3 text-left">Date</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-surface-800">
+					<tbody class="divide-y divide-border">
 						{#each blocklist as entry}
-							<tr class="hover:bg-surface-800/30 transition-colors">
-								<td class="px-4 py-3 text-surface-100 max-w-xs truncate">{entry.title}</td>
+							<tr class="hover:bg-muted/30 transition-colors">
+								<td class="px-4 py-3 text-foreground max-w-xs truncate">{entry.title}</td>
 								<td class="px-4 py-3"><Badge variant="error">{entry.reason}</Badge></td>
-								<td class="px-4 py-3 text-surface-500 text-xs">{new Date(entry.blocklisted_at).toLocaleString()}</td>
+								<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(entry.blocklisted_at).toLocaleString()}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -535,16 +535,16 @@
 			<Card>
 				<div class="space-y-3 py-2">
 					{#each Array(4) as _}
-						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
 					{/each}
 				</div>
 			</Card>
 		{:else if imports.length === 0}
-			<Card><p class="text-sm text-surface-500 text-center py-4">No import entries</p></Card>
+			<Card><p class="text-sm text-muted-foreground text-center py-4">No import entries</p></Card>
 		{:else}
-			<div class="rounded-xl border border-surface-800 overflow-hidden">
+			<div class="rounded-xl border border-border overflow-hidden">
 				<table class="w-full text-sm">
-					<thead class="bg-surface-900 text-surface-400 text-xs uppercase">
+					<thead class="bg-card text-muted-foreground text-xs uppercase">
 						<tr>
 							<th class="px-4 py-3 text-left">Media</th>
 							<th class="px-4 py-3 text-left">Action</th>
@@ -552,13 +552,13 @@
 							<th class="px-4 py-3 text-left">Date</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-surface-800">
+					<tbody class="divide-y divide-border">
 						{#each imports as entry}
-							<tr class="hover:bg-surface-800/30 transition-colors">
-								<td class="px-4 py-3 text-surface-100">{entry.media_title}</td>
+							<tr class="hover:bg-muted/30 transition-colors">
+								<td class="px-4 py-3 text-foreground">{entry.media_title}</td>
 								<td class="px-4 py-3"><Badge variant="info">{entry.action}</Badge></td>
-								<td class="px-4 py-3 text-surface-400 max-w-xs truncate">{entry.reason}</td>
-								<td class="px-4 py-3 text-surface-500 text-xs">{new Date(entry.created_at).toLocaleString()}</td>
+								<td class="px-4 py-3 text-muted-foreground max-w-xs truncate">{entry.reason}</td>
+								<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(entry.created_at).toLocaleString()}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -570,21 +570,21 @@
 	<!-- ──────────────────────────────────────────── -->
 	<!-- Global Blocklist Management                  -->
 	<!-- ──────────────────────────────────────────── -->
-	<div class="border-t border-surface-800 pt-6 mt-6 space-y-4">
-		<h2 class="text-base font-semibold text-surface-200">Global Blocklist Management</h2>
-		<p class="text-xs text-surface-400">Manage community blocklist sources and custom rules that apply across all apps.</p>
+	<div class="border-t border-border pt-6 mt-6 space-y-4">
+		<h2 class="text-base font-semibold text-foreground">Global Blocklist Management</h2>
+		<p class="text-xs text-muted-foreground">Manage community blocklist sources and custom rules that apply across all apps.</p>
 
 		<!-- Sources -->
 		<Card>
 			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-sm font-semibold text-surface-300">Blocklist Sources</h3>
+				<h3 class="text-sm font-semibold text-muted-foreground">Blocklist Sources</h3>
 				<Button size="sm" onclick={() => { showAddSource = !showAddSource; }}>
 					{showAddSource ? 'Cancel' : '+ Add Source'}
 				</Button>
 			</div>
 
 			{#if showAddSource}
-				<div class="mb-4 p-4 rounded-lg bg-surface-800/50 border border-surface-700 space-y-3">
+				<div class="mb-4 p-4 rounded-lg bg-muted/50 border border-border space-y-3">
 					<Input bind:value={newSource.name} label="Name" placeholder="e.g. Trash Guides blocklist" />
 					<Input bind:value={newSource.url} label="URL" placeholder="https://example.com/blocklist.txt" />
 					<Input bind:value={newSource.sync_interval_hours} type="number" label="Sync Interval (hours)" />
@@ -597,16 +597,16 @@
 			{#if !sourcesLoaded}
 				<div class="space-y-2 py-2">
 					{#each Array(3) as _}
-						<div class="h-16 rounded-lg bg-surface-800/50 animate-pulse"></div>
+						<div class="h-16 rounded-lg bg-muted/50 animate-pulse"></div>
 					{/each}
 				</div>
 			{:else if sources.length === 0}
-				<p class="text-sm text-surface-500 py-4 text-center">No blocklist sources configured</p>
+					<p class="text-sm text-muted-foreground py-4 text-center">No blocklist sources configured</p>
 			{:else}
 				<div class="space-y-2">
 					{#each sources as src}
 						{#if editingSource?.id === src.id}
-							<div class="p-3 rounded-lg bg-surface-800/50 border border-surface-700 space-y-3">
+							<div class="p-3 rounded-lg bg-muted/50 border border-border space-y-3">
 								<Input bind:value={editingSource.name} label="Name" />
 								<Input bind:value={editingSource.url} label="URL" />
 								<Input bind:value={editingSource.sync_interval_hours} type="number" label="Sync Interval (hours)" />
@@ -617,30 +617,30 @@
 								</div>
 							</div>
 						{:else}
-							<div class="flex items-center justify-between p-3 rounded-lg bg-surface-900 border border-surface-800">
+							<div class="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
 								<div class="min-w-0 flex-1">
 									<div class="flex items-center gap-2">
-										<span class="text-sm font-medium text-surface-100 truncate">{src.name}</span>
+										<span class="text-sm font-medium text-foreground truncate">{src.name}</span>
 										{#if !src.enabled}
 											<Badge variant="default">Disabled</Badge>
 										{/if}
 									</div>
-									<p class="text-xs text-surface-500 mt-0.5 truncate">{src.url}</p>
+									<p class="text-xs text-muted-foreground mt-0.5 truncate">{src.url}</p>
 									{#if src.last_synced_at}
-										<p class="text-xs text-surface-600 mt-0.5">Last synced: {new Date(src.last_synced_at).toLocaleString()}</p>
+										<p class="text-xs text-muted-foreground/50 mt-0.5">Last synced: {new Date(src.last_synced_at).toLocaleString()}</p>
 									{/if}
 								</div>
 								<div class="flex items-center gap-1.5 ml-3 shrink-0">
-									<button onclick={() => { editingSource = { ...src }; }} class="text-surface-400 hover:text-surface-200 transition-colors" title="Edit">
+									<button onclick={() => { editingSource = { ...src }; }} class="text-muted-foreground hover:text-foreground transition-colors" title="Edit">
 										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
 									</button>
 									{#if confirmDeleteSource === src.id}
 										<span class="flex items-center gap-1">
 											<button onclick={() => { deleteSource(src.id); confirmDeleteSource = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
-											<button onclick={() => confirmDeleteSource = null} class="rounded px-1.5 py-0.5 bg-surface-700 text-surface-300 text-[10px] hover:bg-surface-600">No</button>
+											<button onclick={() => confirmDeleteSource = null} class="rounded px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] hover:bg-muted">No</button>
 										</span>
 							{:else}
-										<button onclick={() => confirmDeleteSource = src.id} class="text-surface-400 hover:text-red-400 transition-colors" title="Delete">
+										<button onclick={() => confirmDeleteSource = src.id} class="text-muted-foreground hover:text-red-400 transition-colors" title="Delete">
 											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
 										</button>
 							{/if}
@@ -655,17 +655,17 @@
 		<!-- Rules -->
 		<Card>
 			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-sm font-semibold text-surface-300">Custom Rules</h3>
+				<h3 class="text-sm font-semibold text-muted-foreground">Custom Rules</h3>
 				<Button size="sm" onclick={() => { showAddRule = !showAddRule; }}>
 					{showAddRule ? 'Cancel' : '+ Add Rule'}
 				</Button>
 			</div>
 
 			{#if showAddRule}
-				<div class="mb-4 p-4 rounded-lg bg-surface-800/50 border border-surface-700 space-y-3">
+				<div class="mb-4 p-4 rounded-lg bg-muted/50 border border-border space-y-3">
 					<label class="block">
-						<span class="block text-sm font-medium text-surface-300 mb-1.5">Pattern Type</span>
-						<select bind:value={newRule.pattern_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+						<span class="block text-sm font-medium text-muted-foreground mb-1.5">Pattern Type</span>
+						<select bind:value={newRule.pattern_type} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 							<option value="title_contains">Title Contains</option>
 							<option value="title_regex">Title Regex</option>
 							<option value="release_group">Release Group</option>
@@ -683,15 +683,15 @@
 			{#if !rulesLoaded}
 				<div class="space-y-2 py-2">
 					{#each Array(3) as _}
-						<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
 					{/each}
 				</div>
 			{:else if rules.length === 0}
-				<p class="text-sm text-surface-500 py-4 text-center">No custom rules</p>
+				<p class="text-sm text-muted-foreground py-4 text-center">No custom rules</p>
 			{:else}
-				<div class="rounded-xl border border-surface-800 overflow-hidden">
+				<div class="rounded-xl border border-border overflow-hidden">
 					<table class="w-full text-sm">
-						<thead class="bg-surface-900 text-surface-400 text-xs uppercase">
+						<thead class="bg-card text-muted-foreground text-xs uppercase">
 							<tr>
 								<th class="px-4 py-3 text-left">Pattern</th>
 								<th class="px-4 py-3 text-left">Type</th>
@@ -700,13 +700,13 @@
 								<th class="px-4 py-3 text-right">Actions</th>
 							</tr>
 						</thead>
-						<tbody class="divide-y divide-surface-800">
+						<tbody class="divide-y divide-border">
 							{#each rules as rule}
-								<tr class="hover:bg-surface-800/30 transition-colors">
-									<td class="px-4 py-3 text-surface-100 font-mono text-xs max-w-xs truncate">{rule.pattern}</td>
+								<tr class="hover:bg-muted/30 transition-colors">
+									<td class="px-4 py-3 text-foreground font-mono text-xs max-w-xs truncate">{rule.pattern}</td>
 									<td class="px-4 py-3"><Badge variant="default">{rule.pattern_type.replace('_', ' ')}</Badge></td>
-									<td class="px-4 py-3 text-surface-400 text-xs max-w-xs truncate">{rule.reason || '—'}</td>
-									<td class="px-4 py-3 text-surface-500 text-xs">
+									<td class="px-4 py-3 text-muted-foreground text-xs max-w-xs truncate">{rule.reason || '—'}</td>
+									<td class="px-4 py-3 text-muted-foreground text-xs">
 										{#if rule.source_id}
 											{@const srcName = sources.find(s => s.id === rule.source_id)?.name}
 											<Badge variant="info">{srcName ?? 'synced'}</Badge>
@@ -719,15 +719,15 @@
 											{#if confirmDeleteRule === rule.id}
 												<span class="flex items-center gap-1">
 													<button onclick={() => { deleteRule(rule.id); confirmDeleteRule = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
-													<button onclick={() => confirmDeleteRule = null} class="rounded px-1.5 py-0.5 bg-surface-700 text-surface-300 text-[10px] hover:bg-surface-600">No</button>
+													<button onclick={() => confirmDeleteRule = null} class="rounded px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] hover:bg-muted">No</button>
 												</span>
 											{:else}
-												<button onclick={() => confirmDeleteRule = rule.id} class="text-surface-400 hover:text-red-400 transition-colors" title="Delete">
+												<button onclick={() => confirmDeleteRule = rule.id} class="text-muted-foreground hover:text-red-400 transition-colors" title="Delete">
 													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
 												</button>
 											{/if}
 										{:else}
-											<span class="text-surface-600 text-xs">synced</span>
+											<span class="text-muted-foreground/50 text-xs">synced</span>
 										{/if}
 									</td>
 								</tr>

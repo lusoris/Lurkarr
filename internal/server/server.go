@@ -62,8 +62,8 @@ type Config struct {
 	OIDCAdminGroup   string
 
 	// WebAuthn / Passkeys
-	WebAuthnRPID          string // e.g. "localhost" or "lurkarr.example.com"
-	WebAuthnRPDisplayName string // e.g. "Lurkarr"
+	WebAuthnRPID          string   // e.g. "localhost" or "lurkarr.example.com"
+	WebAuthnRPDisplayName string   // e.g. "Lurkarr"
 	WebAuthnRPOrigins     []string // e.g. ["http://localhost:9705"]
 }
 

@@ -1,14 +1,41 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { cn } from '$lib/lib/utils';
+	import { tv } from 'tailwind-variants';
+	import { Loader2 } from 'lucide-svelte';
+
+	const buttonVariants = tv({
+		base: 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
+		variants: {
+			variant: {
+				primary: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+				secondary: 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+				danger: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
+				ghost: 'hover:bg-accent hover:text-accent-foreground',
+				outline: 'border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
+				link: 'text-primary underline-offset-4 hover:underline'
+			},
+			size: {
+				sm: 'h-8 rounded-md px-3 text-xs',
+				md: 'h-9 px-4 py-2',
+				lg: 'h-10 rounded-md px-6',
+				icon: 'h-9 w-9'
+			}
+		},
+		defaultVariants: {
+			variant: 'primary',
+			size: 'md'
+		}
+	});
 
 	interface Props {
-		variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-		size?: 'sm' | 'md' | 'lg';
+		variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'link';
+		size?: 'sm' | 'md' | 'lg' | 'icon';
 		disabled?: boolean;
 		loading?: boolean;
 		type?: 'button' | 'submit';
 		class?: string;
-		onclick?: () => void;
+		onclick?: (e: MouseEvent) => void;
 		children: Snippet;
 	}
 
@@ -22,35 +49,16 @@
 		onclick,
 		children
 	}: Props = $props();
-
-	const variants: Record<string, string> = {
-		primary: 'bg-lurk-600 hover:bg-lurk-500 text-white',
-		secondary: 'bg-surface-700 hover:bg-surface-600 text-surface-100',
-		danger: 'bg-red-600 hover:bg-red-500 text-white',
-		ghost: 'bg-transparent hover:bg-surface-800 text-surface-300'
-	};
-
-	const sizes: Record<string, string> = {
-		sm: 'px-3 py-1.5 text-xs',
-		md: 'px-4 py-2 text-sm',
-		lg: 'px-6 py-3 text-base'
-	};
 </script>
 
 <button
 	{type}
-	{disabled}
+	disabled={disabled || loading}
 	{onclick}
-	class="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors
-		focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lurk-500
-		disabled:opacity-50 disabled:cursor-not-allowed
-		{variants[variant]} {sizes[size]} {className}"
+	class={cn(buttonVariants({ variant, size }), className)}
 >
 	{#if loading}
-		<svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-			<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25" />
-			<path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" class="opacity-75" />
-		</svg>
+		<Loader2 class="h-4 w-4 animate-spin" />
 	{/if}
 	{@render children()}
 </button>

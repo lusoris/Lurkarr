@@ -127,7 +127,7 @@
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-surface-50">Schedules</h1>
+		<h1 class="text-2xl font-bold text-foreground">Schedules</h1>
 		<div class="flex gap-2">
 			<Button size="sm" variant="secondary" onclick={loadHistory}>History</Button>
 			<Button size="sm" onclick={openAdd}>Add Schedule</Button>
@@ -137,12 +137,12 @@
 	{#if loading}
 		<div class="space-y-2">
 			{#each Array(3) as _}
-				<div class="h-16 rounded-lg bg-surface-800/50 animate-pulse"></div>
+				<div class="h-16 rounded-lg bg-muted/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if schedules.length === 0}
 		<Card>
-			<p class="text-sm text-surface-500 text-center py-8">No schedules configured</p>
+			<p class="text-sm text-muted-foreground text-center py-8">No schedules configured</p>
 		</Card>
 	{:else}
 		<div class="space-y-2">
@@ -153,15 +153,15 @@
 							{sched.enabled ? 'Active' : 'Inactive'}
 						</Badge>
 						<div>
-							<span class="font-medium text-surface-100">{appDisplayName(sched.app_type)}</span>
-							<span class="text-surface-500 mx-2">&middot;</span>
-							<span class="text-surface-300">{formatAction(sched.action)}</span>
+							<span class="font-medium text-foreground">{appDisplayName(sched.app_type)}</span>
+							<span class="text-muted-foreground mx-2">&middot;</span>
+							<span class="text-muted-foreground">{formatAction(sched.action)}</span>
 						</div>
 					</div>
 					<div class="flex items-center gap-3">
 						<div class="text-right">
-							<span class="font-mono text-surface-200">{formatTime(sched.hour, sched.minute)}</span>
-							<p class="text-xs text-surface-500">{sched.days.length > 0 ? sched.days.join(', ') : 'Every day'}</p>
+							<span class="font-mono text-foreground">{formatTime(sched.hour, sched.minute)}</span>
+							<p class="text-xs text-muted-foreground">{sched.days.length > 0 ? sched.days.join(', ') : 'Every day'}</p>
 						</div>
 						<Button size="sm" variant="ghost" onclick={() => openEdit(sched)}>Edit</Button>
 						{#if deleteConfirm === sched.id}
@@ -181,16 +181,16 @@
 <Modal bind:open={showModal} title={editing ? 'Edit Schedule' : 'Add Schedule'} onclose={() => showModal = false}>
 	<form onsubmit={(e: Event) => { e.preventDefault(); saveSchedule(); }} class="space-y-4">
 		<label class="block">
-			<span class="block text-sm font-medium text-surface-300 mb-1.5">App Type</span>
-			<select bind:value={form.app_type} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+			<span class="block text-sm font-medium text-muted-foreground mb-1.5">App Type</span>
+			<select bind:value={form.app_type} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 				{#each appTypes as app}
 					<option value={app}>{appDisplayName(app)}</option>
 				{/each}
 			</select>
 		</label>
 		<label class="block">
-			<span class="block text-sm font-medium text-surface-300 mb-1.5">Action</span>
-			<select bind:value={form.action} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+			<span class="block text-sm font-medium text-muted-foreground mb-1.5">Action</span>
+			<select bind:value={form.action} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 				{#each actions as action}
 					<option value={action}>{formatAction(action)}</option>
 				{/each}
@@ -201,14 +201,14 @@
 			<Input bind:value={form.minute} type="number" label="Minute (0-59)" />
 		</div>
 		<div>
-			<span class="block text-sm font-medium text-surface-300 mb-2">Days (empty = every day)</span>
+			<span class="block text-sm font-medium text-muted-foreground mb-2">Days (empty = every day)</span>
 			<div class="flex flex-wrap gap-2">
 				{#each dayOptions as day}
 					<button
 						type="button"
 						onclick={() => toggleDay(day)}
 						class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-							{form.days.includes(day) ? 'bg-lurk-600 text-white' : 'bg-surface-800 text-surface-400 hover:bg-surface-700'}"
+							{form.days.includes(day) ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-secondary'}"
 					>{day.slice(0, 3)}</button>
 				{/each}
 			</div>
@@ -223,12 +223,12 @@
 <!-- History Modal -->
 <Modal bind:open={showHistory} title="Schedule History" onclose={() => showHistory = false}>
 	{#if history.length === 0}
-		<p class="text-sm text-surface-500 text-center py-4">No execution history</p>
+		<p class="text-sm text-muted-foreground text-center py-4">No execution history</p>
 	{:else}
 		<div class="max-h-96 overflow-y-auto space-y-2">
 			{#each history as exec}
-				<div class="flex items-center justify-between rounded-lg bg-surface-800/50 px-3 py-2 text-sm">
-					<span class="text-surface-400 text-xs">{new Date(exec.executed_at).toLocaleString()}</span>
+				<div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+					<span class="text-muted-foreground text-xs">{new Date(exec.executed_at).toLocaleString()}</span>
 					<Badge variant={exec.result === 'success' ? 'success' : exec.result ? 'error' : 'default'}>
 						{exec.result ?? 'pending'}
 					</Badge>

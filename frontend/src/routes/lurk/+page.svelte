@@ -52,18 +52,18 @@
 <svelte:head><title>Lurk Settings - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold text-surface-50">Lurk Settings</h1>
-	<p class="text-sm text-surface-400">Configure lurking behavior per app — how many items to search, modes, rate limits, and more.</p>
+	<h1 class="text-2xl font-bold text-foreground">Lurk Settings</h1>
+	<p class="text-sm text-muted-foreground">Configure lurking behavior per app — how many items to search, modes, rate limits, and more.</p>
 
 	<Card>
 		<!-- App selector -->
-		<div class="flex gap-1 mb-5 rounded-lg bg-surface-800/50 p-1 overflow-x-auto">
+		<div class="flex gap-1 mb-5 rounded-lg bg-muted/50 p-1 overflow-x-auto">
 			{#each appTypes as app}
 				{@const logo = appLogo(app)}
 				<button
 					onclick={() => { selectedApp = app; loadAppSettings(app); }}
 					class="shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors
-						{selectedApp === app ? 'bg-lurk-600 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700'}"
+						{selectedApp === app ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
 				>
 					{#if logo}<img src={logo} alt="" class="w-4 h-4 rounded-sm" />{/if}
 					{appTabLabel(app)}
@@ -80,16 +80,16 @@
 				</div>
 				<div class="grid grid-cols-2 gap-4">
 					<label class="block">
-						<span class="block text-sm font-medium text-surface-300 mb-1.5">Missing Mode</span>
-						<select bind:value={settings.lurk_missing_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+						<span class="block text-sm font-medium text-muted-foreground mb-1.5">Missing Mode</span>
+						<select bind:value={settings.lurk_missing_mode} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 							<option value="oldest">Oldest First</option>
 							<option value="newest">Newest First</option>
 							<option value="random">Random</option>
 						</select>
 					</label>
 					<label class="block">
-						<span class="block text-sm font-medium text-surface-300 mb-1.5">Upgrade Mode</span>
-						<select bind:value={settings.upgrade_mode} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500">
+						<span class="block text-sm font-medium text-muted-foreground mb-1.5">Upgrade Mode</span>
+						<select bind:value={settings.upgrade_mode} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
 							<option value="oldest">Oldest First</option>
 							<option value="newest">Newest First</option>
 							<option value="random">Random</option>
@@ -107,7 +107,7 @@
 		{:else}
 			<div class="space-y-4">
 				{#each Array(6) as _}
-					<div class="h-10 rounded-lg bg-surface-800/50 animate-pulse"></div>
+					<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
 				{/each}
 			</div>
 		{/if}

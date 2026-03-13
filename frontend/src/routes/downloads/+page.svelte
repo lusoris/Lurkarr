@@ -80,20 +80,20 @@
 <svelte:head><title>Downloads - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold text-surface-50">Downloads</h1>
+	<h1 class="text-2xl font-bold text-foreground">Downloads</h1>
 
 	{#if loading}
 		<div class="space-y-2">
 			{#each Array(3) as _}
-				<div class="h-16 rounded-lg bg-surface-800/50 animate-pulse"></div>
+				<div class="h-16 rounded-lg bg-muted/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if clients.filter(c => c.enabled).length === 0}
 		<Card>
 			<div class="text-center py-6">
-				<p class="text-sm text-surface-400 mb-2">No download clients configured</p>
-				<p class="text-xs text-surface-500 mb-4">Add a download client on the Connections page to see active downloads.</p>
-				<a href="/apps" class="inline-flex items-center gap-1.5 text-sm font-medium text-lurk-400 hover:text-lurk-300 transition-colors">
+				<p class="text-sm text-muted-foreground mb-2">No download clients configured</p>
+				<p class="text-xs text-muted-foreground mb-4">Add a download client on the Connections page to see active downloads.</p>
+				<a href="/apps" class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
 					Go to Connections
 					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -109,7 +109,7 @@
 					{#if logo}
 						<img src={logo} alt="" class="w-5 h-5 rounded" />
 					{/if}
-					<span class="text-sm font-semibold text-surface-300">{cl.name}</span>
+					<span class="text-sm font-semibold text-muted-foreground">{cl.name}</span>
 					{#if errors[cl.id]}
 						<Badge variant="error">offline</Badge>
 					{:else}

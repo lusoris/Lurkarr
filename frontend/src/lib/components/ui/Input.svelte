@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cn } from '$lib/lib/utils';
+
 	interface Props {
 		value?: string | number;
 		type?: string;
@@ -24,9 +26,9 @@
 	}: Props = $props();
 </script>
 
-<label class="block space-y-1.5 {className}">
+<label class={cn('block space-y-1.5', className)}>
 	{#if label}
-		<span class="text-sm font-medium text-surface-300">{label}</span>
+		<span class="text-sm font-medium text-foreground">{label}</span>
 	{/if}
 	<input
 		{type}
@@ -34,14 +36,18 @@
 		{disabled}
 		{oninput}
 		bind:value
-		class="w-full rounded-lg border px-3 py-2 text-sm bg-surface-900 text-surface-100
-			placeholder:text-surface-500 transition-colors
-			{error ? 'border-red-500 focus:ring-red-500' : 'border-surface-700 focus:border-lurk-500 focus:ring-lurk-500'}
-			focus:outline-none focus:ring-1 disabled:opacity-50"
+		class={cn(
+			'flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+			'file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground',
+			'placeholder:text-muted-foreground',
+			'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+			'disabled:cursor-not-allowed disabled:opacity-50',
+			error ? 'border-destructive focus-visible:ring-destructive' : 'border-input'
+		)}
 	/>
 	{#if error}
-		<p class="text-xs text-red-400">{error}</p>
+		<p class="text-xs text-destructive">{error}</p>
 	{:else if hint}
-		<p class="text-xs text-surface-500">{hint}</p>
+		<p class="text-xs text-muted-foreground">{hint}</p>
 	{/if}
 </label>

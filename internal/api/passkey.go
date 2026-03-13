@@ -130,9 +130,9 @@ func (h *PasskeyHandler) HandleBeginRegistration(w http.ResponseWriter, r *http.
 	excludeList := make([]protocol.CredentialDescriptor, len(waCreds))
 	for i, c := range waCreds {
 		excludeList[i] = protocol.CredentialDescriptor{
-			Type:            protocol.PublicKeyCredentialType,
-			CredentialID:    c.ID,
-			Transport:       c.Transport,
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: c.ID,
+			Transport:    c.Transport,
 		}
 	}
 

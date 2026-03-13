@@ -183,23 +183,23 @@
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-surface-50">Notifications</h1>
+		<h1 class="text-2xl font-bold text-foreground">Notifications</h1>
 		<Button size="sm" onclick={openAdd}>Add Provider</Button>
 	</div>
 
 	{#if loading}
 		<div class="space-y-4">
 			{#each Array(3) as _}
-				<div class="h-20 rounded-xl bg-surface-800/50 animate-pulse"></div>
+				<div class="h-20 rounded-xl bg-muted/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if providers.length === 0}
 		<Card>
 			<div class="text-center py-8">
-				<svg class="w-12 h-12 mx-auto text-surface-600 mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<svg class="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 				</svg>
-				<p class="text-sm text-surface-500">No notification providers configured</p>
+				<p class="text-sm text-muted-foreground">No notification providers configured</p>
 				<Button size="sm" class="mt-4" onclick={openAdd}>Add Your First Provider</Button>
 			</div>
 		</Card>
@@ -210,13 +210,13 @@
 					<div class="flex flex-col sm:flex-row sm:items-center gap-3">
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-1">
-								<span class="font-medium text-surface-100 truncate">{provider.name}</span>
+								<span class="font-medium text-foreground truncate">{provider.name}</span>
 								<Badge variant={provider.enabled ? 'success' : 'default'}>
 									{provider.enabled ? 'Active' : 'Disabled'}
 								</Badge>
 								<Badge>{providerLabel(provider.type)}</Badge>
 							</div>
-							<p class="text-xs text-surface-500">
+							<p class="text-xs text-muted-foreground">
 								{provider.events.length} event{provider.events.length !== 1 ? 's' : ''} subscribed
 							</p>
 						</div>
@@ -247,14 +247,14 @@
 	<div class="space-y-4">
 		{#if !editing}
 			<label class="block">
-				<span class="block text-sm font-medium text-surface-300 mb-1.5">Provider Type</span>
+				<span class="block text-sm font-medium text-muted-foreground mb-1.5">Provider Type</span>
 				<select
 					bind:value={formType}
 				onchange={() => {
 					const fields = providerTypes.find(p => p.value === formType)?.fields ?? [];
 					formConfig = Object.fromEntries(fields.map(f => [f, '']));
 				}}
-					class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500"
+					class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring"
 				>
 					{#each providerTypes as pt}
 						<option value={pt.value}>{pt.label}</option>
@@ -268,8 +268,8 @@
 
 		<!-- Provider-specific config fields -->
 		{#if selectedProvider}
-			<div class="border-t border-surface-800 pt-4">
-				<h3 class="text-sm font-medium text-surface-300 mb-3">Configuration</h3>
+			<div class="border-t border-border pt-4">
+				<h3 class="text-sm font-medium text-muted-foreground mb-3">Configuration</h3>
 				<div class="space-y-3">
 					{#if formType === 'email'}
 						<!-- Email: group SMTP connection and addresses -->
@@ -300,12 +300,12 @@
 		{/if}
 
 		<!-- Events -->
-		<div class="border-t border-surface-800 pt-4">
+		<div class="border-t border-border pt-4">
 			<div class="flex items-center justify-between mb-3">
-				<h3 class="text-sm font-medium text-surface-300">Events</h3>
+				<h3 class="text-sm font-medium text-muted-foreground">Events</h3>
 				<button
 					onclick={() => formEvents = formEvents.length === allEvents.length ? [] : [...allEvents]}
-					class="text-xs text-lurk-400 hover:text-lurk-300"
+					class="text-xs text-primary hover:text-primary/80"
 				>
 					{formEvents.length === allEvents.length ? 'Deselect all' : 'Select all'}
 				</button>
@@ -313,11 +313,11 @@
 			<div class="space-y-3">
 				{#each eventGroups as group}
 					<div>
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500 mb-1 block">{group.label}</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">{group.label}</span>
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
 							{#each group.events as event}
-								<label class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors hover:bg-surface-800 {formEvents.includes(event) ? 'text-surface-100' : 'text-surface-500'}">
-									<input type="checkbox" checked={formEvents.includes(event)} onchange={() => toggleEvent(event)} class="rounded border-surface-600 text-lurk-600 focus:ring-lurk-500 bg-surface-800" />
+								<label class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors hover:bg-muted {formEvents.includes(event) ? 'text-foreground' : 'text-muted-foreground'}">
+									<input type="checkbox" checked={formEvents.includes(event)} onchange={() => toggleEvent(event)} class="rounded border-border text-primary focus:ring-ring bg-muted" />
 									<span class="font-mono text-xs">{event}</span>
 								</label>
 							{/each}

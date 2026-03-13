@@ -5,6 +5,7 @@
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { RotateCcw } from 'lucide-svelte';
 
 	const toasts = getToasts();
 
@@ -127,14 +128,14 @@
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-surface-50">Dashboard</h1>
+		<h1 class="text-2xl font-bold text-foreground">Dashboard</h1>
 		<div class="flex gap-2">
 			<Badge variant="success">Running</Badge>
 			{#if confirmResetStats}
 				<span class="flex items-center gap-1 text-xs">
-					<span class="text-surface-400">Reset all stats?</span>
-					<button onclick={resetStats} class="rounded px-2 py-1 bg-red-600 text-white text-xs hover:bg-red-500">Yes</button>
-					<button onclick={() => confirmResetStats = false} class="rounded px-2 py-1 bg-surface-700 text-surface-300 text-xs hover:bg-surface-600">No</button>
+				<span class="text-muted-foreground">Reset all stats?</span>
+					<button onclick={resetStats} class="rounded px-2 py-1 bg-destructive text-destructive-foreground text-xs hover:bg-destructive/90">Yes</button>
+					<button onclick={() => confirmResetStats = false} class="rounded px-2 py-1 bg-secondary text-secondary-foreground text-xs hover:bg-secondary/80">No</button>
 				</span>
 			{:else}
 				<Button size="sm" variant="ghost" onclick={() => confirmResetStats = true}>Reset Stats</Button>
@@ -145,7 +146,7 @@
 	{#if loading}
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
 			{#each Array(6) as _}
-				<div class="h-32 rounded-xl bg-surface-800/50 animate-pulse"></div>
+				<div class="h-32 rounded-xl bg-muted/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else}
@@ -161,34 +162,34 @@
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<p class="text-2xl font-bold text-surface-50">{totals.lurked.toLocaleString()}</p>
-							<p class="text-xs text-surface-500 mt-0.5">Lurked</p>
+							<p class="text-2xl font-bold text-foreground">{totals.lurked.toLocaleString()}</p>
+							<p class="text-xs text-muted-foreground mt-0.5">Lurked</p>
 						</div>
 						<div>
-							<p class="text-2xl font-bold text-surface-50">{totals.upgraded.toLocaleString()}</p>
-							<p class="text-xs text-surface-500 mt-0.5">Upgraded</p>
+							<p class="text-2xl font-bold text-foreground">{totals.upgraded.toLocaleString()}</p>
+							<p class="text-xs text-muted-foreground mt-0.5">Upgraded</p>
 						</div>
 					</div>
 					<!-- Per-instance breakdown -->
 					{#if (groupedStats()[appType] ?? []).length > 0}
-						<div class="mt-3 pt-3 border-t border-surface-800 space-y-1.5">
+						<div class="mt-3 pt-3 border-t border-border space-y-1.5">
 							{#each groupedStats()[appType] as s}
 								<div class="flex items-center justify-between text-xs gap-2">
-									<span class="text-surface-400 truncate flex-1">{instanceName(appType, s.instance_id)}</span>
-									<span class="text-surface-300 font-mono shrink-0">{s.lurked} / {s.upgraded}</span>
+									<span class="text-muted-foreground truncate flex-1">{instanceName(appType, s.instance_id)}</span>
+									<span class="text-foreground/80 font-mono shrink-0">{s.lurked} / {s.upgraded}</span>
 									{#if confirmResetInstance === `${appType}:${s.instance_id}`}
 										<span class="flex items-center gap-1 shrink-0">
-											<button onclick={() => resetInstance(appType, s.instance_id)} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
-											<button onclick={() => confirmResetInstance = null} class="rounded px-1.5 py-0.5 bg-surface-700 text-surface-300 text-[10px] hover:bg-surface-600">No</button>
+											<button onclick={() => resetInstance(appType, s.instance_id)} class="rounded px-1.5 py-0.5 bg-destructive text-destructive-foreground text-[10px] hover:bg-destructive/90">Yes</button>
+											<button onclick={() => confirmResetInstance = null} class="rounded px-1.5 py-0.5 bg-secondary text-secondary-foreground text-[10px] hover:bg-secondary/80">No</button>
 										</span>
 									{:else}
 										<button
 											onclick={() => confirmResetInstance = `${appType}:${s.instance_id}`}
 											disabled={resettingInstance === `${appType}:${s.instance_id}`}
-											class="shrink-0 text-surface-500 hover:text-surface-200 transition-colors disabled:opacity-50"
+											class="shrink-0 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
 											title="Reset state for this instance"
 										>
-											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+											<RotateCcw class="h-3.5 w-3.5" />
 										</button>
 									{/if}
 								</div>
@@ -201,13 +202,13 @@
 
 		{#if Object.keys(appTotals()).length === 0}
 			<Card>
-				<p class="text-sm text-surface-500 text-center py-8">No stats yet — configure app instances to get started</p>
+			<p class="text-sm text-muted-foreground text-center py-8">No stats yet — configure app instances to get started</p>
 			</Card>
 		{/if}
 
 		<!-- Hourly Caps -->
 		{#if caps.length > 0}
-			<h2 class="text-lg font-semibold text-surface-200 mt-8">Hourly API Usage</h2>
+			<h2 class="text-lg font-semibold text-foreground/80 mt-8">Hourly API Usage</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 				{#each caps as cap}
 					<Card>
@@ -216,9 +217,9 @@
 						<span class="text-sm {appColor(cap.app_type)}">
 								{appDisplayName(cap.app_type)}
 								</span>
-								<span class="text-xs text-surface-500 ml-2">{instanceName(cap.app_type, cap.instance_id)}</span>
+								<span class="text-xs text-muted-foreground ml-2">{instanceName(cap.app_type, cap.instance_id)}</span>
 							</div>
-							<span class="text-lg font-mono font-bold text-surface-100">{cap.api_hits}</span>
+							<span class="text-lg font-mono font-bold text-foreground">{cap.api_hits}</span>
 						</div>
 					</Card>
 				{/each}
@@ -227,7 +228,7 @@
 
 		<!-- Seerr -->
 		{#if seerrCount !== null}
-			<h2 class="text-lg font-semibold text-surface-200 mt-8">Services</h2>
+			<h2 class="text-lg font-semibold text-foreground/80 mt-8">Services</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 				<Card>
 					<div class="flex items-center justify-between mb-3">
@@ -235,8 +236,8 @@
 						<Badge variant="info">Connected</Badge>
 					</div>
 					<div>
-						<p class="text-2xl font-bold text-surface-50">{seerrCount.toLocaleString()}</p>
-						<p class="text-xs text-surface-500 mt-0.5">Pending Requests</p>
+						<p class="text-2xl font-bold text-foreground">{seerrCount.toLocaleString()}</p>
+						<p class="text-xs text-muted-foreground mt-0.5">Pending Requests</p>
 					</div>
 				</Card>
 			</div>

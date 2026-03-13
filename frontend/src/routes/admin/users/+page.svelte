@@ -115,7 +115,7 @@
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-surface-50">User Management</h1>
+		<h1 class="text-2xl font-bold text-foreground">User Management</h1>
 		<Button onclick={() => showCreate = true}>
 			<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
 			Add User
@@ -125,19 +125,19 @@
 	{#if loading}
 		<div class="space-y-3">
 			{#each Array(3) as _}
-				<div class="h-14 rounded-xl bg-surface-800/50 animate-pulse"></div>
+				<div class="h-14 rounded-xl bg-muted/50 animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if users.length === 0}
 		<Card>
-			<p class="text-sm text-surface-500 text-center py-4">No users found</p>
+			<p class="text-sm text-muted-foreground text-center py-4">No users found</p>
 		</Card>
 	{:else}
 		<Card>
 			<div class="overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead>
-						<tr class="border-b border-surface-700 text-left text-surface-400">
+						<tr class="border-b border-border text-left text-muted-foreground">
 							<th class="pb-3 pr-4 font-medium">Username</th>
 							<th class="pb-3 pr-4 font-medium">Provider</th>
 							<th class="pb-3 pr-4 font-medium">Role</th>
@@ -146,28 +146,28 @@
 							<th class="pb-3 font-medium text-right">Actions</th>
 						</tr>
 					</thead>
-					<tbody class="text-surface-200">
+					<tbody class="text-foreground">
 						{#each users as u}
-							<tr class="border-b border-surface-800/50 last:border-0">
+							<tr class="border-b border-border/50 last:border-0">
 								<td class="py-3 pr-4 font-medium">{u.username}</td>
 								<td class="py-3 pr-4">
-									<span class="px-2 py-0.5 rounded text-xs bg-surface-800 text-surface-300">{u.auth_provider}</span>
+									<span class="px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">{u.auth_provider}</span>
 								</td>
 								<td class="py-3 pr-4">
 									{#if u.is_admin}
 										<span class="px-2 py-0.5 rounded text-xs bg-lurk-600/20 text-lurk-400 font-medium">Admin</span>
 									{:else}
-										<span class="text-surface-500 text-xs">User</span>
+										<span class="text-muted-foreground text-xs">User</span>
 									{/if}
 								</td>
 								<td class="py-3 pr-4">
 									{#if u.has_2fa}
 										<svg class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
 									{:else}
-										<span class="text-surface-600">—</span>
+										<span class="text-muted-foreground/50">—</span>
 									{/if}
 								</td>
-								<td class="py-3 pr-4 text-xs text-surface-400">{new Date(u.created_at).toLocaleDateString()}</td>
+								<td class="py-3 pr-4 text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
 								<td class="py-3 text-right">
 									<div class="flex items-center justify-end gap-1">
 										<Button variant="ghost" size="sm" onclick={() => toggleAdmin(u.id, u.is_admin)}>
@@ -193,8 +193,8 @@
 	<div class="space-y-4">
 		<Input bind:value={newUsername} label="Username" placeholder="Enter username" />
 		<Input bind:value={newPassword} type="password" label="Password" placeholder="Min 8 chars, upper + lower + digit" />
-		<label class="flex items-center gap-2 text-sm text-surface-300">
-			<input type="checkbox" bind:checked={newIsAdmin} class="rounded border-surface-600 bg-surface-800 text-lurk-500 focus:ring-lurk-500" />
+		<label class="flex items-center gap-2 text-sm text-muted-foreground">
+			<input type="checkbox" bind:checked={newIsAdmin} class="rounded border-border bg-muted text-primary focus:ring-ring" />
 			Admin privileges
 		</label>
 		<div class="flex gap-2">

@@ -368,26 +368,29 @@
 <div class="space-y-8">
 	<!-- ── Header with Add Dropdown ──────────────────────── -->
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-surface-50">Connections</h1>
+		<h1 class="text-2xl font-bold text-foreground">Connections</h1>
 		<div class="relative">
 			<Button size="sm" onclick={(e) => { e.stopPropagation(); showAddDropdown = !showAddDropdown; }}>
 				<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
 				Add Connection
 			</Button>
 			{#if showAddDropdown}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class="absolute right-0 top-full mt-2 w-56 rounded-xl border border-surface-700 bg-surface-800 shadow-xl shadow-black/30 z-50 overflow-hidden"
+					class="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-muted shadow-xl shadow-black/30 z-50 overflow-hidden"
 					role="menu"
+					tabindex="-1"
 					onclick={(e) => e.stopPropagation()}
+					onkeydown={(e) => { if (e.key === 'Escape') showAddDropdown = false; }}
 				>
 					<!-- Arr Apps -->
 					<div class="px-3 pt-3 pb-1">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Arr Apps</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Arr Apps</span>
 					</div>
 					{#each visibleAppTypes as app}
 						{@const logo = appLogo(app)}
 						<button
-							class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+						class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
 							onclick={() => openAddArr(app)}
 							role="menuitem"
 						>
@@ -398,16 +401,16 @@
 						</button>
 					{/each}
 
-					<div class="mx-3 border-t border-surface-700"></div>
+					<div class="mx-3 border-t border-border"></div>
 
 					<!-- Download Clients -->
 					<div class="px-3 pt-3 pb-1">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Download Clients</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Download Clients</span>
 					</div>
 					{#each clientTypes as ct}
 						{@const logo = appLogo(ct)}
 						<button
-							class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+						class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
 							onclick={() => openAddDl(ct)}
 							role="menuitem"
 						>
@@ -418,14 +421,14 @@
 						</button>
 					{/each}
 
-					<div class="mx-3 border-t border-surface-700"></div>
+					<div class="mx-3 border-t border-border"></div>
 
 					<!-- Services -->
 					<div class="px-3 pt-3 pb-1">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Services</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Services</span>
 					</div>
 					<button
-						class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+					class="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
 						onclick={() => { showAddDropdown = false; showProwlarrModal = true; }}
 						role="menuitem"
 					>
@@ -433,7 +436,7 @@
 						<span>Prowlarr</span>
 					</button>
 					<button
-						class="flex items-center gap-2.5 w-full px-3 py-2 pb-3 text-sm text-surface-200 hover:bg-surface-700/50 hover:text-surface-50 transition-colors"
+					class="flex items-center gap-2.5 w-full px-3 py-2 pb-3 text-sm text-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
 						onclick={() => { showAddDropdown = false; showSeerrModal = true; }}
 						role="menuitem"
 					>
@@ -450,20 +453,20 @@
 		<div class="space-y-6">
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 				{#each Array(6) as _}
-					<div class="h-28 rounded-xl bg-surface-800/50 animate-pulse"></div>
+					<div class="h-28 rounded-xl bg-muted/50 animate-pulse"></div>
 				{/each}
 			</div>
 		</div>
 	{:else if !hasAnything}
 		<!-- ── Empty state ──────────────────────────────────── -->
 		<div class="flex flex-col items-center justify-center py-20 text-center">
-			<div class="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
-				<svg class="w-8 h-8 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<div class="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+				<svg class="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
 				</svg>
 			</div>
-			<h2 class="text-lg font-semibold text-surface-200 mb-1">No connections yet</h2>
-			<p class="text-sm text-surface-500 max-w-sm mb-6">Add your first Arr app, download client, or service to get started with Lurkarr.</p>
+			<h2 class="text-lg font-semibold text-foreground mb-1">No connections yet</h2>
+			<p class="text-sm text-muted-foreground max-w-sm mb-6">Add your first Arr app, download client, or service to get started with Lurkarr.</p>
 			<Button onclick={(e) => { e.stopPropagation(); showAddDropdown = !showAddDropdown; }}>
 				<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
 				Add Connection
@@ -473,7 +476,7 @@
 		<!-- ── Arr Apps (only populated) ────────────────────── -->
 		{#if hasAnyArrApps}
 			<section>
-				<h2 class="text-lg font-semibold text-surface-200 mb-4">Arr Apps</h2>
+				<h2 class="text-lg font-semibold text-foreground mb-4">Arr Apps</h2>
 				{#each populatedArrApps as app}
 					{@const appInstances = app === 'whisparr'
 						? [...(instances['whisparr'] ?? []), ...(instances['eros'] ?? [])]
@@ -486,24 +489,24 @@
 								<img src={logo} alt={appDisplayName(app)} class="w-5 h-5 rounded" />
 							{/if}
 							{#if website}
-								<a href={website} target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-surface-300 hover:text-lurk-400 transition-colors">
+								<a href={website} target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors">
 									{appDisplayName(app)}
 								</a>
 							{:else}
-								<span class="text-sm font-semibold text-surface-300">{appDisplayName(app)}</span>
+								<span class="text-sm font-semibold text-muted-foreground">{appDisplayName(app)}</span>
 							{/if}
-							<span class="text-xs text-surface-600">({appInstances.length})</span>
+							<span class="text-xs text-muted-foreground/50">({appInstances.length})</span>
 						</div>
 						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 							{#each appInstances as inst}
 								{@const instLogo = appLogo(inst.app_type)}
-								<Card class="!p-4 cursor-pointer hover:border-surface-600 transition-colors" onclick={() => openEditArr(inst)}>
+								<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors" onclick={() => openEditArr(inst)}>
 									<div class="flex items-start justify-between gap-2 mb-2">
 										<div class="flex items-center gap-2 min-w-0">
 											{#if instLogo && app === 'whisparr'}
 												<img src={instLogo} alt="" class="w-5 h-5 rounded shrink-0" />
 											{/if}
-											<span class="font-medium text-sm text-surface-100 truncate">{inst.name}</span>
+											<span class="font-medium text-sm text-foreground truncate">{inst.name}</span>
 											{#if app === 'whisparr'}
 												<span class="text-[10px] {appColor(inst.app_type)} shrink-0">({inst.app_type === 'eros' ? 'v3' : 'v2'})</span>
 											{/if}
@@ -521,10 +524,10 @@
 												</span>
 											{/if}
 										{:else}
-											<span class="w-3 h-3 rounded-full border-2 border-surface-600 border-t-surface-400 animate-spin shrink-0"></span>
+											<span class="w-3 h-3 rounded-full border-2 border-muted-foreground/50 border-t-muted-foreground animate-spin shrink-0"></span>
 										{/if}
 									</div>
-									<p class="text-xs text-surface-500 truncate mb-1">{inst.api_url}</p>
+									<p class="text-xs text-muted-foreground truncate mb-1">{inst.api_url}</p>
 									<Badge variant={inst.enabled ? 'success' : 'error'}>
 										{inst.enabled ? 'Enabled' : 'Disabled'}
 									</Badge>
@@ -539,17 +542,17 @@
 		<!-- ── Download Clients (only if populated) ─────────── -->
 		{#if hasAnyDlClients}
 			<section>
-				<h2 class="text-lg font-semibold text-surface-200 mb-4">Download Clients</h2>
+				<h2 class="text-lg font-semibold text-foreground mb-4">Download Clients</h2>
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 					{#each dlClients as dl}
 						{@const logo = appLogo(dl.client_type)}
-						<Card class="!p-4 cursor-pointer hover:border-surface-600 transition-colors" onclick={() => openEditDl(dl)}>
+						<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors" onclick={() => openEditDl(dl)}>
 							<div class="flex items-start justify-between gap-2 mb-2">
 								<div class="flex items-center gap-2 min-w-0">
 									{#if logo}
 										<img src={logo} alt="" class="w-5 h-5 rounded shrink-0" />
 									{/if}
-									<span class="font-medium text-sm text-surface-100 truncate">{dl.name}</span>
+										<span class="font-medium text-sm text-foreground truncate">{dl.name}</span>
 								</div>
 								{#if dl.enabled && dlHealthStatus[dl.id]}
 									{#if dlHealthStatus[dl.id].status === 'ok'}
@@ -564,16 +567,16 @@
 										</span>
 									{/if}
 								{:else if dl.enabled}
-									<span class="w-3 h-3 rounded-full border-2 border-surface-600 border-t-surface-400 animate-spin shrink-0"></span>
+										<span class="w-3 h-3 rounded-full border-2 border-muted-foreground/50 border-t-muted-foreground animate-spin shrink-0"></span>
 								{/if}
 							</div>
 							<div class="flex items-center gap-2 mb-1">
 								<Badge variant="info">{appDisplayName(dl.client_type)}</Badge>
 								{#if dl.category}
-									<span class="text-[10px] text-surface-500">cat: {dl.category}</span>
+										<span class="text-[10px] text-muted-foreground">cat: {dl.category}</span>
 								{/if}
 							</div>
-							<p class="text-xs text-surface-500 truncate mb-1">{dl.url}</p>
+							<p class="text-xs text-muted-foreground truncate mb-1">{dl.url}</p>
 							<Badge variant={dl.enabled ? 'success' : 'error'}>
 								{dl.enabled ? 'Enabled' : 'Disabled'}
 							</Badge>
@@ -586,44 +589,44 @@
 
 	<!-- ── Services (always shown) ───────────────────────── -->
 	<section>
-		<h2 class="text-lg font-semibold text-surface-200 mb-4">Services</h2>
+		<h2 class="text-lg font-semibold text-foreground mb-4">Services</h2>
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 			<!-- Prowlarr card -->
-			<Card class="!p-4 cursor-pointer hover:border-surface-600 transition-colors" onclick={() => showProwlarrModal = true}>
+			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors" onclick={() => showProwlarrModal = true}>
 				<div class="flex items-start justify-between gap-2 mb-2">
 					<div class="flex items-center gap-2">
 						<img src={appLogo('prowlarr')} alt="Prowlarr" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-surface-100">Prowlarr</span>
+						<span class="font-medium text-sm text-foreground">Prowlarr</span>
 					</div>
 					<Badge variant={prowlarr?.enabled ? 'success' : 'error'}>
 						{prowlarr?.enabled ? 'Enabled' : 'Disabled'}
 					</Badge>
 				</div>
 				{#if prowlarr?.url}
-					<p class="text-xs text-surface-500 truncate mb-1">{prowlarr.url}</p>
+					<p class="text-xs text-muted-foreground truncate mb-1">{prowlarr.url}</p>
 				{:else}
-					<p class="text-xs text-surface-600 mb-1">Not configured</p>
+					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
 				{/if}
-				<p class="text-[10px] text-surface-600">Indexer manager</p>
+				<p class="text-[10px] text-muted-foreground/50">Indexer manager</p>
 			</Card>
 
 			<!-- Seerr card -->
-			<Card class="!p-4 cursor-pointer hover:border-surface-600 transition-colors" onclick={() => showSeerrModal = true}>
+			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors" onclick={() => showSeerrModal = true}>
 				<div class="flex items-start justify-between gap-2 mb-2">
 					<div class="flex items-center gap-2">
 						<img src={appLogo('seerr')} alt="Seerr" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-surface-100">Seerr</span>
+						<span class="font-medium text-sm text-foreground">Seerr</span>
 					</div>
 					<Badge variant={seerr?.enabled ? 'success' : 'error'}>
 						{seerr?.enabled ? 'Enabled' : 'Disabled'}
 					</Badge>
 				</div>
 				{#if seerr?.url}
-					<p class="text-xs text-surface-500 truncate mb-1">{seerr.url}</p>
+					<p class="text-xs text-muted-foreground truncate mb-1">{seerr.url}</p>
 				{:else}
-					<p class="text-xs text-surface-600 mb-1">Not configured</p>
+					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
 				{/if}
-				<p class="text-[10px] text-surface-600">Request management</p>
+				<p class="text-[10px] text-muted-foreground/50">Request management</p>
 			</Card>
 		</div>
 	</section>
@@ -634,8 +637,8 @@
 	<form onsubmit={(e: Event) => { e.preventDefault(); saveArrInstance(); }} class="space-y-4">
 		{#if modalApp === 'whisparr'}
 			<label class="block">
-				<span class="block text-sm font-medium text-surface-300 mb-1.5">Version</span>
-				<select bind:value={whisparrVersion} disabled={!!editingInstance} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500 disabled:opacity-50">
+				<span class="block text-sm font-medium text-muted-foreground mb-1.5">Version</span>
+				<select bind:value={whisparrVersion} disabled={!!editingInstance} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring disabled:opacity-50">
 					<option value="whisparr">v2</option>
 					<option value="eros">v3</option>
 				</select>
@@ -669,8 +672,8 @@
 	<form onsubmit={(e: Event) => { e.preventDefault(); saveDlClient(); }} class="space-y-4">
 		<Input bind:value={dlForm.name} label="Name" placeholder="My {appDisplayName(dlForm.client_type)}" />
 		<label class="block">
-			<span class="block text-sm font-medium text-surface-300 mb-1.5">Client Type</span>
-			<select bind:value={dlForm.client_type} disabled={!!editingDl} class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500 disabled:opacity-50">
+			<span class="block text-sm font-medium text-muted-foreground mb-1.5">Client Type</span>
+			<select bind:value={dlForm.client_type} disabled={!!editingDl} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring disabled:opacity-50">
 				{#each clientTypes as ct}
 					<option value={ct}>{appDisplayName(ct)}</option>
 				{/each}
@@ -725,7 +728,7 @@
 			</div>
 		</div>
 	{:else}
-		<p class="text-sm text-surface-500 text-center py-4">Loading Prowlarr settings...</p>
+		<p class="text-sm text-muted-foreground text-center py-4">Loading Prowlarr settings...</p>
 	{/if}
 </Modal>
 
@@ -744,6 +747,6 @@
 			</div>
 		</div>
 	{:else}
-		<p class="text-sm text-surface-500 text-center py-4">Loading Seerr settings...</p>
+		<p class="text-sm text-muted-foreground text-center py-4">Loading Seerr settings...</p>
 	{/if}
 </Modal>
