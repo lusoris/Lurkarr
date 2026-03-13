@@ -92,7 +92,8 @@
 		formType = 'discord';
 		formName = '';
 		formEnabled = true;
-		formConfig = {};
+		const defaultFields = providerTypes.find(p => p.value === 'discord')?.fields ?? [];
+		formConfig = Object.fromEntries(defaultFields.map(f => [f, '']));
 		formEvents = [...allEvents];
 		showModal = true;
 	}
@@ -102,7 +103,8 @@
 		formType = p.type;
 		formName = p.name;
 		formEnabled = p.enabled;
-		formConfig = { ...p.config };
+		const fields = providerTypes.find(pt => pt.value === p.type)?.fields ?? [];
+		formConfig = Object.fromEntries(fields.map(f => [f, p.config[f] ?? '']));
 		formEvents = [...p.events];
 		showModal = true;
 	}
@@ -241,7 +243,10 @@
 				<span class="block text-sm font-medium text-surface-300 mb-1.5">Provider Type</span>
 				<select
 					bind:value={formType}
-					onchange={() => formConfig = {}}
+				onchange={() => {
+					const fields = providerTypes.find(p => p.value === formType)?.fields ?? [];
+					formConfig = Object.fromEntries(fields.map(f => [f, '']));
+				}}
 					class="w-full rounded-lg border border-surface-700 bg-surface-900 text-surface-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-lurk-500 focus:ring-lurk-500"
 				>
 					{#each providerTypes as pt}
