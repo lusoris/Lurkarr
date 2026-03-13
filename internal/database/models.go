@@ -410,3 +410,25 @@ func (d *DownloadClientInstance) MaskedPassword() string {
 	}
 	return "****"
 }
+
+// OIDCSettings holds OIDC/SSO configuration.
+type OIDCSettings struct {
+	Enabled      bool      `json:"enabled"`
+	IssuerURL    string    `json:"issuer_url"`
+	ClientID     string    `json:"client_id"`
+	ClientSecret string    `json:"client_secret"`
+	RedirectURL  string    `json:"redirect_url"`
+	Scopes       string    `json:"scopes"`
+	AutoCreate   bool      `json:"auto_create"`
+	AdminGroup   string    `json:"admin_group"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// MaskedClientSecret returns the OIDC client secret masked for display.
+func (o *OIDCSettings) MaskedClientSecret() string {
+	if len(o.ClientSecret) <= 4 {
+		return "****"
+	}
+	return "****" + o.ClientSecret[len(o.ClientSecret)-4:]
+}

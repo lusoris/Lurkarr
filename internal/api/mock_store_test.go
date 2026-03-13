@@ -520,6 +520,21 @@ func (mr *MockStoreMockRecorder) GetNotificationProvider(ctx, id any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotificationProvider", reflect.TypeOf((*MockStore)(nil).GetNotificationProvider), ctx, id)
 }
 
+// GetOIDCSettings mocks base method.
+func (m *MockStore) GetOIDCSettings(ctx context.Context) (*database.OIDCSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOIDCSettings", ctx)
+	ret0, _ := ret[0].(*database.OIDCSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOIDCSettings indicates an expected call of GetOIDCSettings.
+func (mr *MockStoreMockRecorder) GetOIDCSettings(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOIDCSettings", reflect.TypeOf((*MockStore)(nil).GetOIDCSettings), ctx)
+}
+
 // GetProwlarrSettings mocks base method.
 func (m *MockStore) GetProwlarrSettings(ctx context.Context) (*database.ProwlarrSettings, error) {
 	m.ctrl.T.Helper()
@@ -988,6 +1003,20 @@ func (m *MockStore) UpdateNotificationProvider(ctx context.Context, p *database.
 func (mr *MockStoreMockRecorder) UpdateNotificationProvider(ctx, p any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNotificationProvider", reflect.TypeOf((*MockStore)(nil).UpdateNotificationProvider), ctx, p)
+}
+
+// UpdateOIDCSettings mocks base method.
+func (m *MockStore) UpdateOIDCSettings(ctx context.Context, s *database.OIDCSettings) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateOIDCSettings", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateOIDCSettings indicates an expected call of UpdateOIDCSettings.
+func (mr *MockStoreMockRecorder) UpdateOIDCSettings(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOIDCSettings", reflect.TypeOf((*MockStore)(nil).UpdateOIDCSettings), ctx, s)
 }
 
 // UpdatePassword mocks base method.

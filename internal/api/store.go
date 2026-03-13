@@ -114,6 +114,10 @@ type Store interface {
 	GetSeerrSettings(ctx context.Context) (*database.SeerrSettings, error)
 	UpdateSeerrSettings(ctx context.Context, s *database.SeerrSettings) error
 
+	// OIDC
+	GetOIDCSettings(ctx context.Context) (*database.OIDCSettings, error)
+	UpdateOIDCSettings(ctx context.Context, s *database.OIDCSettings) error
+
 	// WebAuthn Credentials
 	CreateWebAuthnCredential(ctx context.Context, c *database.WebAuthnCredential) error
 	ListWebAuthnCredentials(ctx context.Context, userID uuid.UUID) ([]database.WebAuthnCredential, error)

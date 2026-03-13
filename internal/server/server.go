@@ -137,6 +137,7 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	dlClientH := &api.DownloadClientHandler{DB: db}
 	sessionH := &api.SessionHandler{DB: db}
 	adminH := &api.AdminHandler{DB: db}
+	oidcSettingsH := &api.OIDCSettingsHandler{DB: db}
 
 	// WebAuthn / Passkeys
 	var passkeyH *api.PasskeyHandler
@@ -175,27 +176,60 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 		mux.Handle("POST /api/auth/passkey/login/finish", middleware.RateLimit(loginRL)(http.HandlerFunc(passkeyH.HandleFinishLogin)))
 	}
 
-	// --- OIDC routes (public, no auth) ---
+	// --- Seed OIDC settings from env vars if DB row is empty ---
 	if cfg.OIDCEnabled {
-		oidcH := auth.NewOIDCHandler(auth.OIDCConfig{
-			Enabled:      cfg.OIDCEnabled,
-			IssuerURL:    cfg.OIDCIssuerURL,
-			ClientID:     cfg.OIDCClientID,
-			ClientSecret: cfg.OIDCClientSecret,
-			RedirectURL:  cfg.OIDCRedirectURL,
-			Scopes:       cfg.OIDCScopes,
-			AutoCreate:   cfg.OIDCAutoCreate,
-			AdminGroup:   cfg.OIDCAdminGroup,
-		}, db, authMw)
-		mux.HandleFunc("GET /api/auth/oidc/login", oidcH.HandleLogin)
-		mux.HandleFunc("GET /api/auth/oidc/callback", oidcH.HandleCallback)
+		oidcDB, _ := db.GetOIDCSettings(context.Background())
+		if oidcDB != nil && oidcDB.IssuerURL == "" {
+			oidcDB.Enabled = cfg.OIDCEnabled
+			oidcDB.IssuerURL = cfg.OIDCIssuerURL
+			oidcDB.ClientID = cfg.OIDCClientID
+			oidcDB.ClientSecret = cfg.OIDCClientSecret
+			oidcDB.RedirectURL = cfg.OIDCRedirectURL
+			oidcDB.AutoCreate = cfg.OIDCAutoCreate
+			oidcDB.AdminGroup = cfg.OIDCAdminGroup
+			if len(cfg.OIDCScopes) > 0 {
+				oidcDB.Scopes = strings.Join(cfg.OIDCScopes, ",")
+			}
+			_ = db.UpdateOIDCSettings(context.Background(), oidcDB)
+			slog.Info("seeded OIDC settings from environment variables")
+		}
 	}
+
+	// --- OIDC routes (always registered, handler checks if enabled) ---
+	oidcH := auth.NewOIDCHandler(auth.OIDCConfig{}, db, authMw)
+	oidcH.ConfigLoader = func() (*auth.OIDCConfig, error) {
+		s, err := db.GetOIDCSettings(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		var scopes []string
+		for _, sc := range strings.Split(s.Scopes, ",") {
+			sc = strings.TrimSpace(sc)
+			if sc != "" {
+				scopes = append(scopes, sc)
+			}
+		}
+		return &auth.OIDCConfig{
+			Enabled:      s.Enabled,
+			IssuerURL:    s.IssuerURL,
+			ClientID:     s.ClientID,
+			ClientSecret: s.ClientSecret,
+			RedirectURL:  s.RedirectURL,
+			Scopes:       scopes,
+			AutoCreate:   s.AutoCreate,
+			AdminGroup:   s.AdminGroup,
+		}, nil
+	}
+	mux.HandleFunc("GET /api/auth/oidc/login", oidcH.HandleLogin)
+	mux.HandleFunc("GET /api/auth/oidc/callback", oidcH.HandleCallback)
+
 	mux.HandleFunc("GET /api/auth/oidc/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if cfg.OIDCEnabled {
-			_, _ = w.Write([]byte(`{"enabled":true}`))
-		} else {
+		s, err := db.GetOIDCSettings(r.Context())
+		if err != nil || !s.Enabled {
 			_, _ = w.Write([]byte(`{"enabled":false}`))
+		} else {
+			_, _ = w.Write([]byte(`{"enabled":true}`))
 		}
 	})
 
@@ -367,6 +401,10 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("POST /api/seerr/test", seerrH.HandleTestConnection)
 	protected.HandleFunc("GET /api/seerr/requests", seerrH.HandleGetRequests)
 	protected.HandleFunc("GET /api/seerr/requests/count", seerrH.HandleGetRequestCount)
+
+	// OIDC Settings
+	protected.HandleFunc("GET /api/oidc/settings", oidcSettingsH.HandleGetSettings)
+	protected.HandleFunc("PUT /api/oidc/settings", oidcSettingsH.HandleUpdateSettings)
 
 	// Mount protected routes with auth + CSRF + token injection
 	mux.Handle("/api/", authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected))))

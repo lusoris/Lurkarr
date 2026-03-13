@@ -19,11 +19,25 @@
 		min_download_queue_size: number;
 	}
 
+	interface OIDCSettings {
+		enabled: boolean;
+		issuer_url: string;
+		client_id: string;
+		client_secret: string;
+		redirect_url: string;
+		scopes: string;
+		auto_create: boolean;
+		admin_group: string;
+	}
+
 	let general = $state<GeneralSettings | null>(null);
+	let oidc = $state<OIDCSettings | null>(null);
 	let saving = $state(false);
+	let savingOIDC = $state(false);
 
 	async function load() {
 		api.get<GeneralSettings>('/settings/general').then(r => general = r).catch(() => {});
+		api.get<OIDCSettings>('/oidc/settings').then(r => oidc = r).catch(() => {});
 	}
 
 	async function saveGeneral() {
@@ -36,6 +50,19 @@
 			toasts.error('Failed to save general settings');
 		}
 		saving = false;
+	}
+
+	async function saveOIDC() {
+		if (!oidc) return;
+		savingOIDC = true;
+		try {
+			const result = await api.put<OIDCSettings>('/oidc/settings', oidc);
+			oidc = result;
+			toasts.success('OIDC settings saved');
+		} catch {
+			toasts.error('Failed to save OIDC settings');
+		}
+		savingOIDC = false;
 	}
 
 	$effect(() => { load(); });
@@ -90,6 +117,48 @@
 				<div class="h-20 rounded-xl bg-surface-800/50 animate-pulse"></div>
 			{/each}
 		</div>
+	</Card>
+	{/if}
+
+	<!-- ── OIDC / SSO ───────────────────────────────────── -->
+	<h2 class="text-xl font-bold text-surface-50 mt-2">Single Sign-On (OIDC)</h2>
+
+	{#if oidc}
+	<Card>
+		<h2 class="text-lg font-semibold text-surface-200 mb-1">OpenID Connect Provider</h2>
+		<p class="text-xs text-surface-500 mb-4">Configure an OIDC provider (Authentik, Keycloak, Authelia, etc.) for SSO login.</p>
+		<div class="space-y-4">
+			<Toggle bind:checked={oidc.enabled} label="Enable OIDC" hint="Allow users to sign in via the configured OIDC provider" />
+
+			{#if oidc.enabled}
+			<Input bind:value={oidc.issuer_url} type="text" label="Issuer URL" hint="The OIDC provider's issuer URL (e.g. https://auth.example.com/application/o/lurkarr/)" />
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				<Input bind:value={oidc.client_id} type="text" label="Client ID" hint="OAuth2 client ID from your OIDC provider" />
+				<Input bind:value={oidc.client_secret} type="password" label="Client Secret" hint="OAuth2 client secret" />
+			</div>
+			<Input bind:value={oidc.redirect_url} type="text" label="Redirect URL" hint="Callback URL — usually https://your-domain/api/auth/oidc/callback" />
+			<Input bind:value={oidc.scopes} type="text" label="Scopes" hint="Comma-separated scopes (default: openid,profile,email)" />
+			{/if}
+		</div>
+	</Card>
+
+	{#if oidc.enabled}
+	<Card>
+		<h2 class="text-lg font-semibold text-surface-200 mb-1">User Management</h2>
+		<p class="text-xs text-surface-500 mb-4">Control how OIDC users are provisioned.</p>
+		<div class="space-y-4">
+			<Toggle bind:checked={oidc.auto_create} label="Auto-Create Users" hint="Automatically create local accounts for new OIDC users on first login" />
+			<Input bind:value={oidc.admin_group} type="text" label="Admin Group" hint="OIDC group claim value that grants admin privileges (leave empty to disable)" />
+		</div>
+	</Card>
+	{/if}
+
+	<div class="flex justify-end">
+		<Button onclick={saveOIDC} loading={savingOIDC}>Save OIDC Settings</Button>
+	</div>
+	{:else}
+	<Card>
+		<div class="h-20 rounded-xl bg-surface-800/50 animate-pulse"></div>
 	</Card>
 	{/if}
 </div>

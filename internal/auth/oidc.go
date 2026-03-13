@@ -48,6 +48,13 @@ type OIDCHandler struct {
 	initOnce     sync.Once
 	initErr      error
 
+	// ConfigLoader optionally loads config from DB (overrides static Config).
+	ConfigLoader func() (*OIDCConfig, error)
+
+	// Tracks the issuer URL used for the current provider so we can re-init on change.
+	currentIssuer string
+	providerMu    sync.RWMutex
+
 	// CSRF state storage (in-memory, short-lived).
 	states   map[string]time.Time
 	statesMu sync.Mutex
@@ -63,27 +70,72 @@ func NewOIDCHandler(cfg OIDCConfig, db OIDCStore, authMw *Middleware) *OIDCHandl
 	}
 }
 
+// loadConfig returns the effective OIDC config, preferring DB if a loader is set.
+func (h *OIDCHandler) loadConfig() OIDCConfig {
+	if h.ConfigLoader != nil {
+		cfg, err := h.ConfigLoader()
+		if err != nil {
+			slog.Warn("failed to load OIDC config from DB, using static config", "error", err)
+			return h.Config
+		}
+		return *cfg
+	}
+	return h.Config
+}
+
 // Init lazily initializes the OIDC provider (requires network call to issuer).
 func (h *OIDCHandler) Init(ctx context.Context) error {
-	h.initOnce.Do(func() {
-		provider, err := oidc.NewProvider(ctx, h.Config.IssuerURL)
-		if err != nil {
-			h.initErr = fmt.Errorf("oidc provider discovery: %w", err)
-			return
-		}
-		h.provider = provider
-		h.verifier = provider.Verifier(&oidc.Config{ClientID: h.Config.ClientID})
+	cfg := h.loadConfig()
+	if !cfg.Enabled || cfg.IssuerURL == "" {
+		return fmt.Errorf("oidc not enabled or issuer URL not configured")
+	}
+
+	h.providerMu.RLock()
+	sameIssuer := h.currentIssuer == cfg.IssuerURL && h.provider != nil
+	h.providerMu.RUnlock()
+
+	if sameIssuer {
+		// Update oauth2Config in case other fields changed (client ID, secret, etc.).
+		h.providerMu.Lock()
 		h.oauth2Config = &oauth2.Config{
-			ClientID:     h.Config.ClientID,
-			ClientSecret: h.Config.ClientSecret,
-			RedirectURL:  h.Config.RedirectURL,
-			Endpoint:     provider.Endpoint(),
-			Scopes:       h.Config.Scopes,
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			RedirectURL:  cfg.RedirectURL,
+			Endpoint:     h.provider.Endpoint(),
+			Scopes:       cfg.Scopes,
 		}
-		// Start state cleanup goroutine.
+		h.verifier = h.provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+		h.Config = cfg
+		h.providerMu.Unlock()
+		return nil
+	}
+
+	// Issuer changed or first init — do provider discovery.
+	h.providerMu.Lock()
+	defer h.providerMu.Unlock()
+
+	provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
+	if err != nil {
+		return fmt.Errorf("oidc provider discovery: %w", err)
+	}
+	h.provider = provider
+	h.currentIssuer = cfg.IssuerURL
+	h.verifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+	h.oauth2Config = &oauth2.Config{
+		ClientID:     cfg.ClientID,
+		ClientSecret: cfg.ClientSecret,
+		RedirectURL:  cfg.RedirectURL,
+		Endpoint:     provider.Endpoint(),
+		Scopes:       cfg.Scopes,
+	}
+	h.Config = cfg
+
+	// Start state cleanup goroutine (only once).
+	h.initOnce.Do(func() {
 		go h.cleanupStates(ctx)
 	})
-	return h.initErr
+
+	return nil
 }
 
 // HandleLogin redirects the user to the OIDC provider's authorization endpoint.
