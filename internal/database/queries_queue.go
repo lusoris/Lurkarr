@@ -24,7 +24,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        hardlink_protection, skip_cross_seeds, cross_arr_sync, dry_run,
 		        protected_tags, search_on_remove, ignored_indexers,
 		        bandwidth_limit_bytes_per_sec,
-		        max_strikes_stalled, max_strikes_slow, max_strikes_metadata, max_strikes_paused
+		        max_strikes_stalled, max_strikes_slow, max_strikes_metadata, max_strikes_paused,
+		        ignore_above_bytes
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -37,7 +38,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.HardlinkProtection, &s.SkipCrossSeeds, &s.CrossArrSync, &s.DryRun,
 		&s.ProtectedTags, &s.SearchOnRemove, &s.IgnoredIndexers,
 		&s.BandwidthLimitBytesPerSec,
-		&s.MaxStrikesStalled, &s.MaxStrikesSlow, &s.MaxStrikesMetadata, &s.MaxStrikesPaused)
+		&s.MaxStrikesStalled, &s.MaxStrikesSlow, &s.MaxStrikesMetadata, &s.MaxStrikesPaused,
+		&s.IgnoreAboveBytes)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -60,7 +62,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        protected_tags = $30, search_on_remove = $31, ignored_indexers = $32,
 		        bandwidth_limit_bytes_per_sec = $33,
 		        max_strikes_stalled = $34, max_strikes_slow = $35,
-		        max_strikes_metadata = $36, max_strikes_paused = $37
+		        max_strikes_metadata = $36, max_strikes_paused = $37,
+		        ignore_above_bytes = $38
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -73,7 +76,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.HardlinkProtection, s.SkipCrossSeeds, s.CrossArrSync, s.DryRun,
 		s.ProtectedTags, s.SearchOnRemove, s.IgnoredIndexers,
 		s.BandwidthLimitBytesPerSec,
-		s.MaxStrikesStalled, s.MaxStrikesSlow, s.MaxStrikesMetadata, s.MaxStrikesPaused)
+		s.MaxStrikesStalled, s.MaxStrikesSlow, s.MaxStrikesMetadata, s.MaxStrikesPaused,
+		s.IgnoreAboveBytes)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

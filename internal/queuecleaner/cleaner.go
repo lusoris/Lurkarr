@@ -371,6 +371,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 // detectProblem checks if a queue item is stalled, slow, or metadata-stuck.
 // Returns the reason string, or "" if no problem.
 func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string, pipeSaturated bool) string {
+	// Skip all strike-based detection for items above the size threshold
+	if settings.IgnoreAboveBytes > 0 && record.Size > settings.IgnoreAboveBytes {
+		return ""
+	}
+
 	// For Usenet via SABnzbd: check actual SABnzbd status.
 	// SABnzbd items show as "Queued" when they're just waiting for a slot,
 	// NOT because they're stalled.

@@ -54,6 +54,7 @@
 		max_strikes_slow: number;
 		max_strikes_metadata: number;
 		max_strikes_paused: number;
+		ignore_above_bytes: number;
 	}
 
 	interface ScoringProfile {
@@ -373,6 +374,7 @@
 						<Input bind:value={settings.max_strikes_metadata} type="number" label="Metadata Stuck" hint="No size info" />
 						<Input bind:value={settings.max_strikes_paused} type="number" label="Paused" hint="Paused in SABnzbd" />
 					</div>
+					<Input bind:value={settings.ignore_above_bytes} type="number" label="Ignore Above (bytes)" hint="Skip stalled/slow/metadata for items above this size (0 = disabled)" class="mb-3" />
 					<div class="space-y-2">
 						<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" />
 						<Toggle bind:checked={settings.strike_private} label="Strike Private Trackers" />

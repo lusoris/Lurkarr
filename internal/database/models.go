@@ -264,6 +264,8 @@ type QueueCleanerSettings struct {
 	MaxStrikesSlow     int `json:"max_strikes_slow"`     // Override max_strikes for slow items (0 = use global)
 	MaxStrikesMetadata int `json:"max_strikes_metadata"` // Override max_strikes for metadata-stuck items (0 = use global)
 	MaxStrikesPaused   int `json:"max_strikes_paused"`   // Override max_strikes for paused items (0 = use global)
+	// Global size-based ignore
+	IgnoreAboveBytes int64 `json:"ignore_above_bytes"` // Skip stalled/slow/metadata checks for items above this size (0 = disabled)
 }
 
 // QueueStrike represents a strike against a problematic download.
