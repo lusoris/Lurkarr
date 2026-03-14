@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { api } from '$lib/api';
-	import { appTypes, appDisplayName, appTabLabel, appLogo, appColor } from '$lib';
+	import { appTypes, appDisplayName, appTabLabel, appLogo, appColor, appAccentBorder, appBgColor, appButtonClass } from '$lib';
+	import { SquarePen, Trash2 } from 'lucide-svelte';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 
 	const toasts = getToasts();
 
@@ -39,6 +45,7 @@
 		hardlink_protection: boolean;
 		skip_cross_seeds: boolean;
 		cross_arr_sync: boolean;
+		dry_run: boolean;
 	}
 
 	interface ScoringProfile {
@@ -74,16 +81,6 @@
 		action: string;
 		reason: string;
 		created_at: string;
-	}
-
-	interface BlocklistLog {
-		id: number;
-		app_type: string;
-		instance_id: string;
-		download_id: string;
-		title: string;
-		reason: string;
-		blocklisted_at: string;
 	}
 
 	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports';
@@ -296,36 +293,28 @@
 		{ id: 'blocklist', label: 'Blocklist' },
 		{ id: 'imports', label: 'Import Log' }
 	];
+
+	const appTabs = appTypes.map(app => ({
+		value: app,
+		label: appTabLabel(app),
+		icon: appLogo(app),
+		activeClass: appBgColor(app) + ' text-white shadow-sm'
+	}));
 </script>
 
 <svelte:head><title>Queue Management - Lurkarr</title></svelte:head>
 
 <div class="space-y-4">
-	<h1 class="text-xl font-bold text-foreground">Queue Management</h1>
+	<PageHeader title="Queue Management" description="Queue cleaner, scoring profiles, blocklist, and import history." />
 
 	<!-- App selector -->
-	<div class="flex gap-0.5 rounded-lg bg-card border border-border p-0.5 overflow-x-auto">
-		{#each appTypes as app}
-			{@const logo = appLogo(app)}
-			<button
-				onclick={() => { selectedApp = app; loadTabData(); }}
-				class="shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors
-					{selectedApp === app ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
-			>
-				{#if logo}
-					<img src={logo} alt="" class="w-4 h-4 rounded-sm shrink-0" />
-				{/if}
-				<span class="hidden sm:inline">{appTabLabel(app)}</span>
-				<span class="sm:hidden">{appTabLabel(app).replace('Whisparr ', 'W')}</span>
-			</button>
-		{/each}
-	</div>
+	<Tabs tabs={appTabs} bind:value={selectedApp} />
 
 	<!-- Tab navigation -->
 	<div class="flex gap-0.5 rounded-lg bg-muted/50 p-0.5 overflow-x-auto">
 		{#each tabs as tab}
 			<button
-				onclick={() => { activeTab = tab.id; loadTabData(); }}
+				onclick={() => { activeTab = tab.id; }}
 				class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors
 					{activeTab === tab.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
 			>{tab.label}</button>
@@ -336,9 +325,14 @@
 	{#if activeTab === 'cleaner'}
 		{@const settings = cleanerSettings[selectedApp]}
 		{#if settings}
-			<div class="space-y-3">
+			<div class="space-y-3 border-l-2 {appAccentBorder(selectedApp)} pl-4">
 				<Card>
 					<Toggle bind:checked={settings.enabled} label="Enable Queue Cleaner" hint="Automatically manage stalled, slow, and failed downloads" />
+					{#if settings.enabled}
+						<div class="mt-2">
+							<Toggle bind:checked={settings.dry_run} label="Dry-Run Mode" hint="Preview what would be removed without actually deleting anything — check your logs" />
+						</div>
+					{/if}
 				</Card>
 
 				<Card>
@@ -388,13 +382,10 @@
 							<Input bind:value={settings.seeding_max_ratio} type="number" label="Max Ratio" hint="0 = disabled" />
 							<Input bind:value={settings.seeding_max_hours} type="number" label="Max Hours" hint="0 = disabled" />
 						</div>
-						<label class="block mt-2">
-						<span class="block text-xs font-medium text-muted-foreground mb-1">Mode</span>
-						<select bind:value={settings.seeding_mode} class="w-full rounded-lg border border-input bg-card text-foreground px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
-								<option value="or">Either condition (OR)</option>
-								<option value="and">Both conditions (AND)</option>
-							</select>
-						</label>
+						<Select bind:value={settings.seeding_mode} label="Mode" class="mt-2">
+							<option value="or">Either condition (OR)</option>
+							<option value="and">Both conditions (AND)</option>
+						</Select>
 						<div class="space-y-2 mt-2">
 							<Toggle bind:checked={settings.seeding_delete_files} label="Delete Files on Removal" />
 							<Toggle bind:checked={settings.seeding_skip_private} label="Skip Private Trackers" />
@@ -423,7 +414,7 @@
 					</div>
 				</Card>
 
-				<Button onclick={saveCleaner} loading={saving}>Save Cleaner Settings</Button>
+				<Button onclick={saveCleaner} loading={saving} class={appButtonClass(selectedApp)}>Save Cleaner Settings</Button>
 			</div>
 		{:else if loadedCleaners.has(selectedApp)}
 			<Card>
@@ -434,23 +425,17 @@
 				<p class="text-sm text-muted-foreground text-center py-4">Loading cleaner settings...</p>
 			</Card>
 		{/if}
-	{/if}
-
-	<!-- Scoring Profile -->
-	{#if activeTab === 'scoring'}
+	{:else if activeTab === 'scoring'}
 		{@const profile = scoringProfiles[selectedApp]}
 		{#if profile}
-			<div class="space-y-3">
+			<div class="space-y-3 border-l-2 {appAccentBorder(selectedApp)} pl-4">
 				<Card>
 					<div class="grid grid-cols-2 gap-3">
 						<Input bind:value={profile.name} label="Profile Name" />
-						<label class="block">
-						<span class="block text-xs font-medium text-muted-foreground mb-1">Strategy</span>
-						<select bind:value={profile.strategy} class="w-full rounded-lg border border-input bg-card text-foreground px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
-								<option value="highest">Highest Score</option>
-								<option value="adequate">Adequate Threshold</option>
-							</select>
-						</label>
+						<Select bind:value={profile.strategy} label="Strategy">
+							<option value="highest">Highest Score</option>
+							<option value="adequate">Adequate Threshold</option>
+						</Select>
 					</div>
 					{#if profile.strategy === 'adequate'}
 						<Input bind:value={profile.adequate_threshold} type="number" label="Adequate Threshold" />
@@ -476,35 +461,21 @@
 					</div>
 				</Card>
 
-				<Button onclick={saveScoring} loading={saving}>Save Scoring Profile</Button>
+				<Button onclick={saveScoring} loading={saving} class={appButtonClass(selectedApp)}>Save Scoring Profile</Button>
 			</div>
 		{:else if loadedScoring.has(selectedApp)}
 			<Card>
 				<p class="text-sm text-muted-foreground text-center py-4">No scoring profile configured for {appDisplayName(selectedApp)}.</p>
 			</Card>
 		{:else}
-			<Card>
-				<div class="space-y-3 py-2">
-					{#each Array(4) as _}
-						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
-					{/each}
-				</div>
-			</Card>
+			<Skeleton rows={4} height="h-10" />
 		{/if}
-	{/if}
-
-	<!-- Blocklist Log -->
-	{#if activeTab === 'blocklist'}
+	{:else if activeTab === 'blocklist'}
+		<div class="border-l-2 {appAccentBorder(selectedApp)} pl-4">
 		{#if loading}
-			<Card>
-				<div class="space-y-3 py-2">
-					{#each Array(4) as _}
-						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
-					{/each}
-				</div>
-			</Card>
+			<Skeleton rows={4} height="h-10" />
 		{:else if blocklist.length === 0}
-			<Card><p class="text-sm text-muted-foreground text-center py-4">No blocklist entries</p></Card>
+			<EmptyState title="No blocklist entries" description="Items removed from the queue will appear here." />
 		{:else}
 			<div class="rounded-xl border border-border overflow-hidden">
 				<table class="w-full text-sm">
@@ -527,20 +498,13 @@
 				</table>
 			</div>
 		{/if}
-	{/if}
-
-	<!-- Auto-Import Log -->
-	{#if activeTab === 'imports'}
+		</div>
+	{:else if activeTab === 'imports'}
+		<div class="border-l-2 {appAccentBorder(selectedApp)} pl-4">
 		{#if loading}
-			<Card>
-				<div class="space-y-3 py-2">
-					{#each Array(4) as _}
-						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
-					{/each}
-				</div>
-			</Card>
+			<Skeleton rows={4} height="h-10" />
 		{:else if imports.length === 0}
-			<Card><p class="text-sm text-muted-foreground text-center py-4">No import entries</p></Card>
+			<EmptyState title="No import entries" description="Auto-imported items will appear here." />
 		{:else}
 			<div class="rounded-xl border border-border overflow-hidden">
 				<table class="w-full text-sm">
@@ -565,11 +529,13 @@
 				</table>
 			</div>
 		{/if}
+		</div>
 	{/if}
 
 	<!-- ──────────────────────────────────────────── -->
 	<!-- Global Blocklist Management                  -->
 	<!-- ──────────────────────────────────────────── -->
+	{#if activeTab === 'blocklist'}
 	<div class="border-t border-border pt-6 mt-6 space-y-4">
 		<h2 class="text-base font-semibold text-foreground">Global Blocklist Management</h2>
 		<p class="text-xs text-muted-foreground">Manage community blocklist sources and custom rules that apply across all apps.</p>
@@ -595,11 +561,7 @@
 			{/if}
 
 			{#if !sourcesLoaded}
-				<div class="space-y-2 py-2">
-					{#each Array(3) as _}
-						<div class="h-16 rounded-lg bg-muted/50 animate-pulse"></div>
-					{/each}
-				</div>
+				<Skeleton rows={3} height="h-16" />
 			{:else if sources.length === 0}
 					<p class="text-sm text-muted-foreground py-4 text-center">No blocklist sources configured</p>
 			{:else}
@@ -632,7 +594,7 @@
 								</div>
 								<div class="flex items-center gap-1.5 ml-3 shrink-0">
 									<button onclick={() => { editingSource = { ...src }; }} class="text-muted-foreground hover:text-foreground transition-colors" title="Edit">
-										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+									<SquarePen class="w-4 h-4" />
 									</button>
 									{#if confirmDeleteSource === src.id}
 										<span class="flex items-center gap-1">
@@ -641,7 +603,7 @@
 										</span>
 							{:else}
 										<button onclick={() => confirmDeleteSource = src.id} class="text-muted-foreground hover:text-red-400 transition-colors" title="Delete">
-											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+										<Trash2 class="w-4 h-4" />
 										</button>
 							{/if}
 								</div>
@@ -663,15 +625,12 @@
 
 			{#if showAddRule}
 				<div class="mb-4 p-4 rounded-lg bg-muted/50 border border-border space-y-3">
-					<label class="block">
-						<span class="block text-sm font-medium text-muted-foreground mb-1.5">Pattern Type</span>
-						<select bind:value={newRule.pattern_type} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
-							<option value="title_contains">Title Contains</option>
-							<option value="title_regex">Title Regex</option>
-							<option value="release_group">Release Group</option>
-							<option value="indexer">Indexer</option>
-						</select>
-					</label>
+					<Select bind:value={newRule.pattern_type} label="Pattern Type">
+					<option value="title_contains">Title Contains</option>
+					<option value="title_regex">Title Regex</option>
+					<option value="release_group">Release Group</option>
+					<option value="indexer">Indexer</option>
+				</Select>
 					<Input bind:value={newRule.pattern} label="Pattern" placeholder={newRule.pattern_type === 'title_regex' ? '.*YIFY.*' : newRule.pattern_type === 'release_group' ? 'YTS' : 'pattern'} />
 					<Input bind:value={newRule.reason} label="Reason (optional)" placeholder="Why this pattern is blocked" />
 					<div class="flex justify-end">
@@ -681,11 +640,7 @@
 			{/if}
 
 			{#if !rulesLoaded}
-				<div class="space-y-2 py-2">
-					{#each Array(3) as _}
-						<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
-					{/each}
-				</div>
+				<Skeleton rows={3} height="h-10" />
 			{:else if rules.length === 0}
 				<p class="text-sm text-muted-foreground py-4 text-center">No custom rules</p>
 			{:else}
@@ -723,7 +678,7 @@
 												</span>
 											{:else}
 												<button onclick={() => confirmDeleteRule = rule.id} class="text-muted-foreground hover:text-red-400 transition-colors" title="Delete">
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+											<Trash2 class="w-4 h-4" />
 												</button>
 											{/if}
 										{:else}
@@ -738,4 +693,5 @@
 			{/if}
 		</Card>
 	</div>
+	{/if}
 </div>

@@ -252,6 +252,8 @@ type QueueCleanerSettings struct {
 	SkipCrossSeeds bool `json:"skip_cross_seeds"` // Skip removal if multiple torrents share the same content (save path + size)
 	// Cross-Arr blocklist sync
 	CrossArrSync bool `json:"cross_arr_sync"` // Propagate blocklist removals to all instances of the same app type
+	// Safety
+	DryRun bool `json:"dry_run"` // Log all actions without executing deletions (safe preview mode)
 }
 
 // QueueStrike represents a strike against a problematic download.

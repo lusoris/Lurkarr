@@ -114,6 +114,10 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 			continue
 		}
 
+		if settings.DryRun {
+			log.Info("[DRY-RUN] queue cleaner running in preview mode — no actions will be executed")
+		}
+
 		instances, err := c.db.ListEnabledInstances(ctx, appType)
 		if err != nil {
 			log.Error("failed to list instances", "error", err)
@@ -210,6 +214,15 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if !result.Matched {
 				continue
 			}
+			reason := "blocklist_" + result.Rule.PatternType + ":" + result.Rule.Pattern
+			if settings.DryRun {
+				log.Warn("[DRY-RUN] would remove blocklist match",
+					"title", record.Title,
+					"rule_type", result.Rule.PatternType,
+					"pattern", result.Rule.Pattern)
+				removed = append(removed, removal{Title: record.Title, MediaKey: record.MediaKey()})
+				continue
+			}
 			log.Warn("blocklist match, removing",
 				"title", record.Title,
 				"rule_type", result.Rule.PatternType,
@@ -218,7 +231,6 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				log.Error("failed to remove blocklisted item", "error", err)
 				continue
 			}
-			reason := "blocklist_" + result.Rule.PatternType + ":" + result.Rule.Pattern
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason); err != nil {
 				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
 			}
@@ -242,6 +254,17 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	} else {
 		dupes := FindDuplicates(queue.Records, profile)
 		for _, d := range dupes {
+			var mediaKey string
+			if rec, ok := recordByQueueID[d.RemoveQueueID]; ok {
+				mediaKey = rec.MediaKey()
+			}
+			if settings.DryRun {
+				log.Info("[DRY-RUN] would remove duplicate",
+					"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
+					"keep", d.KeepTitle, "keep_score", d.KeepScore)
+				removed = append(removed, removal{Title: d.RemoveTitle, MediaKey: mediaKey})
+				continue
+			}
 			log.Info("removing duplicate",
 				"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
 				"keep", d.KeepTitle, "keep_score", d.KeepScore)
@@ -251,10 +274,6 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			}
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score"); err != nil {
 				log.Warn("failed to log blocklist", "title", d.RemoveTitle, "error", err)
-			}
-			var mediaKey string
-			if rec, ok := recordByQueueID[d.RemoveQueueID]; ok {
-				mediaKey = rec.MediaKey()
 			}
 			removed = append(removed, removal{Title: d.RemoveTitle, MediaKey: mediaKey})
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
@@ -274,8 +293,10 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			progress := float64(record.Size-record.Sizeleft) / float64(record.Size)
 			if progress > 0.5 && record.TrackedDownloadStatus != "warning" {
 				// Over 50% and healthy — clear any old strikes
-				if err := c.db.ResetStrikes(ctx, appType, inst.ID, record.DownloadID); err != nil {
-					log.Warn("failed to reset strikes", "download_id", record.DownloadID, "error", err)
+				if !settings.DryRun {
+					if err := c.db.ResetStrikes(ctx, appType, inst.ID, record.DownloadID); err != nil {
+						log.Warn("failed to reset strikes", "download_id", record.DownloadID, "error", err)
+					}
 				}
 				continue
 			}
@@ -283,6 +304,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 		reason := c.detectProblem(record, settings, sabStatuses)
 		if reason == "" {
+			continue
+		}
+
+		if settings.DryRun {
+			log.Info("[DRY-RUN] would strike", "title", record.Title, "reason", reason, "max", settings.MaxStrikes)
 			continue
 		}
 
@@ -420,6 +446,12 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		}
 
 		reason := importFailureReason(record)
+
+		if settings.DryRun {
+			log.Warn("[DRY-RUN] would remove failed import", "title", record.Title, "reason", reason, "download_id", record.DownloadID)
+			continue
+		}
+
 		log.Warn("removing failed import", "title", record.Title, "reason", reason, "download_id", record.DownloadID)
 
 		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, settings.FailedImportBlocklist); err != nil {
@@ -633,6 +665,11 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			"delete_files", deleteFiles,
 		)
 
+		if settings.DryRun {
+			log.Info("[DRY-RUN] would remove seeded torrent", "title", record.Title)
+			continue
+		}
+
 		// Remove from the torrent client directly.
 		if err := torrentClient.RemoveItem(ctx, item.ID, deleteFiles); err != nil {
 			log.Error("failed to remove seeded torrent", "title", record.Title, "error", err)
@@ -744,6 +781,13 @@ func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, app
 
 			log.Info("cross-arr sync: removing matching item",
 				"instance", inst.Name, "title", record.Title, "media_key", mediaKey)
+
+			if settings.DryRun {
+				log.Info("[DRY-RUN] would remove cross-arr match",
+					"instance", inst.Name, "title", record.Title, "media_key", mediaKey)
+				continue
+			}
+
 			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, true); err != nil {
 				log.Error("cross-arr sync: failed to remove item",
 					"instance", inst.Name, "title", record.Title, "error", err)
@@ -875,6 +919,11 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 			"added_at", item.AddedAt,
 			"delete_files", deleteFiles,
 		)
+
+		if settings.DryRun {
+			log.Info("[DRY-RUN] would remove orphan", "name", item.Name, "id", item.ID)
+			continue
+		}
 
 		if err := dlClient.RemoveItem(ctx, item.ID, deleteFiles); err != nil {
 			log.Error("orphan: failed to remove item", "name", item.Name, "error", err)
