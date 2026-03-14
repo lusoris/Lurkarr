@@ -38,6 +38,9 @@ type Config struct {
 	WebAuthnRPID          string
 	WebAuthnRPDisplayName string
 	WebAuthnRPOrigins     []string
+
+	// Run-once mode
+	RunOnce bool
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -65,6 +68,9 @@ func Load() (*Config, error) {
 		// WebAuthn / Passkeys
 		WebAuthnRPID:          getEnv("WEBAUTHN_RP_ID", ""),
 		WebAuthnRPDisplayName: getEnv("WEBAUTHN_RP_NAME", "Lurkarr"),
+
+		// Run-once
+		RunOnce: getEnvBool("RUN_ONCE", false),
 	}
 
 	if cfg.DatabaseURL == "" {

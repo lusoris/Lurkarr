@@ -69,6 +69,35 @@ func (e *Engine) Start(ctx context.Context) {
 	slog.Info("lurking engine started", "app_types", started)
 }
 
+// RunOnce performs a single lurk pass for all app types and returns.
+func (e *Engine) RunOnce(ctx context.Context) {
+	for _, appType := range database.AllAppTypes() {
+		if LurkerFor(appType) == nil {
+			continue
+		}
+		log := e.logger.ForApp(string(appType))
+		settings, err := e.db.GetAppSettings(ctx, appType)
+		if err != nil {
+			log.Error("run-once: failed to load settings", "error", err)
+			continue
+		}
+		instances, err := e.db.ListEnabledInstances(ctx, appType)
+		if err != nil {
+			log.Error("run-once: failed to list instances", "error", err)
+			continue
+		}
+		for _, inst := range instances {
+			if ctx.Err() != nil {
+				return
+			}
+			if err := e.lurkInstance(ctx, log, appType, settings, inst); err != nil {
+				metrics.LurkErrors.WithLabelValues(string(appType), inst.Name).Inc()
+			}
+		}
+	}
+	slog.Info("lurking engine run-once complete")
+}
+
 // Stop cancels all lurking goroutines.
 func (e *Engine) Stop() {
 	if e.cancel != nil {
@@ -486,9 +515,9 @@ func (e *Engine) triggerSearch(ctx context.Context, appType database.AppType, cl
 
 // Selection mode constants.
 const (
-	SelectRandom     = "random"
-	SelectNewest     = "newest"
-	SelectOldest     = "oldest"
+	SelectRandom      = "random"
+	SelectNewest      = "newest"
+	SelectOldest      = "oldest"
 	SelectLeastRecent = "least_recent"
 )
 

@@ -91,6 +91,46 @@ func (c *Cleaner) Start(ctx context.Context) {
 	slog.Info("queue cleaner started")
 }
 
+// RunOnce performs a single queue clean pass for all app types and returns.
+func (c *Cleaner) RunOnce(ctx context.Context) {
+	for _, appType := range database.AllAppTypes() {
+		if lurking.LurkerFor(appType) == nil {
+			continue
+		}
+		log := c.logger.ForApp(string(appType))
+		settings, err := c.db.GetQueueCleanerSettings(ctx, appType)
+		if err != nil {
+			log.Error("run-once: failed to load queue cleaner settings", "error", err)
+			continue
+		}
+		if !settings.Enabled {
+			continue
+		}
+		instances, err := c.db.ListEnabledInstances(ctx, appType)
+		if err != nil {
+			log.Error("run-once: failed to list instances", "error", err)
+			continue
+		}
+		removals := make(map[uuid.UUID][]removal)
+		for _, inst := range instances {
+			if ctx.Err() != nil {
+				return
+			}
+			removed := c.cleanInstance(ctx, log, appType, settings, inst)
+			if len(removed) > 0 {
+				removals[inst.ID] = removed
+			}
+		}
+		if settings.OrphanEnabled {
+			c.cleanOrphans(ctx, log, appType, settings, instances)
+		}
+		if settings.CrossArrSync && len(instances) > 1 && len(removals) > 0 {
+			c.syncBlocklistAcross(ctx, log, appType, settings, instances, removals)
+		}
+	}
+	slog.Info("queue cleaner run-once complete")
+}
+
 // Stop cancels all cleaner goroutines.
 func (c *Cleaner) Stop() {
 	if c.cancel != nil {

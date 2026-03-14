@@ -65,6 +65,10 @@ var maintenanceModule = fx.Module("maintenance",
 	fx.Invoke(startMaintenance),
 )
 
+var runOnceModule = fx.Module("run-once",
+	fx.Invoke(executeRunOnce),
+)
+
 // --- Providers ---
 
 // provideConfig loads configuration and sets up structured logging.
@@ -369,4 +373,32 @@ func runMaintenance(ctx context.Context, db *database.DB) {
 			return
 		}
 	}
+}
+
+// executeRunOnce runs all services once synchronously and triggers shutdown.
+func executeRunOnce(lc fx.Lifecycle, shutdowner fx.Shutdowner, db *database.DB, logger *logging.Logger, notifMgr *notifications.Manager) {
+	lc.Append(fx.Hook{
+		OnStart: func(_ context.Context) error {
+			go func() {
+				ctx := context.Background()
+				slog.Info("run-once mode: starting single pass")
+
+				e := lurking.New(db, logger)
+				e.SetNotifier(notifMgr)
+				e.RunOnce(ctx)
+
+				c := queuecleaner.New(db, logger)
+				c.SetNotifier(notifMgr)
+				c.RunOnce(ctx)
+
+				imp := autoimport.New(db, logger)
+				imp.SetNotifier(notifMgr)
+				imp.RunOnce(ctx)
+
+				slog.Info("run-once mode: all passes complete, shutting down")
+				_ = shutdowner.Shutdown()
+			}()
+			return nil
+		},
+	})
 }

@@ -59,6 +59,28 @@ func (imp *Importer) Start(ctx context.Context) {
 	slog.Info("auto-importer started")
 }
 
+// RunOnce performs a single auto-import pass for all app types and returns.
+func (imp *Importer) RunOnce(ctx context.Context) {
+	for _, appType := range database.AllAppTypes() {
+		if lurking.LurkerFor(appType) == nil {
+			continue
+		}
+		log := imp.logger.ForApp(string(appType))
+		instances, err := imp.db.ListEnabledInstances(ctx, appType)
+		if err != nil {
+			log.Error("run-once: failed to list instances", "error", err)
+			continue
+		}
+		for _, inst := range instances {
+			if ctx.Err() != nil {
+				return
+			}
+			imp.checkInstance(ctx, log, appType, inst)
+		}
+	}
+	slog.Info("auto-importer run-once complete")
+}
+
 // Stop cancels all importer goroutines.
 func (imp *Importer) Stop() {
 	if imp.cancel != nil {
