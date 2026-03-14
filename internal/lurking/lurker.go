@@ -28,7 +28,7 @@ func (sonarrLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lurk
 	}
 	items := make([]lurkableItem, len(eps))
 	for i, ep := range eps {
-		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title}
+		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title, SortDate: parseArrDate(ep.AirDateUtc)}
 	}
 	return items, nil
 }
@@ -40,7 +40,7 @@ func (sonarrLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]lur
 	}
 	items := make([]lurkableItem, len(eps))
 	for i, ep := range eps {
-		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title}
+		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title, SortDate: parseArrDate(ep.AirDateUtc)}
 	}
 	return items, nil
 }
@@ -65,7 +65,7 @@ func (radarrLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lurk
 	}
 	items := make([]lurkableItem, len(movies))
 	for i, m := range movies {
-		items[i] = lurkableItem{ID: m.ID, Title: m.Title}
+		items[i] = lurkableItem{ID: m.ID, Title: m.Title, SortDate: parseArrDate(m.Added)}
 	}
 	return items, nil
 }
@@ -77,7 +77,7 @@ func (radarrLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]lur
 	}
 	items := make([]lurkableItem, len(movies))
 	for i, m := range movies {
-		items[i] = lurkableItem{ID: m.ID, Title: m.Title}
+		items[i] = lurkableItem{ID: m.ID, Title: m.Title, SortDate: parseArrDate(m.Added)}
 	}
 	return items, nil
 }
@@ -102,7 +102,7 @@ func (lidarrLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lurk
 	}
 	items := make([]lurkableItem, len(albums))
 	for i, a := range albums {
-		items[i] = lurkableItem{ID: a.ID, Title: a.Title}
+		items[i] = lurkableItem{ID: a.ID, Title: a.Title, SortDate: parseArrDate(a.ReleaseDate)}
 	}
 	return items, nil
 }
@@ -114,7 +114,7 @@ func (lidarrLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]lur
 	}
 	items := make([]lurkableItem, len(albums))
 	for i, a := range albums {
-		items[i] = lurkableItem{ID: a.ID, Title: a.Title}
+		items[i] = lurkableItem{ID: a.ID, Title: a.Title, SortDate: parseArrDate(a.ReleaseDate)}
 	}
 	return items, nil
 }
@@ -139,7 +139,7 @@ func (readarrLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lur
 	}
 	items := make([]lurkableItem, len(books))
 	for i, b := range books {
-		items[i] = lurkableItem{ID: b.ID, Title: b.Title}
+		items[i] = lurkableItem{ID: b.ID, Title: b.Title, SortDate: parseArrDate(b.ReleaseDate)}
 	}
 	return items, nil
 }
@@ -151,7 +151,7 @@ func (readarrLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]lu
 	}
 	items := make([]lurkableItem, len(books))
 	for i, b := range books {
-		items[i] = lurkableItem{ID: b.ID, Title: b.Title}
+		items[i] = lurkableItem{ID: b.ID, Title: b.Title, SortDate: parseArrDate(b.ReleaseDate)}
 	}
 	return items, nil
 }
@@ -176,7 +176,7 @@ func (whisparrLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lu
 	}
 	items := make([]lurkableItem, len(episodes))
 	for i, ep := range episodes {
-		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title}
+		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title, SortDate: parseArrDate(ep.ReleaseDate)}
 	}
 	return items, nil
 }
@@ -188,7 +188,7 @@ func (whisparrLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]l
 	}
 	items := make([]lurkableItem, len(episodes))
 	for i, ep := range episodes {
-		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title}
+		items[i] = lurkableItem{ID: ep.ID, Title: ep.Title, SortDate: parseArrDate(ep.ReleaseDate)}
 	}
 	return items, nil
 }
@@ -213,7 +213,7 @@ func (erosLurker) GetMissing(ctx context.Context, c *arrclient.Client) ([]lurkab
 	}
 	items := make([]lurkableItem, len(movies))
 	for i, m := range movies {
-		items[i] = lurkableItem{ID: m.ID, Title: m.Title}
+		items[i] = lurkableItem{ID: m.ID, Title: m.Title, SortDate: parseArrDate(m.Added)}
 	}
 	return items, nil
 }
@@ -225,7 +225,7 @@ func (erosLurker) GetUpgrades(ctx context.Context, c *arrclient.Client) ([]lurka
 	}
 	items := make([]lurkableItem, len(movies))
 	for i, m := range movies {
-		items[i] = lurkableItem{ID: m.ID, Title: m.Title}
+		items[i] = lurkableItem{ID: m.ID, Title: m.Title, SortDate: parseArrDate(m.Added)}
 	}
 	return items, nil
 }

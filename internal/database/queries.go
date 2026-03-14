@@ -290,12 +290,12 @@ func (db *DB) GetAppSettings(ctx context.Context, appType AppType) (*AppSettings
 	err := db.Pool.QueryRow(ctx,
 		`SELECT app_type, lurk_missing_count, lurk_upgrade_count, lurk_missing_mode,
 		        upgrade_mode, sleep_duration, monitored_only, skip_future,
-		        hourly_cap, random_selection, debug_mode
+		        hourly_cap, selection_mode, debug_mode
 		 FROM app_settings WHERE app_type = $1`,
 		string(appType),
 	).Scan(&s.AppType, &s.LurkMissingCount, &s.LurkUpgradeCount, &s.LurkMissingMode,
 		&s.UpgradeMode, &s.SleepDuration, &s.MonitoredOnly, &s.SkipFuture,
-		&s.HourlyCap, &s.RandomSelection, &s.DebugMode)
+		&s.HourlyCap, &s.SelectionMode, &s.DebugMode)
 	if err != nil {
 		return nil, err
 	}
@@ -307,11 +307,11 @@ func (db *DB) UpdateAppSettings(ctx context.Context, s *AppSettings) error {
 		`UPDATE app_settings SET
 		    lurk_missing_count = $1, lurk_upgrade_count = $2, lurk_missing_mode = $3,
 		    upgrade_mode = $4, sleep_duration = $5, monitored_only = $6, skip_future = $7,
-		    hourly_cap = $8, random_selection = $9, debug_mode = $10
+		    hourly_cap = $8, selection_mode = $9, debug_mode = $10
 		 WHERE app_type = $11`,
 		s.LurkMissingCount, s.LurkUpgradeCount, s.LurkMissingMode,
 		s.UpgradeMode, s.SleepDuration, s.MonitoredOnly, s.SkipFuture,
-		s.HourlyCap, s.RandomSelection, s.DebugMode, string(s.AppType),
+		s.HourlyCap, s.SelectionMode, s.DebugMode, string(s.AppType),
 	)
 	return err
 }
@@ -370,10 +370,36 @@ func (db *DB) IsProcessed(ctx context.Context, appType AppType, instanceID uuid.
 func (db *DB) MarkProcessed(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID int, operation string) error {
 	_, err := db.Pool.Exec(ctx,
 		`INSERT INTO processed_items (app_type, instance_id, media_id, operation)
-		 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (app_type, instance_id, media_id, operation) DO UPDATE SET processed_at = now()`,
 		string(appType), instanceID, mediaID, operation,
 	)
 	return err
+}
+
+// GetProcessedTimes returns the last-processed timestamp for each media ID.
+// Used by the "least_recent" selection mode to prioritize items that haven't
+// been searched recently. Items not in the map have never been processed.
+func (db *DB) GetProcessedTimes(ctx context.Context, appType AppType, instanceID uuid.UUID, operation string) (map[int]time.Time, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT media_id, processed_at FROM processed_items
+		 WHERE app_type = $1 AND instance_id = $2 AND operation = $3`,
+		string(appType), instanceID, operation,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int]time.Time)
+	for rows.Next() {
+		var id int
+		var t time.Time
+		if err := rows.Scan(&id, &t); err != nil {
+			return nil, err
+		}
+		out[id] = t
+	}
+	return out, rows.Err()
 }
 
 func (db *DB) ResetState(ctx context.Context, appType AppType, instanceID uuid.UUID) error {

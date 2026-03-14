@@ -35,7 +35,7 @@ func TestSelectItemsAll(t *testing.T) {
 		{ID: 3, Title: "c"},
 	}
 	// Request more than available
-	selected := selectItems(items, 10, false)
+	selected := selectItems(items, 10, "oldest", nil)
 	if len(selected) != 3 {
 		t.Fatalf("expected 3, got %d", len(selected))
 	}
@@ -47,11 +47,11 @@ func TestSelectItemsLimited(t *testing.T) {
 		{ID: 2, Title: "b"},
 		{ID: 3, Title: "c"},
 	}
-	selected := selectItems(items, 2, false)
+	selected := selectItems(items, 2, "oldest", nil)
 	if len(selected) != 2 {
 		t.Fatalf("expected 2, got %d", len(selected))
 	}
-	// Non-random: should get first 2
+	// Non-random: oldest mode with zero dates preserves order
 	if selected[0].ID != 1 || selected[1].ID != 2 {
 		t.Fatalf("expected first 2 items in order, got %v", selected)
 	}
@@ -62,7 +62,7 @@ func TestSelectItemsRandom(t *testing.T) {
 	for i := range items {
 		items[i] = lurkableItem{ID: i, Title: "item"}
 	}
-	selected := selectItems(items, 5, true)
+	selected := selectItems(items, 5, "random", nil)
 	if len(selected) != 5 {
 		t.Fatalf("expected 5, got %d", len(selected))
 	}

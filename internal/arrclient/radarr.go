@@ -15,6 +15,7 @@ type RadarrMovie struct {
 	Title     string `json:"title"`
 	Monitored bool   `json:"monitored"`
 	HasFile   bool   `json:"hasFile"`
+	Added     string `json:"added"`
 }
 
 // RadarrGetMissing fetches movies without files via the wanted/missing endpoint.

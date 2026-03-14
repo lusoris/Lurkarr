@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { api } from '$lib/api';
-	import { appTypes, appDisplayName, appTabLabel, appLogo } from '$lib';
+	import { appTypes, appDisplayName, appTabLabel, appLogo, appAccentBorder, appBgColor, appButtonClass } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import Separator from '$lib/components/ui/Separator.svelte';
 
 	const toasts = getToasts();
 
@@ -19,13 +24,20 @@
 		monitored_only: boolean;
 		skip_future: boolean;
 		hourly_cap: number;
-		random_selection: boolean;
+		selection_mode: string;
 		debug_mode: boolean;
 	}
 
 	let appSettings = $state<Record<string, AppSettings>>({});
 	let selectedApp = $state<string>('sonarr');
 	let saving = $state(false);
+
+	const tabs = appTypes.map(app => ({
+		value: app,
+		label: appTabLabel(app),
+		icon: appLogo(app),
+		activeClass: appBgColor(app) + ' text-white shadow-sm'
+	}));
 
 	async function loadAppSettings(app: string) {
 		try {
@@ -34,14 +46,15 @@
 	}
 
 	async function saveAppSettings() {
-		const settings = appSettings[selectedApp];
+		const app = selectedApp;
+		const settings = appSettings[app];
 		if (!settings) return;
 		saving = true;
 		try {
-			await api.put(`/settings/${selectedApp}`, settings);
-			toasts.success(`${appDisplayName(selectedApp)} settings saved`);
+			await api.put(`/settings/${app}`, settings);
+			toasts.success(`${appDisplayName(app)} settings saved`);
 		} catch {
-			toasts.error(`Failed to save ${appDisplayName(selectedApp)} settings`);
+			toasts.error(`Failed to save ${appDisplayName(app)} settings`);
 		}
 		saving = false;
 	}
@@ -52,64 +65,79 @@
 <svelte:head><title>Lurk Settings - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold text-foreground">Lurk Settings</h1>
-	<p class="text-sm text-muted-foreground">Configure lurking behavior per app — how many items to search, modes, rate limits, and more.</p>
+	<PageHeader title="Lurk Settings" description="Configure lurking behavior per app — how many items to search, modes, rate limits, and more." />
 
-	<Card>
-		<!-- App selector -->
-		<div class="flex gap-1 mb-5 rounded-lg bg-muted/50 p-1 overflow-x-auto">
-			{#each appTypes as app}
-				{@const logo = appLogo(app)}
-				<button
-					onclick={() => { selectedApp = app; loadAppSettings(app); }}
-					class="shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors
-						{selectedApp === app ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
-				>
-					{#if logo}<img src={logo} alt="" class="w-4 h-4 rounded-sm" />{/if}
-					{appTabLabel(app)}
-				</button>
-			{/each}
-		</div>
+	<Tabs {tabs} bind:value={selectedApp} />
 
+	<Card class="border-l-2 {appAccentBorder(selectedApp)}">
 		{#if appSettings[selectedApp]}
 			{@const settings = appSettings[selectedApp]}
-			<div class="space-y-4">
-				<div class="grid grid-cols-2 gap-4">
-					<Input bind:value={settings.lurk_missing_count} type="number" label="Lurk Missing Count" hint="Number of missing items to search per lurk cycle" />
-					<Input bind:value={settings.lurk_upgrade_count} type="number" label="Lurk Upgrade Count" hint="Number of cutoff-unmet items to search per cycle" />
+			<div class="space-y-6">
+				<!-- Search Counts -->
+				<div>
+					<h3 class="text-sm font-semibold text-foreground mb-3">Search Counts</h3>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<Input bind:value={settings.lurk_missing_count} type="number" label="Missing Count" hint="Number of missing items to search per lurk cycle" />
+						<Input bind:value={settings.lurk_upgrade_count} type="number" label="Upgrade Count" hint="Number of cutoff-unmet items to search per cycle" />
+					</div>
 				</div>
-				<div class="grid grid-cols-2 gap-4">
-					<label class="block">
-						<span class="block text-sm font-medium text-muted-foreground mb-1.5">Missing Mode</span>
-						<select bind:value={settings.lurk_missing_mode} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
+
+				<Separator />
+
+				<!-- Search Mode -->
+				<div>
+					<h3 class="text-sm font-semibold text-foreground mb-3">Search Mode</h3>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<Select bind:value={settings.lurk_missing_mode} label="Missing Mode" hint="How missing items are selected for search">
 							<option value="oldest">Oldest First</option>
 							<option value="newest">Newest First</option>
 							<option value="random">Random</option>
-						</select>
-					</label>
-					<label class="block">
-						<span class="block text-sm font-medium text-muted-foreground mb-1.5">Upgrade Mode</span>
-						<select bind:value={settings.upgrade_mode} class="w-full rounded-lg border border-input bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:border-ring focus:ring-ring">
+						</Select>
+						<Select bind:value={settings.upgrade_mode} label="Upgrade Mode" hint="How upgrade candidates are selected for search">
 							<option value="oldest">Oldest First</option>
 							<option value="newest">Newest First</option>
 							<option value="random">Random</option>
-						</select>
-					</label>
+						</Select>
+					</div>
 				</div>
-				<Input bind:value={settings.sleep_duration} type="number" label="Sleep Duration (ms)" hint="Delay between individual API commands to avoid rate-limiting" />
-				<Input bind:value={settings.hourly_cap} type="number" label="Hourly API Cap (0 = unlimited)" hint="Max API search commands per hour. 0 disables the limit" />
-				<Toggle bind:checked={settings.monitored_only} label="Monitored Only" hint="Only search for items marked as monitored in the arr app" />
-				<Toggle bind:checked={settings.skip_future} label="Skip Future Releases" hint="Skip items with a release date in the future" />
-				<Toggle bind:checked={settings.random_selection} label="Random Selection" hint="Randomize which items are picked within the selected mode" />
-				<Toggle bind:checked={settings.debug_mode} label="Debug Mode" hint="Log detailed information about each lurk cycle for troubleshooting" />
-				<Button onclick={saveAppSettings} loading={saving}>Save {appDisplayName(selectedApp)} Settings</Button>
+
+				<Separator />
+
+				<!-- Rate Limiting -->
+				<div>
+					<h3 class="text-sm font-semibold text-foreground mb-3">Rate Limiting</h3>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<Input bind:value={settings.sleep_duration} type="number" label="Sleep Duration (ms)" hint="Delay between individual API commands" />
+						<Input bind:value={settings.hourly_cap} type="number" label="Hourly API Cap" hint="Max API search commands per hour (0 = unlimited)" />
+					</div>
+				</div>
+
+				<Separator />
+
+				<!-- Behaviour -->
+				<div>
+					<h3 class="text-sm font-semibold text-foreground mb-3">Behaviour</h3>
+					<div class="space-y-4">
+						<Toggle bind:checked={settings.monitored_only} label="Monitored Only" hint="Only search for items marked as monitored in the arr app" />
+						<Toggle bind:checked={settings.skip_future} label="Skip Future Releases" hint="Skip items with a release date in the future" />
+						<Select bind:value={settings.selection_mode} label="Selection Mode" hint="How items are chosen from the candidate pool">
+							<option value="random">Random</option>
+							<option value="newest">Newest First</option>
+							<option value="oldest">Oldest First</option>
+							<option value="least_recent">Least Recently Searched</option>
+						</Select>
+						<Toggle bind:checked={settings.debug_mode} label="Debug Mode" hint="Log detailed information about each lurk cycle for troubleshooting" />
+					</div>
+				</div>
+
+				<Separator />
+
+				<div class="flex justify-end">
+					<Button onclick={saveAppSettings} loading={saving} class={appButtonClass(selectedApp)}>Save {appDisplayName(selectedApp)} Settings</Button>
+				</div>
 			</div>
 		{:else}
-			<div class="space-y-4">
-				{#each Array(6) as _}
-					<div class="h-10 rounded-lg bg-muted/50 animate-pulse"></div>
-				{/each}
-			</div>
+			<Skeleton rows={6} height="h-10" />
 		{/if}
 	</Card>
 </div>

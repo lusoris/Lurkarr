@@ -202,3 +202,18 @@ func (mr *MockStoreMockRecorder) ResetState(ctx, appType, instanceID any) *gomoc
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetState", reflect.TypeOf((*MockStore)(nil).ResetState), ctx, appType, instanceID)
 }
+
+// GetProcessedTimes mocks base method.
+func (m *MockStore) GetProcessedTimes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, operation string) (map[int]time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProcessedTimes", ctx, appType, instanceID, operation)
+	ret0, _ := ret[0].(map[int]time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProcessedTimes indicates an expected call of GetProcessedTimes.
+func (mr *MockStoreMockRecorder) GetProcessedTimes(ctx, appType, instanceID, operation any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProcessedTimes", reflect.TypeOf((*MockStore)(nil).GetProcessedTimes), ctx, appType, instanceID, operation)
+}

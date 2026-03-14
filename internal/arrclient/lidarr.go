@@ -11,10 +11,11 @@ const lidarrAPI = "/api/v1"
 
 // LidarrAlbum represents an album from Lidarr.
 type LidarrAlbum struct {
-	ID         int    `json:"id"`
-	Title      string `json:"title"`
-	Monitored  bool   `json:"monitored"`
-	Statistics struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Monitored   bool   `json:"monitored"`
+	ReleaseDate string `json:"releaseDate"`
+	Statistics  struct {
 		TrackCount     int `json:"trackCount"`
 		TrackFileCount int `json:"trackFileCount"`
 	} `json:"statistics"`

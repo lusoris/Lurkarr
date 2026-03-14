@@ -98,7 +98,7 @@ type AppSettings struct {
 	MonitoredOnly    bool    `json:"monitored_only"`
 	SkipFuture       bool    `json:"skip_future"`
 	HourlyCap        int     `json:"hourly_cap"`
-	RandomSelection  bool    `json:"random_selection"`
+	SelectionMode    string  `json:"selection_mode"`
 	DebugMode        bool    `json:"debug_mode"`
 }
 

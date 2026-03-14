@@ -11,10 +11,11 @@ const readarrAPI = "/api/v1"
 
 // ReadarrBook represents a book from Readarr.
 type ReadarrBook struct {
-	ID         int    `json:"id"`
-	Title      string `json:"title"`
-	Monitored  bool   `json:"monitored"`
-	Statistics struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Monitored   bool   `json:"monitored"`
+	ReleaseDate string `json:"releaseDate"`
+	Statistics  struct {
 		BookFileCount int `json:"bookFileCount"`
 	} `json:"statistics"`
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,7 @@ type Store interface {
 	ResetState(ctx context.Context, appType database.AppType, instanceID uuid.UUID) error
 	IsProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, lurkType string) (bool, error)
 	MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, lurkType string) error
+	GetProcessedTimes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, operation string) (map[int]time.Time, error)
 	AddLurkHistory(ctx context.Context, appType database.AppType, instanceID uuid.UUID, instanceName string, mediaID int, title, lurkType string) error
 	IncrementStats(ctx context.Context, appType database.AppType, instanceID uuid.UUID, missing, upgrades int64) error
 	IncrementHourlyHits(ctx context.Context, appType database.AppType, instanceID uuid.UUID, count int) error
@@ -142,8 +144,19 @@ func backoff(errors int) time.Duration {
 }
 
 type lurkableItem struct {
-	ID    int
-	Title string
+	ID       int
+	Title    string
+	SortDate time.Time // Date used for newest/oldest sort; zero if unavailable
+}
+
+// parseArrDate parses ISO 8601 date strings returned by *arr APIs.
+func parseArrDate(s string) time.Time {
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05Z", "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func (e *Engine) lurkInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance) error {
@@ -155,7 +168,7 @@ func (e *Engine) lurkInstance(ctx context.Context, log *slog.Logger, appType dat
 		log.Error("failed to check hourly cap", "error", err)
 		return err
 	}
-	if hits >= settings.HourlyCap {
+	if settings.HourlyCap > 0 && hits >= settings.HourlyCap {
 		log.Info("hourly cap reached, skipping", "hits", hits, "cap", settings.HourlyCap)
 		return nil
 	}
@@ -201,6 +214,9 @@ func (e *Engine) lurkInstance(ctx context.Context, log *slog.Logger, appType dat
 	}
 
 	remaining := settings.HourlyCap - hits
+	if settings.HourlyCap == 0 {
+		remaining = 1<<31 - 1 // unlimited
+	}
 
 	// Lurk missing items
 	var missingCount, upgradeCount int
@@ -239,26 +255,38 @@ func (e *Engine) lurkMissing(ctx context.Context, log *slog.Logger, appType data
 		return 0
 	}
 
-	// Filter already processed
-	var unprocessed []lurkableItem
-	for _, item := range items {
-		processed, err := e.db.IsProcessed(ctx, appType, inst.ID, item.ID, "missing")
+	var candidates []lurkableItem
+	var processedTimes map[int]time.Time
+
+	if settings.SelectionMode == SelectLeastRecent {
+		// In least_recent mode, include ALL items and sort by last-processed time.
+		processedTimes, err = e.db.GetProcessedTimes(ctx, appType, inst.ID, "missing")
 		if err != nil {
-			log.Error("failed to check processed", "error", err)
-			continue
+			log.Error("failed to get processed times", "error", err)
+			return 0
 		}
-		if !processed {
-			unprocessed = append(unprocessed, item)
+		candidates = items
+	} else {
+		// Standard modes: filter out already-processed items.
+		for _, item := range items {
+			processed, err := e.db.IsProcessed(ctx, appType, inst.ID, item.ID, "missing")
+			if err != nil {
+				log.Error("failed to check processed", "error", err)
+				continue
+			}
+			if !processed {
+				candidates = append(candidates, item)
+			}
 		}
 	}
 
-	if len(unprocessed) == 0 {
-		log.Debug("no unprocessed missing items")
+	if len(candidates) == 0 {
+		log.Debug("no eligible missing items")
 		return 0
 	}
 
 	// Select items
-	selected := selectItems(unprocessed, maxCount, settings.RandomSelection)
+	selected := selectItems(candidates, maxCount, settings.SelectionMode, processedTimes)
 
 	// Trigger searches
 	lurked := 0
@@ -297,22 +325,33 @@ func (e *Engine) lurkUpgrades(ctx context.Context, log *slog.Logger, appType dat
 		return 0
 	}
 
-	var unprocessed []lurkableItem
-	for _, item := range items {
-		processed, err := e.db.IsProcessed(ctx, appType, inst.ID, item.ID, "upgrade")
+	var candidates []lurkableItem
+	var processedTimes map[int]time.Time
+
+	if settings.SelectionMode == SelectLeastRecent {
+		processedTimes, err = e.db.GetProcessedTimes(ctx, appType, inst.ID, "upgrade")
 		if err != nil {
-			continue
+			log.Error("failed to get processed times", "error", err)
+			return 0
 		}
-		if !processed {
-			unprocessed = append(unprocessed, item)
+		candidates = items
+	} else {
+		for _, item := range items {
+			processed, err := e.db.IsProcessed(ctx, appType, inst.ID, item.ID, "upgrade")
+			if err != nil {
+				continue
+			}
+			if !processed {
+				candidates = append(candidates, item)
+			}
 		}
 	}
 
-	if len(unprocessed) == 0 {
+	if len(candidates) == 0 {
 		return 0
 	}
 
-	selected := selectItems(unprocessed, maxCount, settings.RandomSelection)
+	selected := selectItems(candidates, maxCount, settings.SelectionMode, processedTimes)
 
 	upgraded := 0
 	for _, item := range selected {
@@ -367,11 +406,44 @@ func (e *Engine) triggerSearch(ctx context.Context, appType database.AppType, cl
 	return lurker.Search(ctx, client, mediaID)
 }
 
-func selectItems(items []lurkableItem, count int, random bool) []lurkableItem {
+// Selection mode constants.
+const (
+	SelectRandom     = "random"
+	SelectNewest     = "newest"
+	SelectOldest     = "oldest"
+	SelectLeastRecent = "least_recent"
+)
+
+func selectItems(items []lurkableItem, count int, mode string, processedTimes map[int]time.Time) []lurkableItem {
 	if count >= len(items) {
-		return items
+		count = len(items)
 	}
-	if random {
+	switch mode {
+	case SelectNewest:
+		slices.SortFunc(items, func(a, b lurkableItem) int {
+			return b.SortDate.Compare(a.SortDate) // newest first
+		})
+	case SelectOldest:
+		slices.SortFunc(items, func(a, b lurkableItem) int {
+			return a.SortDate.Compare(b.SortDate) // oldest first
+		})
+	case SelectLeastRecent:
+		slices.SortFunc(items, func(a, b lurkableItem) int {
+			ta, okA := processedTimes[a.ID]
+			tb, okB := processedTimes[b.ID]
+			// Never-processed items come first
+			if !okA && !okB {
+				return 0
+			}
+			if !okA {
+				return -1
+			}
+			if !okB {
+				return 1
+			}
+			return ta.Compare(tb) // oldest processed first
+		})
+	default: // "random"
 		rand.Shuffle(len(items), func(i, j int) {
 			items[i], items[j] = items[j], items[i]
 		})

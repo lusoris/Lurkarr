@@ -17,6 +17,7 @@ type ErosMovie struct {
 	Monitored bool   `json:"monitored"`
 	HasFile   bool   `json:"hasFile"`
 	ItemType  string `json:"itemType"` // "movie" or "scene"
+	Added     string `json:"added"`
 }
 
 // ErosGetMissing fetches scenes/movies without files.
