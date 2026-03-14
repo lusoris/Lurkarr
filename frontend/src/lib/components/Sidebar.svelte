@@ -7,7 +7,7 @@
 	import {
 		LayoutDashboard, Cable, Flame, CalendarDays, History, Download,
 		ListOrdered, Bell, Activity, Settings, Users, UserCircle,
-		ChevronLeft, Menu, X, Heart, LogOut, Layers
+		ChevronLeft, Menu, X, Heart, LogOut, Layers, ScrollText
 	} from 'lucide-svelte';
 
 	const auth = getAuth();
@@ -25,6 +25,7 @@
 		{ href: '/lurk', label: 'Lurk Settings', icon: Flame },
 		{ href: '/scheduling', label: 'Scheduling', icon: CalendarDays },
 		{ href: '/history', label: 'History', icon: History },
+		{ href: '/activity', label: 'Activity', icon: ScrollText },
 		{ href: '/downloads', label: 'Downloads', icon: Download },
 		{ href: '/queue', label: 'Queue', icon: ListOrdered },
 		{ href: '/dedup', label: 'Dedup', icon: Layers },

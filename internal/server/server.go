@@ -136,6 +136,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	settingsH := &api.SettingsHandler{DB: db}
 	appsH := &api.AppsHandler{DB: db}
 	historyH := &api.HistoryHandler{DB: db}
+	activityH := &api.ActivityHandler{DB: db}
 	statsH := &api.StatsHandler{DB: db}
 	stateH := &api.StateHandler{DB: db}
 	schedulerH := &api.SchedulerHandler{DB: db, Scheduler: sched}
@@ -337,6 +338,9 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	// History
 	protected.HandleFunc("GET /api/history", historyH.HandleListHistory)
 	protected.HandleFunc("DELETE /api/history/{app}", historyH.HandleDeleteHistory)
+
+	// Activity Feed
+	protected.HandleFunc("GET /api/activity", activityH.HandleGetActivity)
 
 	// Stats
 	protected.HandleFunc("GET /api/stats", statsH.HandleGetStats)
