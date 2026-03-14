@@ -23,6 +23,8 @@ type Store interface {
 	ListUsers(ctx context.Context) ([]database.User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	UpdateUserAdmin(ctx context.Context, id uuid.UUID, isAdmin bool) error
+	IncrementFailedLogins(ctx context.Context, id uuid.UUID, maxAttempts int, lockDuration time.Duration) error
+	ResetFailedLogins(ctx context.Context, id uuid.UUID) error
 
 	// Sessions
 	DeleteSession(ctx context.Context, id uuid.UUID) error

@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
@@ -21,6 +23,11 @@ type setupRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+const (
+	maxFailedLogins = 5
+	lockoutDuration = 15 * time.Minute
+)
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
@@ -43,7 +50,14 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check account lockout
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+		writeJSON(w, http.StatusTooManyRequests, errorResponse("account temporarily locked"))
+		return
+	}
+
 	if !auth.CheckPassword(req.Password, user.Password) {
+		_ = h.DB.IncrementFailedLogins(r.Context(), user.ID, maxFailedLogins, lockoutDuration)
 		writeJSON(w, http.StatusUnauthorized, errorResponse("invalid credentials"))
 		return
 	}
@@ -68,11 +82,20 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 			remaining := make([]string, 0, len(user.RecoveryCodes)-1)
 			remaining = append(remaining, user.RecoveryCodes[:idx]...)
 			remaining = append(remaining, user.RecoveryCodes[idx+1:]...)
-			_ = h.DB.SetRecoveryCodes(r.Context(), user.ID, remaining)
+			if err := h.DB.SetRecoveryCodes(r.Context(), user.ID, remaining); err != nil {
+				slog.Error("failed to consume recovery code", "error", err, "user", user.ID)
+				writeJSON(w, http.StatusInternalServerError, errorResponse("failed to consume recovery code"))
+				return
+			}
 		} else if !auth.ValidateTOTP(req.TOTPCode, *user.TOTPSecret) {
 			writeJSON(w, http.StatusUnauthorized, errorResponse("invalid TOTP code"))
 			return
 		}
+	}
+
+	// Reset failed login counter on successful authentication
+	if user.FailedLoginAttempts > 0 {
+		_ = h.DB.ResetFailedLogins(r.Context(), user.ID)
 	}
 
 	// Session rotation: invalidate any existing session before creating a new one
@@ -162,7 +185,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		StatefulResetHours:   168,
 		CommandWaitDelay:     1,
 		CommandWaitAttempts:  600,
-		MinDownloadQueueSize: -1,
+		MinDownloadQueueSize: 0,
 	}
 	if err := h.DB.UpsertGeneralSettings(r.Context(), settings); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save settings"))

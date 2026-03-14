@@ -15,9 +15,9 @@ func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*U
 	var u User
 	err := db.Pool.QueryRow(ctx,
 		`INSERT INTO users (username, password) VALUES ($1, $2)
-		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at`,
+		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until`,
 		username, passwordHash,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -27,9 +27,9 @@ func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*U
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE username = $1`,
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
 	if err != nil {
 		return nil, fmt.Errorf("get user by username: %w", err)
 	}
@@ -39,9 +39,9 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, er
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at FROM users WHERE id = $1`,
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
 	if err != nil {
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
@@ -86,14 +86,41 @@ func (db *DB) UserCount(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// IncrementFailedLogins bumps the failed login counter for a user.
+// If the counter reaches maxAttempts, the account is locked for lockDuration.
+func (db *DB) IncrementFailedLogins(ctx context.Context, id uuid.UUID, maxAttempts int, lockDuration time.Duration) error {
+	lockUntil := time.Now().Add(lockDuration)
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE users
+		 SET failed_login_attempts = failed_login_attempts + 1,
+		     locked_until = CASE
+		         WHEN failed_login_attempts + 1 >= $2 THEN $3
+		         ELSE locked_until
+		     END,
+		     updated_at = now()
+		 WHERE id = $1`,
+		id, maxAttempts, lockUntil,
+	)
+	return err
+}
+
+// ResetFailedLogins clears the failed login counter and lock for a user.
+func (db *DB) ResetFailedLogins(ctx context.Context, id uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE users SET failed_login_attempts = 0, locked_until = NULL, updated_at = now() WHERE id = $1`,
+		id,
+	)
+	return err
+}
+
 // GetOrCreateExternalUser finds a user by auth_provider + external_id, or creates one.
 func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID, username string) (*User, error) {
 	var u User
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until
 		 FROM users WHERE auth_provider = $1 AND external_id = $2`,
 		provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
 	if err == nil {
 		// Update username if changed at the provider.
 		if u.Username != username {
@@ -110,9 +137,9 @@ func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID,
 	err = db.Pool.QueryRow(ctx,
 		`INSERT INTO users (username, password, auth_provider, external_id)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at`,
+		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until`,
 		username, "!oidc-no-local-password", provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
 	if err != nil {
 		return nil, fmt.Errorf("create external user: %w", err)
 	}
@@ -193,7 +220,7 @@ func (db *DB) DeleteUserSessionsExcept(ctx context.Context, userID, keep uuid.UU
 // ListUsers returns all users.
 func (db *DB) ListUsers(ctx context.Context) ([]User, error) {
 	rows, err := db.Pool.Query(ctx,
-		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at
+		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until
 		 FROM users ORDER BY created_at`,
 	)
 	if err != nil {

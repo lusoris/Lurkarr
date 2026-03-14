@@ -1865,12 +1865,29 @@ func TestHandleLogin_WrongPassword(t *testing.T) {
 	store := NewMockStore(ctrl)
 	hash, _ := auth.HashPassword("correct")
 	store.EXPECT().GetUserByUsername(gomock.Any(), "admin").Return(&database.User{ID: uuid.New(), Username: "admin", Password: hash}, nil)
+	store.EXPECT().IncrementFailedLogins(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	h := &AuthHandler{DB: store}
 	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "wrong"})
 	w := httptest.NewRecorder()
 	h.HandleLogin(w, httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body)))
 	if w.Code != 401 {
 		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestHandleLogin_AccountLocked(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	future := time.Now().Add(10 * time.Minute)
+	store.EXPECT().GetUserByUsername(gomock.Any(), "admin").Return(&database.User{
+		ID: uuid.New(), Username: "admin", LockedUntil: &future,
+	}, nil)
+	h := &AuthHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "any"})
+	w := httptest.NewRecorder()
+	h.HandleLogin(w, httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body)))
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w.Code)
 	}
 }
 
