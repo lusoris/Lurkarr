@@ -179,13 +179,14 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := &database.GeneralSettings{
-		SecretKey:            secretKey,
-		SSLVerify:            true,
-		APITimeout:           120,
-		StatefulResetHours:   168,
-		CommandWaitDelay:     1,
-		CommandWaitAttempts:  600,
-		MinDownloadQueueSize: 0,
+		SecretKey:                  secretKey,
+		SSLVerify:                  true,
+		APITimeout:                 120,
+		StatefulResetHours:         168,
+		CommandWaitDelay:           1,
+		CommandWaitAttempts:        600,
+		MinDownloadQueueSize:       0,
+		AutoImportIntervalMinutes:  5,
 	}
 	if err := h.DB.UpsertGeneralSettings(r.Context(), settings); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save settings"))

@@ -350,11 +350,11 @@ func (db *DB) GetGeneralSettings(ctx context.Context) (*GeneralSettings, error) 
 	err := db.Pool.QueryRow(ctx,
 		`SELECT secret_key, proxy_auth_bypass, ssl_verify, api_timeout,
 		        stateful_reset_hours, command_wait_delay, command_wait_attempts,
-		        min_download_queue_size
+		        min_download_queue_size, auto_import_interval_minutes
 		 FROM general_settings WHERE id = 1`,
 	).Scan(&s.SecretKey, &s.ProxyAuthBypass, &s.SSLVerify, &s.APITimeout,
 		&s.StatefulResetHours, &s.CommandWaitDelay, &s.CommandWaitAttempts,
-		&s.MinDownloadQueueSize)
+		&s.MinDownloadQueueSize, &s.AutoImportIntervalMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -364,8 +364,9 @@ func (db *DB) GetGeneralSettings(ctx context.Context) (*GeneralSettings, error) 
 func (db *DB) UpsertGeneralSettings(ctx context.Context, s *GeneralSettings) error {
 	_, err := db.Pool.Exec(ctx,
 		`INSERT INTO general_settings (id, secret_key, proxy_auth_bypass, ssl_verify, api_timeout,
-		    stateful_reset_hours, command_wait_delay, command_wait_attempts, min_download_queue_size)
-		 VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)
+		    stateful_reset_hours, command_wait_delay, command_wait_attempts, min_download_queue_size,
+		    auto_import_interval_minutes)
+		 VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 ON CONFLICT (id) DO UPDATE SET
 		    secret_key = EXCLUDED.secret_key,
 		    proxy_auth_bypass = EXCLUDED.proxy_auth_bypass,
@@ -374,10 +375,11 @@ func (db *DB) UpsertGeneralSettings(ctx context.Context, s *GeneralSettings) err
 		    stateful_reset_hours = EXCLUDED.stateful_reset_hours,
 		    command_wait_delay = EXCLUDED.command_wait_delay,
 		    command_wait_attempts = EXCLUDED.command_wait_attempts,
-		    min_download_queue_size = EXCLUDED.min_download_queue_size`,
+		    min_download_queue_size = EXCLUDED.min_download_queue_size,
+		    auto_import_interval_minutes = EXCLUDED.auto_import_interval_minutes`,
 		s.SecretKey, s.ProxyAuthBypass, s.SSLVerify, s.APITimeout,
 		s.StatefulResetHours, s.CommandWaitDelay, s.CommandWaitAttempts,
-		s.MinDownloadQueueSize,
+		s.MinDownloadQueueSize, s.AutoImportIntervalMinutes,
 	)
 	return err
 }

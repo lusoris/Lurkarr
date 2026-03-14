@@ -171,14 +171,15 @@ type AppSettings struct {
 }
 
 type GeneralSettings struct {
-	SecretKey            string `json:"secret_key"`
-	ProxyAuthBypass      bool   `json:"proxy_auth_bypass"`
-	SSLVerify            bool   `json:"ssl_verify"`
-	APITimeout           int    `json:"api_timeout"`
-	StatefulResetHours   int    `json:"stateful_reset_hours"`
-	CommandWaitDelay     int    `json:"command_wait_delay"`
-	CommandWaitAttempts  int    `json:"command_wait_attempts"`
-	MinDownloadQueueSize int    `json:"min_download_queue_size"`
+	SecretKey                  string `json:"secret_key"`
+	ProxyAuthBypass            bool   `json:"proxy_auth_bypass"`
+	SSLVerify                  bool   `json:"ssl_verify"`
+	APITimeout                 int    `json:"api_timeout"`
+	StatefulResetHours         int    `json:"stateful_reset_hours"`
+	CommandWaitDelay           int    `json:"command_wait_delay"`
+	CommandWaitAttempts        int    `json:"command_wait_attempts"`
+	MinDownloadQueueSize       int    `json:"min_download_queue_size"`
+	AutoImportIntervalMinutes  int    `json:"auto_import_interval_minutes"`
 }
 
 type ProcessedItem struct {

@@ -72,8 +72,11 @@ func (imp *Importer) importLoop(ctx context.Context, appType database.AppType) {
 	log := imp.logger.ForApp(string(appType))
 
 	for {
-		// Check every 5 minutes
-		if !sleep(ctx, 5*time.Minute) {
+		interval := 5 * time.Minute
+		if settings, err := imp.db.GetGeneralSettings(ctx); err == nil && settings.AutoImportIntervalMinutes > 0 {
+			interval = time.Duration(settings.AutoImportIntervalMinutes) * time.Minute
+		}
+		if !sleep(ctx, interval) {
 			return
 		}
 

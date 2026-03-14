@@ -374,7 +374,7 @@ func TestHandleUpdateGeneralSettings(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{SecretKey: "supersecret", APITimeout: 30}, nil)
 	store.EXPECT().UpsertGeneralSettings(gomock.Any(), gomock.Any()).Return(nil)
 	h := &SettingsHandler{DB: store}
-	body, _ := json.Marshal(database.GeneralSettings{APITimeout: 60, StatefulResetHours: 168})
+	body, _ := json.Marshal(database.GeneralSettings{APITimeout: 60, StatefulResetHours: 168, AutoImportIntervalMinutes: 5})
 	w := httptest.NewRecorder()
 	h.HandleUpdateGeneralSettings(w, httptest.NewRequest("PUT", "/api/settings/general", bytes.NewReader(body)))
 	if w.Code != 200 {
@@ -464,7 +464,7 @@ func TestHandleUpdateGeneralSettings_SaveError(t *testing.T) {
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{SecretKey: "s"}, nil)
 	store.EXPECT().UpsertGeneralSettings(gomock.Any(), gomock.Any()).Return(errors.New("fail"))
 	h := &SettingsHandler{DB: store}
-	body, _ := json.Marshal(database.GeneralSettings{APITimeout: 30, StatefulResetHours: 168})
+	body, _ := json.Marshal(database.GeneralSettings{APITimeout: 30, StatefulResetHours: 168, AutoImportIntervalMinutes: 5})
 	w := httptest.NewRecorder()
 	h.HandleUpdateGeneralSettings(w, httptest.NewRequest("PUT", "/api/settings/general", bytes.NewReader(body)))
 	if w.Code != 500 {

@@ -115,6 +115,10 @@ func (h *SettingsHandler) HandleUpdateGeneralSettings(w http.ResponseWriter, r *
 		writeJSON(w, http.StatusBadRequest, errorResponse("min_download_queue_size cannot be negative"))
 		return
 	}
+	if update.AutoImportIntervalMinutes < 1 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("auto_import_interval_minutes must be at least 1"))
+		return
+	}
 
 	if err := h.DB.UpsertGeneralSettings(r.Context(), &update); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save settings"))

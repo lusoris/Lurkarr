@@ -206,6 +206,7 @@ func TestImporterStopNilCancel(t *testing.T) {
 func TestImporterStartStop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	logger := newTestLogger()
@@ -327,6 +328,7 @@ func TestCheckInstance_UnsupportedAppType(t *testing.T) {
 func TestImportLoopCancellation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil).AnyTimes()
 
 	logger := newTestLogger()
 	defer logger.Close()
@@ -377,6 +379,7 @@ func TestImportLoop_ListInstancesError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil).AnyTimes()
 	store.EXPECT().ListEnabledInstances(gomock.Any(), database.AppSonarr).
 		Return(nil, context.DeadlineExceeded).AnyTimes()
 
