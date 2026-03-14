@@ -10,7 +10,8 @@ import (
 
 // SeerrHandler handles Seerr API endpoints.
 type SeerrHandler struct {
-	DB Store
+	DB     Store
+	Router *seerr.RequestRouter
 }
 
 // HandleGetSettings handles GET /api/seerr/settings.
@@ -159,4 +160,28 @@ func (h *SeerrHandler) HandleGetRequestCount(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusOK, count)
+}
+
+// HandleScanDuplicates scans all Seerr requests against cross-instance data
+// and returns flags for potential duplicates.
+func (h *SeerrHandler) HandleScanDuplicates(w http.ResponseWriter, r *http.Request) {
+	if h.Router == nil {
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse("request router not configured"))
+		return
+	}
+
+	settings, err := h.DB.GetSeerrSettings(r.Context())
+	if err != nil || settings.URL == "" || settings.APIKey == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("seerr not configured"))
+		return
+	}
+
+	client := seerr.NewClient(settings.URL, settings.APIKey, 30*time.Second)
+	result, err := h.Router.ScanForDuplicates(r.Context(), client)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, errorResponse("duplicate scan failed"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }

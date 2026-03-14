@@ -10,13 +10,17 @@ import (
 )
 
 type mockRoutingStore struct {
-	presences []database.MediaPresenceResult
-	findErr   error
-	actions   []database.CrossInstanceAction
-	createErr error
+	presences    []database.MediaPresenceResult
+	presenceByID map[string][]database.MediaPresenceResult
+	findErr      error
+	actions      []database.CrossInstanceAction
+	createErr    error
 }
 
-func (m *mockRoutingStore) FindMediaPresenceByExternalID(_ context.Context, _ string) ([]database.MediaPresenceResult, error) {
+func (m *mockRoutingStore) FindMediaPresenceByExternalID(_ context.Context, externalID string) ([]database.MediaPresenceResult, error) {
+	if m.presenceByID != nil {
+		return m.presenceByID[externalID], m.findErr
+	}
 	return m.presences, m.findErr
 }
 

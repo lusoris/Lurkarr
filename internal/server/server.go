@@ -21,6 +21,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/middleware"
 	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/scheduler"
+	"github.com/lusoris/lurkarr/internal/seerr"
 )
 
 // scalarHTML is the Scalar API reference page.
@@ -144,7 +145,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	queueH := &api.QueueHandler{DB: db}
 	blocklistH := &api.BlocklistHandler{DB: db}
 	notificationH := &api.NotificationHandler{DB: db, Manager: notifMgr}
-	seerrH := &api.SeerrHandler{DB: db}
+	seerrH := &api.SeerrHandler{DB: db, Router: &seerr.RequestRouter{DB: db}}
 	dlClientH := &api.DownloadClientHandler{DB: db}
 	sessionH := &api.SessionHandler{DB: db}
 	adminH := &api.AdminHandler{DB: db}
@@ -414,6 +415,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("POST /api/seerr/test", seerrH.HandleTestConnection)
 	protected.HandleFunc("GET /api/seerr/requests", seerrH.HandleGetRequests)
 	protected.HandleFunc("GET /api/seerr/requests/count", seerrH.HandleGetRequestCount)
+	protected.HandleFunc("POST /api/seerr/scan-duplicates", seerrH.HandleScanDuplicates)
 
 	// OIDC Settings
 	protected.HandleFunc("GET /api/oidc/settings", oidcSettingsH.HandleGetSettings)
