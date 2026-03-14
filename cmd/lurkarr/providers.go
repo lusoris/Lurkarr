@@ -123,6 +123,7 @@ func provideLogger() *logging.Logger {
 // provideNotifications creates the notification manager and loads providers from DB.
 func provideNotifications(db *database.DB) *notifications.Manager {
 	mgr := notifications.NewManager()
+	mgr.SetRecorder(&dbHistoryRecorder{db: db})
 	enabled, err := db.ListEnabledNotificationProviders(context.Background())
 	if err != nil {
 		slog.Warn("failed to load notification providers", "error", err)
@@ -140,6 +141,27 @@ func provideNotifications(db *database.DB) *notifications.Manager {
 		slog.Warn("some notification providers failed to load", "error", loadErr)
 	}
 	return mgr
+}
+
+// dbHistoryRecorder implements notifications.HistoryRecorder using the DB.
+type dbHistoryRecorder struct {
+	db *database.DB
+}
+
+func (r *dbHistoryRecorder) RecordNotification(ctx context.Context, entry notifications.HistoryEntry) error {
+	h := &database.NotificationHistory{
+		ProviderType: entry.ProviderType,
+		ProviderName: entry.ProviderName,
+		EventType:    entry.EventType,
+		Title:        entry.Title,
+		Message:      entry.Message,
+		AppType:      entry.AppType,
+		Instance:     entry.Instance,
+		Status:       entry.Status,
+		Error:        entry.Error,
+		DurationMs:   entry.DurationMs,
+	}
+	return r.db.InsertNotificationHistory(ctx, h)
 }
 
 // provideScheduler creates the scheduler (lifecycle hooks start/stop the cron engine).

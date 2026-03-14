@@ -182,3 +182,16 @@ func validProviderType(t string) bool {
 	}
 	return false
 }
+
+// HandleGetNotificationHistory handles GET /api/notifications/history.
+func (h *NotificationHandler) HandleGetNotificationHistory(w http.ResponseWriter, r *http.Request) {
+	history, err := h.DB.ListNotificationHistory(r.Context(), 200)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list notification history"))
+		return
+	}
+	if history == nil {
+		history = []database.NotificationHistory{}
+	}
+	writeJSON(w, http.StatusOK, history)
+}

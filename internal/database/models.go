@@ -448,6 +448,23 @@ type NotificationProvider struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 }
 
+// NotificationHistory records a single notification delivery attempt.
+type NotificationHistory struct {
+	ID           uuid.UUID  `json:"id"`
+	ProviderID   *uuid.UUID `json:"provider_id,omitempty"`
+	ProviderType string     `json:"provider_type"`
+	ProviderName string     `json:"provider_name"`
+	EventType    string     `json:"event_type"`
+	Title        string     `json:"title"`
+	Message      string     `json:"message"`
+	AppType      string     `json:"app_type"`
+	Instance     string     `json:"instance"`
+	Status       string     `json:"status"` // "sent" | "failed"
+	Error        string     `json:"error,omitempty"`
+	DurationMs   int        `json:"duration_ms"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
 // SeerrSettings holds Seerr integration configuration.
 type SeerrSettings struct {
 	ID                  uuid.UUID `json:"id"`

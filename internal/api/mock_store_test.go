@@ -923,6 +923,35 @@ func (mr *MockStoreMockRecorder) ListLurkHistory(ctx, q any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLurkHistory", reflect.TypeOf((*MockStore)(nil).ListLurkHistory), ctx, q)
 }
 
+// InsertNotificationHistory mocks base method.
+func (m *MockStore) InsertNotificationHistory(ctx context.Context, h *database.NotificationHistory) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertNotificationHistory", ctx, h)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertNotificationHistory indicates an expected call of InsertNotificationHistory.
+func (mr *MockStoreMockRecorder) InsertNotificationHistory(ctx, h any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertNotificationHistory", reflect.TypeOf((*MockStore)(nil).InsertNotificationHistory), ctx, h)
+}
+
+// ListNotificationHistory mocks base method.
+func (m *MockStore) ListNotificationHistory(ctx context.Context, limit int) ([]database.NotificationHistory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNotificationHistory", ctx, limit)
+	ret0, _ := ret[0].([]database.NotificationHistory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNotificationHistory indicates an expected call of ListNotificationHistory.
+func (mr *MockStoreMockRecorder) ListNotificationHistory(ctx, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNotificationHistory", reflect.TypeOf((*MockStore)(nil).ListNotificationHistory), ctx, limit)
+}
+
 // ListNotificationProviders mocks base method.
 func (m *MockStore) ListNotificationProviders(ctx context.Context) ([]database.NotificationProvider, error) {
 	m.ctrl.T.Helper()

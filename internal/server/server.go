@@ -403,6 +403,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("PUT /api/notifications/providers/{id}", notificationH.HandleUpdateProvider)
 	protected.HandleFunc("DELETE /api/notifications/providers/{id}", notificationH.HandleDeleteProvider)
 	protected.HandleFunc("POST /api/notifications/providers/{id}/test", notificationH.HandleTestProvider)
+	protected.HandleFunc("GET /api/notifications/history", notificationH.HandleGetNotificationHistory)
 
 	// Download Client Instances
 	protected.HandleFunc("GET /api/download-clients", dlClientH.HandleList)

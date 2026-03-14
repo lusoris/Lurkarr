@@ -140,6 +140,25 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// 7. Notification history.
+	if items, err := h.DB.ListNotificationHistory(r.Context(), perSource); err == nil {
+		for _, it := range items {
+			detail := it.ProviderName
+			if it.Status == "failed" && it.Error != "" {
+				detail = it.Error
+			}
+			events = append(events, ActivityEvent{
+				ID:        fmt.Sprintf("notif-%s", it.ID),
+				Source:    "notification",
+				AppType:   it.AppType,
+				Title:     it.Title,
+				Action:    it.Status,
+				Detail:    detail,
+				Timestamp: it.CreatedAt,
+			})
+		}
+	}
+
 	// Sort all events by timestamp descending, then truncate.
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].Timestamp.After(events[j].Timestamp)

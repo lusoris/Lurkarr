@@ -65,12 +65,32 @@ const (
 type Manager struct {
 	mu        sync.RWMutex
 	providers map[ProviderType]providerEntry
+	recorder  HistoryRecorder
 }
 
 // Notifier is a minimal interface for sending notification events.
 // Used by other packages to avoid a hard dependency on the full Manager.
 type Notifier interface {
 	Notify(ctx context.Context, event Event)
+}
+
+// HistoryRecorder persists notification delivery results.
+type HistoryRecorder interface {
+	RecordNotification(ctx context.Context, entry HistoryEntry) error
+}
+
+// HistoryEntry holds data for a single notification delivery attempt.
+type HistoryEntry struct {
+	ProviderType string
+	ProviderName string
+	EventType    string
+	Title        string
+	Message      string
+	AppType      string
+	Instance     string
+	Status       string // "sent" | "failed"
+	Error        string
+	DurationMs   int
 }
 
 type providerEntry struct {
@@ -83,6 +103,13 @@ func NewManager() *Manager {
 	return &Manager{
 		providers: make(map[ProviderType]providerEntry),
 	}
+}
+
+// SetRecorder configures an optional history recorder.
+func (m *Manager) SetRecorder(r HistoryRecorder) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.recorder = r
 }
 
 // Register adds a provider that will receive the specified event types.
@@ -119,33 +146,65 @@ func (m *Manager) Unregister(pt ProviderType) {
 // Errors are logged but do not halt delivery to other providers.
 func (m *Manager) Notify(ctx context.Context, event Event) {
 	m.mu.RLock()
-	entries := make([]providerEntry, 0, len(m.providers))
-	for _, e := range m.providers {
+	entries := make([]struct {
+		pt    ProviderType
+		entry providerEntry
+	}, 0, len(m.providers))
+	for pt, e := range m.providers {
 		if e.events[event.Type] {
-			entries = append(entries, e)
+			entries = append(entries, struct {
+				pt    ProviderType
+				entry providerEntry
+			}{pt, e})
 		}
 	}
+	recorder := m.recorder
 	m.mu.RUnlock()
 
 	var wg sync.WaitGroup
-	for _, entry := range entries {
+	for _, item := range entries {
 		wg.Add(1)
-		go func(e providerEntry) {
+		go func(pt ProviderType, e providerEntry) {
 			defer wg.Done()
 			start := time.Now()
 			name := e.provider.Name()
-			if err := e.provider.Send(ctx, event); err != nil {
+			sendErr := e.provider.Send(ctx, event)
+			dur := time.Since(start)
+
+			if sendErr != nil {
 				metrics.NotificationErrorsTotal.WithLabelValues(name, string(event.Type)).Inc()
 				slog.Error("notification delivery failed",
 					"provider", name,
 					"event", event.Type,
-					"error", err,
+					"error", sendErr,
 				)
 			} else {
 				metrics.NotificationSentTotal.WithLabelValues(name, string(event.Type)).Inc()
 			}
-			metrics.NotificationDuration.WithLabelValues(name).Observe(time.Since(start).Seconds())
-		}(entry)
+			metrics.NotificationDuration.WithLabelValues(name).Observe(dur.Seconds())
+
+			if recorder != nil {
+				entry := HistoryEntry{
+					ProviderType: string(pt),
+					ProviderName: name,
+					EventType:    string(event.Type),
+					Title:        event.Title,
+					Message:      event.Message,
+					AppType:      event.AppType,
+					Instance:     event.Instance,
+					Status:       "sent",
+					DurationMs:   int(dur.Milliseconds()),
+				}
+				if sendErr != nil {
+					entry.Status = "failed"
+					entry.Error = sendErr.Error()
+				}
+				if recErr := recorder.RecordNotification(ctx, entry); recErr != nil {
+					slog.Error("failed to record notification history",
+						"provider", name, "error", recErr)
+				}
+			}
+		}(item.pt, item.entry)
 	}
 	wg.Wait()
 }

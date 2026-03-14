@@ -100,6 +100,8 @@ type Store interface {
 	CreateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	UpdateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error
 	DeleteNotificationProvider(ctx context.Context, id uuid.UUID) error
+	ListNotificationHistory(ctx context.Context, limit int) ([]database.NotificationHistory, error)
+	InsertNotificationHistory(ctx context.Context, h *database.NotificationHistory) error
 
 	// Download Clients (legacy per-app)
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
