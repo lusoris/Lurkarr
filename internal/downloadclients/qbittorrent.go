@@ -68,6 +68,14 @@ func (a *QBittorrentAdapter) ResumeAll(ctx context.Context) error {
 	return a.client.ResumeTorrents(ctx, []string{"all"})
 }
 
+func (a *QBittorrentAdapter) ResumeItem(ctx context.Context, id string) error {
+	return a.client.ResumeTorrents(ctx, []string{id})
+}
+
+func (a *QBittorrentAdapter) RecheckItem(ctx context.Context, id string) error {
+	return a.client.RecheckTorrents(ctx, []string{id})
+}
+
 func (a *QBittorrentAdapter) RemoveItem(ctx context.Context, id string, deleteData bool) error {
 	return a.client.DeleteTorrents(ctx, []string{id}, deleteData)
 }

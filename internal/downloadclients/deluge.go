@@ -83,6 +83,14 @@ func (a *DelugeAdapter) ResumeAll(ctx context.Context) error {
 	return a.client.ResumeTorrents(ctx, hashes)
 }
 
+func (a *DelugeAdapter) ResumeItem(ctx context.Context, id string) error {
+	return a.client.ResumeTorrents(ctx, []string{id})
+}
+
+func (a *DelugeAdapter) RecheckItem(ctx context.Context, id string) error {
+	return a.client.RecheckTorrents(ctx, []string{id})
+}
+
 func (a *DelugeAdapter) RemoveItem(ctx context.Context, id string, deleteData bool) error {
 	return a.client.DeleteTorrents(ctx, []string{id}, deleteData)
 }

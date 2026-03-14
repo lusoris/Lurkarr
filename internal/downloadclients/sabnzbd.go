@@ -63,6 +63,10 @@ func (a *SABnzbdAdapter) ResumeAll(ctx context.Context) error {
 	return a.client.Resume(ctx)
 }
 
+func (a *SABnzbdAdapter) ResumeItem(_ context.Context, _ string) error { return nil }
+
+func (a *SABnzbdAdapter) RecheckItem(_ context.Context, _ string) error { return nil }
+
 func (a *SABnzbdAdapter) RemoveItem(ctx context.Context, id string, _ bool) error {
 	return a.client.DeleteQueueItem(ctx, id)
 }

@@ -42,6 +42,10 @@ type Client interface {
 	PauseAll(ctx context.Context) error
 	// ResumeAll resumes all downloads.
 	ResumeAll(ctx context.Context) error
+	// ResumeItem resumes a single download by its ID.
+	ResumeItem(ctx context.Context, id string) error
+	// RecheckItem triggers a data integrity recheck for a download by its ID.
+	RecheckItem(ctx context.Context, id string) error
 	// RemoveItem removes a download by its ID. If deleteData is true, downloaded files are also removed.
 	RemoveItem(ctx context.Context, id string, deleteData bool) error
 	// GetStatus returns overall client status.

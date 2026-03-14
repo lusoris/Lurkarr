@@ -57,7 +57,7 @@ type jsonRPCError struct {
 	Code    int    `json:"code"`
 }
 
-// login authenticates with the Deluge Web UI.
+// login authenticates with the Deluge Web UI and ensures the daemon is connected.
 func (c *Client) login(ctx context.Context) error {
 	result, err := c.call(ctx, "auth.login", []interface{}{c.Password})
 	if err != nil {
@@ -71,7 +71,46 @@ func (c *Client) login(ctx context.Context) error {
 		return fmt.Errorf("login rejected: invalid password")
 	}
 	c.authenticated = true
+
+	// Ensure the WebUI is connected to its daemon.
+	if err := c.ensureDaemonConnected(ctx); err != nil {
+		return fmt.Errorf("daemon connect: %w", err)
+	}
 	return nil
+}
+
+// ensureDaemonConnected checks if the WebUI has an active daemon connection,
+// and if not, connects to the first configured host.
+func (c *Client) ensureDaemonConnected(ctx context.Context) error {
+	raw, err := c.call(ctx, "web.connected", nil)
+	if err != nil {
+		return err
+	}
+	var connected bool
+	if err := json.Unmarshal(raw, &connected); err == nil && connected {
+		return nil
+	}
+
+	// Get configured hosts and connect to the first one.
+	raw, err = c.call(ctx, "web.get_hosts", nil)
+	if err != nil {
+		return fmt.Errorf("web.get_hosts: %w", err)
+	}
+	var hosts []json.RawMessage
+	if err := json.Unmarshal(raw, &hosts); err != nil || len(hosts) == 0 {
+		return fmt.Errorf("no daemon hosts configured")
+	}
+	// Each host is [id, ip, port, user]; extract the id (first element).
+	var firstHost []json.RawMessage
+	if err := json.Unmarshal(hosts[0], &firstHost); err != nil || len(firstHost) == 0 {
+		return fmt.Errorf("invalid host entry")
+	}
+	var hostID string
+	if err := json.Unmarshal(firstHost[0], &hostID); err != nil {
+		return fmt.Errorf("decode host id: %w", err)
+	}
+	_, err = c.call(ctx, "web.connect", []interface{}{hostID})
+	return err
 }
 
 // ensureAuth logs in if not already authenticated.
@@ -211,6 +250,12 @@ func (c *Client) ResumeTorrents(ctx context.Context, hashes []string) error {
 	return err
 }
 
+// RecheckTorrents triggers a data integrity recheck for the specified torrents.
+func (c *Client) RecheckTorrents(ctx context.Context, hashes []string) error {
+	_, err := c.authenticatedCall(ctx, "core.force_recheck", []interface{}{hashes})
+	return err
+}
+
 // DeleteTorrents removes the specified torrents. If removeData is true, downloaded data is also removed.
 func (c *Client) DeleteTorrents(ctx context.Context, hashes []string, removeData bool) error {
 	for _, hash := range hashes {
@@ -224,7 +269,7 @@ func (c *Client) DeleteTorrents(ctx context.Context, hashes []string, removeData
 
 // GetVersion returns the Deluge daemon version.
 func (c *Client) GetVersion(ctx context.Context) (string, error) {
-	raw, err := c.authenticatedCall(ctx, "daemon.info", nil)
+	raw, err := c.authenticatedCall(ctx, "daemon.get_version", nil)
 	if err != nil {
 		return "", err
 	}

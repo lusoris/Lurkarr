@@ -204,6 +204,13 @@ func (c *Client) ResumeTorrents(ctx context.Context, ids []int) error {
 	return err
 }
 
+// RecheckTorrents triggers a data integrity verify for the specified torrents.
+func (c *Client) RecheckTorrents(ctx context.Context, ids []int) error {
+	args := map[string]interface{}{"ids": ids}
+	_, err := c.doRPC(ctx, "torrent-verify", args)
+	return err
+}
+
 // DeleteTorrents removes the specified torrents. If deleteData is true, local data is also removed.
 func (c *Client) DeleteTorrents(ctx context.Context, ids []int, deleteData bool) error {
 	args := map[string]interface{}{

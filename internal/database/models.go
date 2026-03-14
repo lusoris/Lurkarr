@@ -354,6 +354,8 @@ type QueueCleanerSettings struct {
 	// Unregistered torrent detection
 	UnregisteredEnabled      bool `json:"unregistered_enabled"`       // Detect and strike torrents removed from tracker
 	MaxStrikesUnregistered   int  `json:"max_strikes_unregistered"`   // Override max_strikes for unregistered items (0 = use global)
+	// Recheck paused torrents
+	RecheckPausedEnabled bool `json:"recheck_paused_enabled"` // Recheck paused torrents and auto-resume if complete
 }
 
 // QueueStrike represents a strike against a problematic download.

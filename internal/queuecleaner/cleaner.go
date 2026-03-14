@@ -444,6 +444,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		c.cleanUnmonitored(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
 	}
 
+	// 4.7. Recheck paused torrents — verify integrity and auto-resume if complete
+	if settings.RecheckPausedEnabled {
+		c.recheckPaused(ctx, log, appType, queue.Records)
+	}
+
 	return removed
 }
 
@@ -851,6 +856,70 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 
 // seedingLimitReached evaluates whether a torrent has exceeded the configured
 // seeding limits. In "or" mode either condition triggers; in "and" mode both must be met.
+// recheckPaused triggers a data integrity recheck on paused torrents and
+// auto-resumes them if they're already complete. This recovers torrents that
+// were paused due to transient errors but have valid data.
+func (c *Cleaner) recheckPaused(ctx context.Context, log *slog.Logger, appType database.AppType, records []arrclient.QueueRecord) {
+	torrentClient := c.getDownloadClient(ctx, appType)
+	if torrentClient == nil {
+		return
+	}
+
+	items, err := torrentClient.GetItems(ctx)
+	if err != nil {
+		log.Error("failed to get torrent items for recheck", "error", err)
+		return
+	}
+
+	itemsByID := make(map[string]downloadclient.DownloadItem, len(items))
+	for _, item := range items {
+		itemsByID[strings.ToLower(item.ID)] = item
+	}
+
+	for _, record := range records {
+		if record.Protocol != "torrent" || record.DownloadID == "" {
+			continue
+		}
+
+		item, ok := itemsByID[strings.ToLower(record.DownloadID)]
+		if !ok {
+			continue
+		}
+
+		if !isPausedStatus(item.Status) {
+			continue
+		}
+
+		if item.Progress >= 1.0 {
+			// Already complete — just resume, no recheck needed.
+			log.Info("resuming complete paused torrent", "title", record.Title, "hash", item.ID)
+			if err := torrentClient.ResumeItem(ctx, item.ID); err != nil {
+				log.Error("failed to resume torrent", "title", record.Title, "error", err)
+			}
+			continue
+		}
+
+		// Incomplete and paused — trigger recheck so the client verifies data integrity.
+		log.Info("rechecking paused torrent", "title", record.Title, "hash", item.ID, "progress", item.Progress)
+		if err := torrentClient.RecheckItem(ctx, item.ID); err != nil {
+			log.Error("failed to trigger recheck", "title", record.Title, "error", err)
+		}
+	}
+}
+
+// isPausedStatus returns true if the download client status indicates a paused torrent.
+func isPausedStatus(status string) bool {
+	switch status {
+	case "pausedDL", "pausedUP": // qBittorrent
+		return true
+	case "stopped": // Transmission
+		return true
+	case "Paused": // Deluge
+		return true
+	}
+	return false
+}
+
 func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, item downloadclient.DownloadItem) bool {
 	ratioMet := settings.SeedingMaxRatio > 0 && item.Ratio >= settings.SeedingMaxRatio
 	timeMet := settings.SeedingMaxHours > 0 && item.SeedingTime >= int64(settings.SeedingMaxHours)*3600

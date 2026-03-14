@@ -74,6 +74,10 @@ func (a *NZBGetAdapter) ResumeAll(ctx context.Context) error {
 	return a.client.Resume(ctx)
 }
 
+func (a *NZBGetAdapter) ResumeItem(_ context.Context, _ string) error { return nil }
+
+func (a *NZBGetAdapter) RecheckItem(_ context.Context, _ string) error { return nil }
+
 func (a *NZBGetAdapter) RemoveItem(ctx context.Context, id string, _ bool) error {
 	nzbID, err := strconv.Atoi(id)
 	if err != nil {

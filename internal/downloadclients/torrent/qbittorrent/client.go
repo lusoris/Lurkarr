@@ -257,6 +257,13 @@ func (c *Client) ResumeTorrents(ctx context.Context, hashes []string) error {
 	return err
 }
 
+// RecheckTorrents triggers a data integrity recheck for the specified torrents.
+func (c *Client) RecheckTorrents(ctx context.Context, hashes []string) error {
+	form := url.Values{"hashes": {strings.Join(hashes, "|")}}
+	_, err := c.apiPost(ctx, "/api/v2/torrents/recheck", form)
+	return err
+}
+
 // DeleteTorrents deletes torrents by hash. If deleteFiles is true, downloaded data is also removed.
 func (c *Client) DeleteTorrents(ctx context.Context, hashes []string, deleteFiles bool) error {
 	deleteStr := "false"

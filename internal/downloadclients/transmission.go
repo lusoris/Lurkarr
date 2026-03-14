@@ -110,6 +110,22 @@ func (a *TransmissionAdapter) ResumeAll(ctx context.Context) error {
 	return a.client.ResumeTorrents(ctx, ids)
 }
 
+func (a *TransmissionAdapter) ResumeItem(ctx context.Context, id string) error {
+	torrentID, err := strconv.Atoi(id)
+	if err != nil {
+		return err
+	}
+	return a.client.ResumeTorrents(ctx, []int{torrentID})
+}
+
+func (a *TransmissionAdapter) RecheckItem(ctx context.Context, id string) error {
+	torrentID, err := strconv.Atoi(id)
+	if err != nil {
+		return err
+	}
+	return a.client.RecheckTorrents(ctx, []int{torrentID})
+}
+
 func (a *TransmissionAdapter) RemoveItem(ctx context.Context, id string, deleteData bool) error {
 	torrentID, err := strconv.Atoi(id)
 	if err != nil {
