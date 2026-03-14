@@ -297,6 +297,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	}
 
 	// 2. Stalled/slow detection with strike system
+	pipeSaturated := isBandwidthSaturated(log, settings, queue.Records)
 	for _, record := range queue.Records {
 		if record.TrackedDownloadState == "importPending" {
 			continue // Don't strike items waiting for import
@@ -316,7 +317,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			}
 		}
 
-		reason := c.detectProblem(record, settings, sabStatuses)
+		reason := c.detectProblem(record, settings, sabStatuses, pipeSaturated)
 		if reason == "" {
 			continue
 		}
@@ -369,7 +370,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 // detectProblem checks if a queue item is stalled, slow, or metadata-stuck.
 // Returns the reason string, or "" if no problem.
-func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string) string {
+func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string, pipeSaturated bool) string {
 	// For Usenet via SABnzbd: check actual SABnzbd status.
 	// SABnzbd items show as "Queued" when they're just waiting for a slot,
 	// NOT because they're stalled.
@@ -406,7 +407,7 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 	}
 
 	// Check download speed for active downloads
-	if record.Size > 0 && record.Sizeleft > 0 && record.Sizeleft < record.Size && settings.SlowThresholdBytesPerSec > 0 {
+	if !pipeSaturated && record.Size > 0 && record.Sizeleft > 0 && record.Sizeleft < record.Size && settings.SlowThresholdBytesPerSec > 0 {
 		// Skip slow detection for large downloads if configured
 		if settings.SlowIgnoreAboveBytes > 0 && record.Sizeleft > settings.SlowIgnoreAboveBytes {
 			return ""
@@ -1110,6 +1111,32 @@ func filterProtectedTags(ctx context.Context, log *slog.Logger, client *arrclien
 		}
 	}
 	return filtered
+}
+
+// isBandwidthSaturated estimates total download bandwidth from queue records and
+// returns true when usage exceeds 80% of the configured limit. When true, slow
+// detection is suppressed to avoid false positives from a full pipe.
+func isBandwidthSaturated(log *slog.Logger, settings *database.QueueCleanerSettings, records []arrclient.QueueRecord) bool {
+	if settings.BandwidthLimitBytesPerSec <= 0 || settings.SlowThresholdBytesPerSec <= 0 {
+		return false
+	}
+
+	var totalSpeed int64
+	for _, rec := range records {
+		if rec.Size > 0 && rec.Sizeleft > 0 && rec.Sizeleft < rec.Size {
+			if tl := parseTimeleft(rec.TimeleftStr); tl > 0 {
+				totalSpeed += rec.Sizeleft / int64(tl.Seconds())
+			}
+		}
+	}
+
+	threshold := settings.BandwidthLimitBytesPerSec * 80 / 100
+	if totalSpeed >= threshold {
+		log.Info("bandwidth saturated, skipping slow detection",
+			"estimated_speed", totalSpeed, "threshold", threshold)
+		return true
+	}
+	return false
 }
 
 // filterIgnoredIndexers removes queue records from indexers listed in the

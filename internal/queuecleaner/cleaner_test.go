@@ -31,7 +31,7 @@ func TestDetectProblemStalled(t *testing.T) {
 		StrikePrivate: true,
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "stalled" {
 		t.Errorf("detectProblem() = %q, want stalled", reason)
 	}
@@ -49,7 +49,7 @@ func TestDetectProblemStalledPublicSkip(t *testing.T) {
 		StrikePrivate: true,
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty reason for public torrent with StrikePublic=false, got %q", reason)
 	}
@@ -66,7 +66,7 @@ func TestDetectProblemUsenetSABnzbdQueued(t *testing.T) {
 	settings := &database.QueueCleanerSettings{StrikePublic: true}
 	sabStatuses := map[string]string{"sab123": "Queued"}
 
-	reason := c.detectProblem(record, settings, sabStatuses)
+	reason := c.detectProblem(record, settings, sabStatuses, false)
 	if reason != "" {
 		t.Errorf("expected empty reason for SABnzbd Queued item, got %q", reason)
 	}
@@ -83,7 +83,7 @@ func TestDetectProblemUsenetSABnzbdGrabbing(t *testing.T) {
 	settings := &database.QueueCleanerSettings{StrikePublic: true}
 	sabStatuses := map[string]string{"sab456": "Grabbing"}
 
-	reason := c.detectProblem(record, settings, sabStatuses)
+	reason := c.detectProblem(record, settings, sabStatuses, false)
 	if reason != "" {
 		t.Errorf("expected empty reason for SABnzbd Grabbing, got %q", reason)
 	}
@@ -98,7 +98,7 @@ func TestDetectProblemUsenetSABnzbdPaused(t *testing.T) {
 	settings := &database.QueueCleanerSettings{}
 	sabStatuses := map[string]string{"sab789": "Paused"}
 
-	reason := c.detectProblem(record, settings, sabStatuses)
+	reason := c.detectProblem(record, settings, sabStatuses, false)
 	if reason != "paused_in_sabnzbd" {
 		t.Errorf("detectProblem() = %q, want paused_in_sabnzbd", reason)
 	}
@@ -115,7 +115,7 @@ func TestDetectProblemMetadataStuck(t *testing.T) {
 		MetadataStuckMinutes: 15,
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "metadata_stuck" {
 		t.Errorf("detectProblem() = %q, want metadata_stuck", reason)
 	}
@@ -132,7 +132,7 @@ func TestDetectProblemMetadataStuckDelay(t *testing.T) {
 		MetadataStuckMinutes: 15,
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "metadata_stuck" {
 		t.Errorf("detectProblem() = %q, want metadata_stuck", reason)
 	}
@@ -149,7 +149,7 @@ func TestDetectProblemMetadataStuckDisabled(t *testing.T) {
 		MetadataStuckMinutes: 0,
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty for disabled metadata stuck, got %q", reason)
 	}
@@ -166,7 +166,7 @@ func TestDetectProblemSlowDownload(t *testing.T) {
 		SlowThresholdBytesPerSec: 100 * 1024, // 100 KB/s
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "slow" {
 		t.Errorf("detectProblem() = %q, want slow", reason)
 	}
@@ -184,7 +184,7 @@ func TestDetectProblemSlowIgnoreAboveBytes(t *testing.T) {
 		SlowIgnoreAboveBytes:     30 * 1024 * 1024 * 1024, // Ignore if >30GB remaining
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty for large remaining download, got %q", reason)
 	}
@@ -203,7 +203,7 @@ func TestDetectProblemNoProblem(t *testing.T) {
 		SlowThresholdBytesPerSec: 100 * 1024,
 	}
 
-	reason := c.detectProblem(record, settings, nil)
+	reason := c.detectProblem(record, settings, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty for healthy download, got %q", reason)
 	}

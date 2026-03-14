@@ -49,6 +49,7 @@
 		protected_tags: string;
 		search_on_remove: boolean;
 		ignored_indexers: string;
+		bandwidth_limit_bytes_per_sec: number;
 	}
 
 	interface ScoringProfile {
@@ -351,6 +352,7 @@
 						<Input bind:value={settings.slow_threshold_bytes_per_sec} type="number" label="Slow (bytes/s)" hint="Below this = slow" />
 						<Input bind:value={settings.slow_ignore_above_bytes} type="number" label="Ignore Slow Above" hint="0 = disabled" />
 						<Input bind:value={settings.metadata_stuck_minutes} type="number" label="Metadata Stuck (min)" hint="0 = disabled" />
+						<Input bind:value={settings.bandwidth_limit_bytes_per_sec} type="number" label="Bandwidth Limit (bytes/s)" hint="Skip slow detection when >80% saturated (0 = disabled)" />
 					</div>
 				</Card>
 
