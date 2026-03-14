@@ -367,6 +367,10 @@ type QueueCleanerSettings struct {
 	BlocklistUnregistered bool `json:"blocklist_unregistered"` // Blocklist when removing unregistered torrents
 	// Ignore specific download clients
 	IgnoredDownloadClients string `json:"ignored_download_clients"` // Comma-separated download client names to skip during cleanup
+	// Metadata mismatch detection
+	MismatchEnabled    bool `json:"mismatch_enabled"`     // Detect and strike downloads with wrong metadata (wrong series/movie/episode)
+	MaxStrikesMismatch int  `json:"max_strikes_mismatch"` // Override max_strikes for mismatch items (0 = use global)
+	BlocklistMismatch  bool `json:"blocklist_mismatch"`   // Blocklist when removing mismatched items
 }
 
 // QueueStrike represents a strike against a problematic download.

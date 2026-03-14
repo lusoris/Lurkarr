@@ -450,6 +450,12 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		c.cleanUnmonitored(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
 	}
 
+	// 4.8. Metadata mismatch detection — strike/remove items where download
+	// doesn't match the expected media (wrong series/movie/episode).
+	if settings.MismatchEnabled {
+		c.cleanMismatches(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
+	}
+
 	// 4.7. Recheck paused torrents — verify integrity and auto-resume if complete
 	if settings.RecheckPausedEnabled {
 		c.recheckPaused(ctx, log, appType, queue.Records)
@@ -586,6 +592,36 @@ func isUnregisteredTorrent(record arrclient.QueueRecord) bool {
 		for _, msg := range sm.Messages {
 			lower := strings.ToLower(msg)
 			for _, kw := range unregisteredKeywords {
+				if strings.Contains(lower, kw) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// mismatchKeywords are substrings in arr status messages that indicate a
+// download's metadata doesn't match the expected media. Matched case-insensitively.
+var mismatchKeywords = []string{
+	"no matching series",
+	"no matching movie",
+	"no matching artist",
+	"no matching album",
+	"no matching author",
+	"no matching book",
+	"series was matched by series id",
+	"unable to identify correct episode",
+	"unable to identify correct movie",
+}
+
+// isMismatchedRelease checks whether a queue record's status messages indicate
+// the download doesn't match the expected media (wrong series/movie/episode).
+func isMismatchedRelease(record arrclient.QueueRecord) bool {
+	for _, sm := range record.StatusMessages {
+		for _, msg := range sm.Messages {
+			lower := strings.ToLower(msg)
+			for _, kw := range mismatchKeywords {
 				if strings.Contains(lower, kw) {
 					return true
 				}
@@ -1036,6 +1072,57 @@ func (c *Cleaner) cleanUnmonitored(ctx context.Context, log *slog.Logger, appTyp
 	}
 }
 
+// cleanMismatches detects and strikes queue items where the download doesn't
+// match the expected media (wrong series/movie/episode) based on *arr status messages.
+// Uses the strike system since mismatches can be transient during initial processing.
+func (c *Cleaner) cleanMismatches(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, lurker lurking.ArrLurker, searchBudget *int) {
+	for _, record := range records {
+		// Only check items in warning state with import pending/failed — that's where
+		// mismatch messages appear. Skip items that imported successfully.
+		if record.TrackedDownloadStatus != "warning" {
+			continue
+		}
+		if record.TrackedDownloadState != "importPending" && record.TrackedDownloadState != "importFailed" {
+			continue
+		}
+		if !isMismatchedRelease(record) {
+			continue
+		}
+
+		if settings.DryRun {
+			log.Info("[DRY-RUN] would strike (metadata mismatch)", "title", record.Title, "download_id", record.DownloadID)
+			continue
+		}
+
+		count, err := c.db.AddStrikeAndCount(ctx, appType, inst.ID, record.DownloadID, record.Title, "mismatch", settings.StrikeWindowHours)
+		if err != nil {
+			log.Error("failed to add mismatch strike", "error", err)
+			continue
+		}
+		metrics.QueueCleanerStrikes.WithLabelValues(string(appType), inst.Name).Inc()
+
+		maxStrikes := effectiveMaxStrikes("mismatch", settings)
+		log.Info("mismatch strike added", "title", record.Title, "strikes", count, "max", maxStrikes)
+
+		if count >= maxStrikes {
+			log.Warn("metadata mismatch — max strikes reached, removing", "title", record.Title, "download_id", record.DownloadID)
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, shouldBlocklist("mismatch", settings)); err != nil {
+				log.Error("failed to remove mismatched item", "title", record.Title, "error", err)
+				continue
+			}
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "mismatch"); err != nil {
+				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+			}
+			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
+			c.notifyRemoval(ctx, appType, inst.Name, record.Title, "mismatch")
+			if settings.SearchOnRemove {
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+			}
+		}
+	}
+}
+
 // syncBlocklistAcross propagates removals to sibling instances of the same app type.
 // Matching uses external media IDs (TMDB for Radarr, TVDB+season for Sonarr, etc.)
 // so that different releases of the same media are correctly matched across instances
@@ -1461,6 +1548,10 @@ func effectiveMaxStrikes(reason string, settings *database.QueueCleanerSettings)
 		if settings.MaxStrikesUnregistered > 0 {
 			return settings.MaxStrikesUnregistered
 		}
+	case "mismatch":
+		if settings.MaxStrikesMismatch > 0 {
+			return settings.MaxStrikesMismatch
+		}
 	}
 	return settings.MaxStrikes
 }
@@ -1479,6 +1570,8 @@ func shouldBlocklist(reason string, settings *database.QueueCleanerSettings) boo
 		return settings.BlocklistDuplicate
 	case "unregistered":
 		return settings.BlocklistUnregistered
+	case "mismatch":
+		return settings.BlocklistMismatch
 	}
 	return settings.BlocklistOnRemove
 }

@@ -73,6 +73,9 @@
 		blocklist_duplicate: boolean;
 		blocklist_unregistered: boolean;
 		ignored_download_clients: string;
+		mismatch_enabled: boolean;
+		max_strikes_mismatch: number;
+		blocklist_mismatch: boolean;
 	}
 
 	interface ScoringProfile {
@@ -436,6 +439,7 @@
 								<Toggle bind:checked={settings.blocklist_metadata} label="Blocklist Metadata Stuck" />
 								<Toggle bind:checked={settings.blocklist_duplicate} label="Blocklist Duplicates" />
 								<Toggle bind:checked={settings.blocklist_unregistered} label="Blocklist Unregistered" />
+								<Toggle bind:checked={settings.blocklist_mismatch} label="Blocklist Mismatch" />
 							</div>
 						</details>
 						<Toggle bind:checked={settings.search_on_remove} label="Re-search on Remove" hint="Trigger a new search when an item is removed (blocklist, stalled, failed import)" />
@@ -457,6 +461,16 @@
 						<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" />
 						<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" />
 						<Input bind:value={settings.failed_import_patterns} label="Message Patterns" hint="Comma-separated substrings to match (empty = built-in defaults: import failed, no files found, etc.)" />
+					</div>
+				</Card>
+
+				<Card>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Metadata Mismatch</h3>
+					<div class="space-y-2">
+						<Toggle bind:checked={settings.mismatch_enabled} label="Detect Metadata Mismatches" hint="Strike downloads whose metadata doesn't match the expected media (wrong series/movie/episode)" />
+						{#if settings.mismatch_enabled}
+							<Input bind:value={settings.max_strikes_mismatch} type="number" label="Max Strikes (mismatch)" hint="0 = use global max strikes" />
+						{/if}
 					</div>
 				</Card>
 
