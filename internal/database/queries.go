@@ -183,7 +183,7 @@ func (db *DB) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
 }
 
 // DeleteUserSessionsExcept deletes all sessions for a user except the given session.
-func (db *DB) DeleteUserSessionsExcept(ctx context.Context, userID uuid.UUID, keep uuid.UUID) error {
+func (db *DB) DeleteUserSessionsExcept(ctx context.Context, userID, keep uuid.UUID) error {
 	_, err := db.Pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND id != $2`, userID, keep)
 	return err
 }

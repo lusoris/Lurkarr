@@ -60,7 +60,7 @@ func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Only update API key if a non-masked value is provided.
-	if req.APIKey != "" && !(len(req.APIKey) >= 4 && req.APIKey[:4] == "****") {
+	if req.APIKey != "" && (len(req.APIKey) < 4 || req.APIKey[:4] != "****") {
 		settings.APIKey = req.APIKey
 	}
 

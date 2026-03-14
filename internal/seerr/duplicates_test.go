@@ -111,8 +111,8 @@ func TestScanForDuplicates_Pagination(t *testing.T) {
 		}
 		for i := skip; i < end; i++ {
 			results = append(results, MediaRequest{
-				ID:   i + 1,
-				Type: "movie",
+				ID:    i + 1,
+				Type:  "movie",
 				Media: Media{TmdbID: i + 100},
 			})
 		}

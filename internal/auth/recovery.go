@@ -12,7 +12,7 @@ const recoveryCodeCount = 10
 
 // GenerateRecoveryCodes creates a set of random recovery codes and their bcrypt hashes.
 // Returns plaintext codes (to show the user once) and hashed codes (to store in DB).
-func GenerateRecoveryCodes() (plain []string, hashed []string, err error) {
+func GenerateRecoveryCodes() (plain, hashed []string, err error) {
 	plain = make([]string, recoveryCodeCount)
 	hashed = make([]string, recoveryCodeCount)
 
@@ -24,7 +24,7 @@ func GenerateRecoveryCodes() (plain []string, hashed []string, err error) {
 		code := hex.EncodeToString(b) // 8-char hex string
 		plain[i] = fmt.Sprintf("%s-%s", code[:4], code[4:])
 
-		hash, err := bcrypt.GenerateFromPassword([]byte(plain[i]), bcrypt.MinCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(plain[i]), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, nil, fmt.Errorf("hash recovery code: %w", err)
 		}

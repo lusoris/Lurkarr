@@ -42,7 +42,7 @@ func TestHasHardlinks_EmptyDir(t *testing.T) {
 
 func TestHasHardlinks_DirWithSingleFile(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("data"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("data"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// On non-Linux: always false (stub). On Linux: single file has nlink=1, so false.

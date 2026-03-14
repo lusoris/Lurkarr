@@ -46,7 +46,6 @@ type OIDCHandler struct {
 	verifier     *oidc.IDTokenVerifier
 	oauth2Config *oauth2.Config
 	initOnce     sync.Once
-	initErr      error
 
 	// ConfigLoader optionally loads config from DB (overrides static Config).
 	ConfigLoader func() (*OIDCConfig, error)

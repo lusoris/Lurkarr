@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -43,7 +45,7 @@ func dbCredToWebAuthn(c database.WebAuthnCredential) webauthn.Credential {
 		Transport:       transport,
 		Authenticator: webauthn.Authenticator{
 			AAGUID:    aaguid[:],
-			SignCount: uint32(c.SignCount),
+			SignCount: uint32(min(c.SignCount, math.MaxUint32)), // #nosec G115 -- clamped to MaxUint32
 		},
 	}
 }
@@ -66,7 +68,7 @@ type sessionEntry struct {
 }
 
 // NewPasskeyHandler creates a PasskeyHandler with the given WebAuthn configuration.
-func NewPasskeyHandler(db Store, authMw *auth.Middleware, wa *webauthn.WebAuthn) *PasskeyHandler {
+func NewPasskeyHandler(ctx context.Context, db Store, authMw *auth.Middleware, wa *webauthn.WebAuthn) *PasskeyHandler {
 	h := &PasskeyHandler{
 		DB:       db,
 		Auth:     authMw,
@@ -77,15 +79,20 @@ func NewPasskeyHandler(db Store, authMw *auth.Middleware, wa *webauthn.WebAuthn)
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			h.mu.Lock()
-			now := time.Now()
-			for k, v := range h.sessions {
-				if now.After(v.expiresAt) {
-					delete(h.sessions, k)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.mu.Lock()
+				now := time.Now()
+				for k, v := range h.sessions {
+					if now.After(v.expiresAt) {
+						delete(h.sessions, k)
+					}
 				}
+				h.mu.Unlock()
 			}
-			h.mu.Unlock()
 		}
 	}()
 	return h

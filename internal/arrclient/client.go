@@ -26,7 +26,7 @@ func NewClient(baseURL, apiKey string, timeout time.Duration, sslVerify bool) *C
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	if !sslVerify {
 		if transport.TLSClientConfig == nil {
-			transport.TLSClientConfig = &tls.Config{}
+			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		}
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
