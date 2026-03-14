@@ -45,6 +45,9 @@ type Store interface {
 	IsSearchOnCooldown(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, cooldownHours int) (bool, error)
 	RecordSearch(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
 	MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, operation string) error
+	RecordSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
+	ClearSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
+	IsSearchFailureLimitReached(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, maxFailures int) (bool, error)
 }
 
 // removal tracks a removed queue item with both its title and media key for
@@ -267,7 +270,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget)
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
@@ -374,7 +377,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget)
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
@@ -527,7 +530,7 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)
 		if settings.SearchOnRemove {
 			if l := lurking.LurkerFor(appType); l != nil {
-				c.triggerReSearch(ctx, log, l, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget)
+				c.triggerReSearch(ctx, log, l, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
@@ -1271,7 +1274,7 @@ func filterIgnoredIndexers(log *slog.Logger, ignoredCSV string, records []arrcli
 // searched media is skipped. When searchBudget is non-nil and points to a
 // positive value, it is decremented on each search; when it reaches zero,
 // further searches are skipped. Pass nil to disable budget tracking.
-func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord, appType database.AppType, instID uuid.UUID, cooldownHours int, searchBudget *int) {
+func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord, appType database.AppType, instID uuid.UUID, cooldownHours int, searchBudget *int, maxSearchFailures int) {
 	mediaID := record.MediaID()
 	if mediaID <= 0 {
 		return
@@ -1289,8 +1292,22 @@ func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker 
 			return
 		}
 	}
+	if maxSearchFailures > 0 {
+		limitReached, err := c.db.IsSearchFailureLimitReached(ctx, appType, instID, mediaID, maxSearchFailures)
+		if err != nil {
+			log.Warn("failed to check search failure limit", "media_id", mediaID, "error", err)
+		} else if limitReached {
+			log.Debug("skipping re-search (failure limit reached)", "title", record.Title, "media_id", mediaID)
+			return
+		}
+	}
 	if err := lurker.Search(ctx, client, mediaID); err != nil {
 		log.Warn("re-search failed", "title", record.Title, "media_id", mediaID, "error", err)
+		if maxSearchFailures > 0 {
+			if ferr := c.db.RecordSearchFailure(ctx, appType, instID, mediaID); ferr != nil {
+				log.Warn("failed to record search failure", "media_id", mediaID, "error", ferr)
+			}
+		}
 	} else {
 		log.Info("re-search triggered", "title", record.Title, "media_id", mediaID)
 		if searchBudget != nil {
@@ -1305,6 +1322,11 @@ func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker 
 		// search for the same media on its next cycle.
 		if err := c.db.MarkProcessed(ctx, appType, instID, mediaID, "missing"); err != nil {
 			log.Debug("failed to mark lurk-processed after re-search", "media_id", mediaID, "error", err)
+		}
+		if maxSearchFailures > 0 {
+			if ferr := c.db.ClearSearchFailure(ctx, appType, instID, mediaID); ferr != nil {
+				log.Debug("failed to clear search failure", "media_id", mediaID, "error", ferr)
+			}
 		}
 	}
 }

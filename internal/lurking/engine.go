@@ -32,6 +32,9 @@ type Store interface {
 	AddLurkHistory(ctx context.Context, appType database.AppType, instanceID uuid.UUID, instanceName string, mediaID int, title, lurkType string) error
 	IncrementStats(ctx context.Context, appType database.AppType, instanceID uuid.UUID, missing, upgrades int64) error
 	IncrementHourlyHits(ctx context.Context, appType database.AppType, instanceID uuid.UUID, count int) error
+	RecordSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
+	ClearSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
+	GetSearchFailureCounts(ctx context.Context, appType database.AppType, instanceID uuid.UUID) (map[int]int, error)
 }
 
 // Engine manages lurking goroutines for all app types.
@@ -305,12 +308,41 @@ func (e *Engine) lurkMissing(ctx context.Context, log *slog.Logger, appType data
 	// Select items
 	selected := selectItems(candidates, maxCount, settings.SelectionMode, processedTimes)
 
+	// Filter out items that have exceeded the search failure limit.
+	var failureCounts map[int]int
+	if settings.MaxSearchFailures > 0 {
+		failureCounts, err = e.db.GetSearchFailureCounts(ctx, appType, inst.ID)
+		if err != nil {
+			log.Warn("failed to get search failure counts", "error", err)
+		} else {
+			filtered := selected[:0]
+			for _, item := range selected {
+				if count, ok := failureCounts[item.ID]; ok && count >= settings.MaxSearchFailures {
+					log.Debug("skipping item (search failure limit reached)", "title", item.Title, "media_id", item.ID, "failures", count)
+					continue
+				}
+				filtered = append(filtered, item)
+			}
+			selected = filtered
+		}
+	}
+
 	// Trigger searches
 	lurked := 0
 	for _, item := range selected {
 		if err := e.triggerSearch(ctx, appType, client, item.ID); err != nil {
 			log.Error("search command failed", "media_id", item.ID, "error", err)
+			if settings.MaxSearchFailures > 0 {
+				if ferr := e.db.RecordSearchFailure(ctx, appType, inst.ID, item.ID); ferr != nil {
+					log.Warn("failed to record search failure", "media_id", item.ID, "error", ferr)
+				}
+			}
 			continue
+		}
+		if settings.MaxSearchFailures > 0 {
+			if ferr := e.db.ClearSearchFailure(ctx, appType, inst.ID, item.ID); ferr != nil {
+				log.Warn("failed to clear search failure", "media_id", item.ID, "error", ferr)
+			}
 		}
 		metrics.LurkSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
 		if err := e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "missing"); err != nil {
@@ -370,11 +402,40 @@ func (e *Engine) lurkUpgrades(ctx context.Context, log *slog.Logger, appType dat
 
 	selected := selectItems(candidates, maxCount, settings.SelectionMode, processedTimes)
 
+	// Filter out items that have exceeded the search failure limit.
+	var failureCounts map[int]int
+	if settings.MaxSearchFailures > 0 {
+		failureCounts, err = e.db.GetSearchFailureCounts(ctx, appType, inst.ID)
+		if err != nil {
+			log.Warn("failed to get search failure counts", "error", err)
+		} else {
+			filtered := selected[:0]
+			for _, item := range selected {
+				if count, ok := failureCounts[item.ID]; ok && count >= settings.MaxSearchFailures {
+					log.Debug("skipping upgrade (search failure limit reached)", "title", item.Title, "media_id", item.ID, "failures", count)
+					continue
+				}
+				filtered = append(filtered, item)
+			}
+			selected = filtered
+		}
+	}
+
 	upgraded := 0
 	for _, item := range selected {
 		if err := e.triggerSearch(ctx, appType, client, item.ID); err != nil {
 			log.Error("upgrade search failed", "media_id", item.ID, "error", err)
+			if settings.MaxSearchFailures > 0 {
+				if ferr := e.db.RecordSearchFailure(ctx, appType, inst.ID, item.ID); ferr != nil {
+					log.Warn("failed to record search failure", "media_id", item.ID, "error", ferr)
+				}
+			}
 			continue
+		}
+		if settings.MaxSearchFailures > 0 {
+			if ferr := e.db.ClearSearchFailure(ctx, appType, inst.ID, item.ID); ferr != nil {
+				log.Warn("failed to clear search failure", "media_id", item.ID, "error", ferr)
+			}
 		}
 		metrics.LurkSearchesTotal.WithLabelValues(string(appType), inst.Name).Inc()
 		if err := e.db.MarkProcessed(ctx, appType, inst.ID, item.ID, "upgrade"); err != nil {

@@ -98,8 +98,9 @@ type AppSettings struct {
 	MonitoredOnly    bool    `json:"monitored_only"`
 	SkipFuture       bool    `json:"skip_future"`
 	HourlyCap        int     `json:"hourly_cap"`
-	SelectionMode    string  `json:"selection_mode"`
-	DebugMode        bool    `json:"debug_mode"`
+	SelectionMode      string  `json:"selection_mode"`
+	MaxSearchFailures  int     `json:"max_search_failures"`
+	DebugMode          bool    `json:"debug_mode"`
 }
 
 type GeneralSettings struct {
@@ -277,6 +278,7 @@ type QueueCleanerSettings struct {
 	// Search cooldown
 	SearchCooldownHours int `json:"search_cooldown_hours"` // Minimum hours between re-searches for the same media (0 = no cooldown)
 	MaxSearchesPerRun   int `json:"max_searches_per_run"`  // Max re-searches per cleanup run per instance (0 = unlimited)
+	MaxSearchFailures   int `json:"max_search_failures"`   // Max consecutive search failures before deprioritizing media (0 = no limit)
 }
 
 // QueueStrike represents a strike against a problematic download.

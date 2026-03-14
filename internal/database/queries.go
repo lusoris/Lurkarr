@@ -290,12 +290,12 @@ func (db *DB) GetAppSettings(ctx context.Context, appType AppType) (*AppSettings
 	err := db.Pool.QueryRow(ctx,
 		`SELECT app_type, lurk_missing_count, lurk_upgrade_count, lurk_missing_mode,
 		        upgrade_mode, sleep_duration, monitored_only, skip_future,
-		        hourly_cap, selection_mode, debug_mode
+		        hourly_cap, selection_mode, max_search_failures, debug_mode
 		 FROM app_settings WHERE app_type = $1`,
 		string(appType),
 	).Scan(&s.AppType, &s.LurkMissingCount, &s.LurkUpgradeCount, &s.LurkMissingMode,
 		&s.UpgradeMode, &s.SleepDuration, &s.MonitoredOnly, &s.SkipFuture,
-		&s.HourlyCap, &s.SelectionMode, &s.DebugMode)
+		&s.HourlyCap, &s.SelectionMode, &s.MaxSearchFailures, &s.DebugMode)
 	if err != nil {
 		return nil, err
 	}
@@ -307,11 +307,11 @@ func (db *DB) UpdateAppSettings(ctx context.Context, s *AppSettings) error {
 		`UPDATE app_settings SET
 		    lurk_missing_count = $1, lurk_upgrade_count = $2, lurk_missing_mode = $3,
 		    upgrade_mode = $4, sleep_duration = $5, monitored_only = $6, skip_future = $7,
-		    hourly_cap = $8, selection_mode = $9, debug_mode = $10
-		 WHERE app_type = $11`,
+		    hourly_cap = $8, selection_mode = $9, max_search_failures = $10, debug_mode = $11
+		 WHERE app_type = $12`,
 		s.LurkMissingCount, s.LurkUpgradeCount, s.LurkMissingMode,
 		s.UpgradeMode, s.SleepDuration, s.MonitoredOnly, s.SkipFuture,
-		s.HourlyCap, s.SelectionMode, s.DebugMode, string(s.AppType),
+		s.HourlyCap, s.SelectionMode, s.MaxSearchFailures, s.DebugMode, string(s.AppType),
 	)
 	return err
 }
@@ -400,6 +400,81 @@ func (db *DB) GetProcessedTimes(ctx context.Context, appType AppType, instanceID
 		out[id] = t
 	}
 	return out, rows.Err()
+}
+
+// --- Search Failure Tracking ---
+
+// RecordSearchFailure increments the failure count for a media item, or inserts
+// a new record with count=1 if none exists.
+func (db *DB) RecordSearchFailure(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID int) error {
+	_, err := db.Pool.Exec(ctx,
+		`INSERT INTO search_failures (app_type, instance_id, media_id, fail_count, last_failed)
+		 VALUES ($1, $2, $3, 1, NOW())
+		 ON CONFLICT (app_type, instance_id, media_id)
+		 DO UPDATE SET fail_count = search_failures.fail_count + 1, last_failed = NOW()`,
+		string(appType), instanceID, mediaID,
+	)
+	return err
+}
+
+// ClearSearchFailure removes the failure record for a media item on successful search.
+func (db *DB) ClearSearchFailure(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID int) error {
+	_, err := db.Pool.Exec(ctx,
+		`DELETE FROM search_failures WHERE app_type = $1 AND instance_id = $2 AND media_id = $3`,
+		string(appType), instanceID, mediaID,
+	)
+	return err
+}
+
+// GetSearchFailureCounts returns a map of mediaID → fail_count for all tracked
+// failures on the given instance. Used by the lurking engine to batch-filter
+// items that have exceeded the failure limit.
+func (db *DB) GetSearchFailureCounts(ctx context.Context, appType AppType, instanceID uuid.UUID) (map[int]int, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT media_id, fail_count FROM search_failures
+		 WHERE app_type = $1 AND instance_id = $2`,
+		string(appType), instanceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int]int)
+	for rows.Next() {
+		var id, count int
+		if err := rows.Scan(&id, &count); err != nil {
+			return nil, err
+		}
+		out[id] = count
+	}
+	return out, rows.Err()
+}
+
+// IsSearchFailureLimitReached checks whether a single media item has reached
+// the maximum number of consecutive search failures.
+func (db *DB) IsSearchFailureLimitReached(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID, maxFailures int) (bool, error) {
+	var count int
+	err := db.Pool.QueryRow(ctx,
+		`SELECT fail_count FROM search_failures
+		 WHERE app_type = $1 AND instance_id = $2 AND media_id = $3`,
+		string(appType), instanceID, mediaID,
+	).Scan(&count)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return false, nil
+		}
+		return false, err
+	}
+	return count >= maxFailures, nil
+}
+
+// PruneSearchFailures deletes failure records older than the given duration.
+func (db *DB) PruneSearchFailures(ctx context.Context, olderThan time.Duration) error {
+	_, err := db.Pool.Exec(ctx,
+		`DELETE FROM search_failures WHERE last_failed < NOW() - $1::interval`,
+		olderThan.String(),
+	)
+	return err
 }
 
 func (db *DB) ResetState(ctx context.Context, appType AppType, instanceID uuid.UUID) error {

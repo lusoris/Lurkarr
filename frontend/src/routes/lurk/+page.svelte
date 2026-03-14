@@ -25,6 +25,7 @@
 		skip_future: boolean;
 		hourly_cap: number;
 		selection_mode: string;
+		max_search_failures: number;
 		debug_mode: boolean;
 	}
 
@@ -126,6 +127,7 @@
 							<option value="oldest">Oldest First</option>
 							<option value="least_recent">Least Recently Searched</option>
 						</Select>
+						<Input type="number" bind:value={settings.max_search_failures} label="Max Search Failures" hint="Stop retrying items after this many consecutive search failures (0 = no limit)" min={0} />
 						<Toggle bind:checked={settings.debug_mode} label="Debug Mode" hint="Log detailed information about each lurk cycle for troubleshooting" />
 					</div>
 				</div>

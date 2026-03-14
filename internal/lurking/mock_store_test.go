@@ -217,3 +217,46 @@ func (mr *MockStoreMockRecorder) GetProcessedTimes(ctx, appType, instanceID, ope
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProcessedTimes", reflect.TypeOf((*MockStore)(nil).GetProcessedTimes), ctx, appType, instanceID, operation)
 }
+
+// RecordSearchFailure mocks base method.
+func (m *MockStore) RecordSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordSearchFailure", ctx, appType, instanceID, mediaID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordSearchFailure indicates an expected call of RecordSearchFailure.
+func (mr *MockStoreMockRecorder) RecordSearchFailure(ctx, appType, instanceID, mediaID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordSearchFailure", reflect.TypeOf((*MockStore)(nil).RecordSearchFailure), ctx, appType, instanceID, mediaID)
+}
+
+// ClearSearchFailure mocks base method.
+func (m *MockStore) ClearSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearSearchFailure", ctx, appType, instanceID, mediaID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearSearchFailure indicates an expected call of ClearSearchFailure.
+func (mr *MockStoreMockRecorder) ClearSearchFailure(ctx, appType, instanceID, mediaID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearSearchFailure", reflect.TypeOf((*MockStore)(nil).ClearSearchFailure), ctx, appType, instanceID, mediaID)
+}
+
+// GetSearchFailureCounts mocks base method.
+func (m *MockStore) GetSearchFailureCounts(ctx context.Context, appType database.AppType, instanceID uuid.UUID) (map[int]int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSearchFailureCounts", ctx, appType, instanceID)
+	ret0, _ := ret[0].(map[int]int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSearchFailureCounts indicates an expected call of GetSearchFailureCounts.
+func (mr *MockStoreMockRecorder) GetSearchFailureCounts(ctx, appType, instanceID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSearchFailureCounts", reflect.TypeOf((*MockStore)(nil).GetSearchFailureCounts), ctx, appType, instanceID)
+}

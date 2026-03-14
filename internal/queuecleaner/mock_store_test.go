@@ -276,3 +276,46 @@ func (mr *MockStoreMockRecorder) MarkProcessed(ctx, appType, instanceID, mediaID
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkProcessed", reflect.TypeOf((*MockStore)(nil).MarkProcessed), ctx, appType, instanceID, mediaID, operation)
 }
+
+// RecordSearchFailure mocks base method.
+func (m *MockStore) RecordSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordSearchFailure", ctx, appType, instanceID, mediaID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordSearchFailure indicates an expected call of RecordSearchFailure.
+func (mr *MockStoreMockRecorder) RecordSearchFailure(ctx, appType, instanceID, mediaID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordSearchFailure", reflect.TypeOf((*MockStore)(nil).RecordSearchFailure), ctx, appType, instanceID, mediaID)
+}
+
+// ClearSearchFailure mocks base method.
+func (m *MockStore) ClearSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearSearchFailure", ctx, appType, instanceID, mediaID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearSearchFailure indicates an expected call of ClearSearchFailure.
+func (mr *MockStoreMockRecorder) ClearSearchFailure(ctx, appType, instanceID, mediaID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearSearchFailure", reflect.TypeOf((*MockStore)(nil).ClearSearchFailure), ctx, appType, instanceID, mediaID)
+}
+
+// IsSearchFailureLimitReached mocks base method.
+func (m *MockStore) IsSearchFailureLimitReached(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, maxFailures int) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSearchFailureLimitReached", ctx, appType, instanceID, mediaID, maxFailures)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsSearchFailureLimitReached indicates an expected call of IsSearchFailureLimitReached.
+func (mr *MockStoreMockRecorder) IsSearchFailureLimitReached(ctx, appType, instanceID, mediaID, maxFailures any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSearchFailureLimitReached", reflect.TypeOf((*MockStore)(nil).IsSearchFailureLimitReached), ctx, appType, instanceID, mediaID, maxFailures)
+}
