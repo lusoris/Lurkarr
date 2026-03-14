@@ -5,6 +5,13 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import Badge from '$lib/components/ui/Badge.svelte';
+	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
+	import * as T from '$lib/components/ui/table';
+	import { Plus, Users, ShieldCheck, Trash2 } from 'lucide-svelte';
 
 	const toasts = getToasts();
 
@@ -64,11 +71,18 @@
 		creating = false;
 	}
 
+	let confirmDelete = $state<{ id: string; username: string } | null>(null);
+
 	async function deleteUser(id: string, username: string) {
-		if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+		confirmDelete = { id, username };
+	}
+
+	async function confirmDeleteUser() {
+		if (!confirmDelete) return;
 		try {
-			await api.del(`/admin/users/${id}`);
-			toasts.success(`User "${username}" deleted`);
+			await api.del(`/admin/users/${confirmDelete.id}`);
+			toasts.success(`User "${confirmDelete.username}" deleted`);
+			confirmDelete = null;
 			await load();
 		} catch (e: any) {
 			toasts.error(e?.message || 'Failed to delete user');
@@ -109,84 +123,88 @@
 	}
 
 	$effect(() => { load(); });
+
+	const userColumns: Column<UserEntry>[] = [
+		{ key: 'username', header: 'Username', sortable: true },
+		{ key: 'auth_provider', header: 'Provider', sortable: true },
+		{ key: 'is_admin', header: 'Role', sortable: true },
+		{ key: 'has_2fa', header: '2FA' },
+		{ key: 'created_at', header: 'Created', sortable: true },
+		{ key: '_actions', header: 'Actions', headerClass: 'text-right' }
+	];
 </script>
 
 <svelte:head><title>User Management - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold text-foreground">User Management</h1>
-		<Button onclick={() => showCreate = true}>
-			<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-			Add User
-		</Button>
-	</div>
+	<PageHeader title="User Management" description="Create, manage, and remove user accounts.">
+		{#snippet actions()}
+			<Button size="sm" onclick={() => showCreate = true}>
+				<Plus class="h-4 w-4" />
+				Add User
+			</Button>
+		{/snippet}
+	</PageHeader>
 
 	{#if loading}
-		<div class="space-y-3">
-			{#each Array(3) as _}
-				<div class="h-14 rounded-xl bg-muted/50 animate-pulse"></div>
-			{/each}
-		</div>
+		<Skeleton rows={3} height="h-14" />
 	{:else if users.length === 0}
-		<Card>
-			<p class="text-sm text-muted-foreground text-center py-4">No users found</p>
-		</Card>
+		<EmptyState icon={Users} title="No users found" description="Create the first user account to get started.">
+			{#snippet actions()}
+				<Button size="sm" onclick={() => showCreate = true}>
+					<Plus class="h-4 w-4" />
+					Add User
+				</Button>
+			{/snippet}
+		</EmptyState>
 	{:else}
-		<Card>
-			<div class="overflow-x-auto">
-				<table class="w-full text-sm">
-					<thead>
-						<tr class="border-b border-border text-left text-muted-foreground">
-							<th class="pb-3 pr-4 font-medium">Username</th>
-							<th class="pb-3 pr-4 font-medium">Provider</th>
-							<th class="pb-3 pr-4 font-medium">Role</th>
-							<th class="pb-3 pr-4 font-medium">2FA</th>
-							<th class="pb-3 pr-4 font-medium">Created</th>
-							<th class="pb-3 font-medium text-right">Actions</th>
-						</tr>
-					</thead>
-					<tbody class="text-foreground">
-						{#each users as u}
-							<tr class="border-b border-border/50 last:border-0">
-								<td class="py-3 pr-4 font-medium">{u.username}</td>
-								<td class="py-3 pr-4">
-									<span class="px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">{u.auth_provider}</span>
-								</td>
-								<td class="py-3 pr-4">
-									{#if u.is_admin}
-										<span class="px-2 py-0.5 rounded text-xs bg-lurk-600/20 text-lurk-400 font-medium">Admin</span>
-									{:else}
-										<span class="text-muted-foreground text-xs">User</span>
-									{/if}
-								</td>
-								<td class="py-3 pr-4">
-									{#if u.has_2fa}
-										<svg class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
-									{:else}
-										<span class="text-muted-foreground/50">—</span>
-									{/if}
-								</td>
-								<td class="py-3 pr-4 text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
-								<td class="py-3 text-right">
-									<div class="flex items-center justify-end gap-1">
-										<Button variant="ghost" size="sm" onclick={() => toggleAdmin(u.id, u.is_admin)}>
-											{u.is_admin ? 'Demote' : 'Promote'}
-										</Button>
-										<Button variant="ghost" size="sm" onclick={() => openResetPassword(u.id, u.username)}>Reset PW</Button>
-										<Button variant="ghost" size="sm" onclick={() => deleteUser(u.id, u.username)}>
-											<svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-										</Button>
-									</div>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		</Card>
+		<DataTable data={users} columns={userColumns} searchable searchPlaceholder="Search users..." noun="users">
+			{#snippet row(u)}
+				<T.Row>
+					<T.Cell class="font-medium">{u.username}</T.Cell>
+					<T.Cell><Badge variant="default">{u.auth_provider}</Badge></T.Cell>
+					<T.Cell>
+						{#if u.is_admin}
+							<Badge variant="warning">Admin</Badge>
+						{:else}
+							<span class="text-muted-foreground text-xs">User</span>
+						{/if}
+					</T.Cell>
+					<T.Cell>
+						{#if u.has_2fa}
+							<ShieldCheck class="h-4 w-4 text-green-400" />
+						{:else}
+							<span class="text-muted-foreground/50">—</span>
+						{/if}
+					</T.Cell>
+					<T.Cell class="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</T.Cell>
+					<T.Cell class="text-right">
+						<div class="flex items-center justify-end gap-1">
+							<Button variant="ghost" size="sm" onclick={() => toggleAdmin(u.id, u.is_admin)}>
+								{u.is_admin ? 'Demote' : 'Promote'}
+							</Button>
+							<Button variant="ghost" size="sm" onclick={() => openResetPassword(u.id, u.username)}>Reset PW</Button>
+							<Button variant="danger" size="sm" onclick={() => deleteUser(u.id, u.username)}>
+								<Trash2 class="h-4 w-4" />
+							</Button>
+						</div>
+					</T.Cell>
+				</T.Row>
+			{/snippet}
+		</DataTable>
 	{/if}
 </div>
+
+<!-- Delete Confirmation Modal -->
+<Modal open={!!confirmDelete} title="Delete User" onclose={() => confirmDelete = null}>
+	<div class="space-y-4">
+		<p class="text-sm text-muted-foreground">Delete user <strong class="text-foreground">"{confirmDelete?.username}"</strong>? This cannot be undone.</p>
+		<div class="flex justify-end gap-2">
+			<Button variant="secondary" onclick={() => confirmDelete = null}>Cancel</Button>
+			<Button variant="danger" onclick={confirmDeleteUser}>Delete</Button>
+		</div>
+	</div>
+</Modal>
 
 <!-- Create User Modal -->
 <Modal open={showCreate} title="Create User" onclose={() => showCreate = false}>

@@ -4,16 +4,16 @@
 	import { appDisplayName, appColor, visibleAppTypes } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
+	import * as T from '$lib/components/ui/table';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
-	import { History, Trash2, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { History, Trash2 } from 'lucide-svelte';
 
 	const toasts = getToasts();
 	const PAGE_SIZE = 50;
@@ -127,36 +127,48 @@
 	}
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
+	let mounted = false;
 
 	onMount(() => {
 		load();
+		mounted = true;
 		return () => clearTimeout(debounceTimer);
 	});
 
-	function onSearch() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => { page = 1; load(); }, 300);
-	}
+	// React to server-side search/filter/page changes (debounced for search, immediate for page/filter)
+	let prevSearch = '';
+	let prevFilterApp = '';
+	let prevPage = 1;
 
-	function onFilterChange() {
-		page = 1;
-		load();
-	}
+	$effect(() => {
+		// Track reactive deps
+		const s = search;
+		const f = filterApp;
+		const p = page;
+		if (!mounted) return;
+
+		if (s !== prevSearch) {
+			// Search changed — debounce and reset page
+			prevSearch = s;
+			clearTimeout(debounceTimer);
+			debounceTimer = setTimeout(() => { page = 1; prevPage = 1; load(); }, 300);
+		} else if (f !== prevFilterApp) {
+			// Filter changed — immediate reload, reset page
+			prevFilterApp = f;
+			page = 1;
+			prevPage = 1;
+			load();
+		} else if (p !== prevPage) {
+			// Page changed — immediate reload
+			prevPage = p;
+			load();
+		}
+	});
 
 	function onTabChange(tab: string) {
 		activeTab = tab as ActiveTab;
 		if (tab === 'cleaner' && blocklistItems.length === 0 && blocklistApp) loadBlocklist();
 		if (tab === 'imports' && importItems.length === 0 && importApp) loadImports();
-	}
-
-	const totalPages = $derived(Math.max(1, Math.ceil(total / PAGE_SIZE)));
-
-	function prevPage() {
-		if (page > 1) { page--; load(); }
-	}
-
-	function nextPage() {
-		if (page < totalPages) { page++; load(); }
 	}
 
 	// Unique app types present in current results
@@ -178,6 +190,28 @@
 		if (reason.includes('blocklist')) return 'info';
 		return 'default';
 	}
+
+	// --- Column definitions ---
+	const historyColumns: Column<HistoryItem>[] = [
+		{ key: 'media_title', header: 'Media', sortable: true },
+		{ key: 'app_type', header: 'App', accessor: (r) => appDisplayName(r.app_type) },
+		{ key: 'instance_name', header: 'Instance' },
+		{ key: 'operation', header: 'Operation', sortable: true },
+		{ key: 'created_at', header: 'Date', sortable: true }
+	];
+
+	const blocklistColumns: Column<BlocklistEntry>[] = [
+		{ key: 'title', header: 'Title', sortable: true },
+		{ key: 'reason', header: 'Reason', sortable: true, accessor: (r) => reasonLabel(r.reason) },
+		{ key: 'blocklisted_at', header: 'Date', sortable: true }
+	];
+
+	const importColumns: Column<ImportEntry>[] = [
+		{ key: 'media_title', header: 'Media', sortable: true },
+		{ key: 'action', header: 'Action', sortable: true },
+		{ key: 'reason', header: 'Reason' },
+		{ key: 'created_at', header: 'Date', sortable: true }
+	];
 </script>
 
 <svelte:head><title>History - Lurkarr</title></svelte:head>
@@ -197,23 +231,6 @@
 
 	<!-- ==================== Lurk History Tab ==================== -->
 	{#if activeTab === 'lurking'}
-		{#if total > 0}
-			<span class="text-sm text-muted-foreground">{total.toLocaleString()} total</span>
-		{/if}
-
-		<!-- Filters -->
-		<div class="flex flex-col sm:flex-row gap-3">
-			<div class="flex-1">
-				<Input bind:value={search} placeholder="Search media titles..." oninput={onSearch} />
-			</div>
-			<Select bind:value={filterApp} onchange={onFilterChange} class="sm:w-48">
-				<option value="">All Apps</option>
-				{#each visibleAppTypes as app}
-					<option value={app}>{appDisplayName(app)}</option>
-				{/each}
-			</Select>
-		</div>
-
 		<!-- Delete by app type -->
 		{#if presentApps.length > 0}
 			<div class="flex flex-wrap gap-2">
@@ -242,47 +259,35 @@
 		{:else if items.length === 0}
 			<EmptyState icon={History} title="No history entries" description="Lurk history will appear here once Lurkarr starts searching." />
 		{:else}
-			<DataTable>
-				<thead class="bg-muted/50 text-muted-foreground text-xs uppercase">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium">Media</th>
-						<th class="px-4 py-3 text-left font-medium">App</th>
-						<th class="px-4 py-3 text-left font-medium">Instance</th>
-						<th class="px-4 py-3 text-left font-medium">Operation</th>
-						<th class="px-4 py-3 text-left font-medium">Date</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-border">
-					{#each items as item}
-						<tr class="hover:bg-muted/30 transition-colors">
-							<td class="px-4 py-3 text-foreground">{item.media_title}</td>
-							<td class="px-4 py-3"><Badge>{appDisplayName(item.app_type)}</Badge></td>
-							<td class="px-4 py-3 text-muted-foreground">{item.instance_name}</td>
-							<td class="px-4 py-3">
-								<Badge variant={item.operation === 'missing' ? 'warning' : 'info'}>{item.operation}</Badge>
-							</td>
-							<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(item.created_at).toLocaleString()}</td>
-						</tr>
-					{/each}
-				</tbody>
+			<DataTable
+				data={items}
+				columns={historyColumns}
+				searchable
+				searchPlaceholder="Search media titles..."
+				bind:search
+				pageSize={PAGE_SIZE}
+				bind:page
+				totalItems={total}
+				noun="entries"
+			>
+				{#snippet toolbar()}
+					<Select bind:value={filterApp} class="sm:w-48">
+						<option value="">All Apps</option>
+						{#each visibleAppTypes as app}
+							<option value={app}>{appDisplayName(app)}</option>
+						{/each}
+					</Select>
+				{/snippet}
+				{#snippet row(item)}
+					<T.Row>
+						<T.Cell class="text-foreground">{item.media_title}</T.Cell>
+						<T.Cell><Badge>{appDisplayName(item.app_type)}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground">{item.instance_name}</T.Cell>
+						<T.Cell><Badge variant={item.operation === 'missing' ? 'warning' : 'info'}>{item.operation}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground text-xs">{new Date(item.created_at).toLocaleString()}</T.Cell>
+					</T.Row>
+				{/snippet}
 			</DataTable>
-
-			<!-- Pagination -->
-			{#if totalPages > 1}
-				<div class="flex items-center justify-between">
-					<p class="text-sm text-muted-foreground">
-						Page {page} of {totalPages}
-					</p>
-					<div class="flex items-center gap-1">
-						<Button size="sm" variant="ghost" disabled={page <= 1} onclick={prevPage}>
-							<ChevronLeft class="h-4 w-4" />
-						</Button>
-						<Button size="sm" variant="ghost" disabled={page >= totalPages} onclick={nextPage}>
-							<ChevronRight class="h-4 w-4" />
-						</Button>
-					</div>
-				</div>
-			{/if}
 		{/if}
 
 	<!-- ==================== Queue Cleaner Log Tab ==================== -->
@@ -303,26 +308,14 @@
 		{:else if blocklistItems.length === 0}
 			<EmptyState icon={History} title="No actions recorded" description="Queue cleaner actions for {appDisplayName(blocklistApp)} will appear here." />
 		{:else}
-			<p class="text-sm text-muted-foreground">{blocklistItems.length} recent actions</p>
-			<DataTable>
-				<thead class="bg-muted/50 text-muted-foreground text-xs uppercase">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium">Title</th>
-						<th class="px-4 py-3 text-left font-medium">Reason</th>
-						<th class="px-4 py-3 text-left font-medium">Date</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-border">
-					{#each blocklistItems as entry}
-						<tr class="hover:bg-muted/30 transition-colors">
-							<td class="px-4 py-3 text-foreground text-sm truncate max-w-xs" title={entry.title}>{entry.title}</td>
-							<td class="px-4 py-3">
-								<Badge variant={reasonVariant(entry.reason)}>{reasonLabel(entry.reason)}</Badge>
-							</td>
-							<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(entry.blocklisted_at).toLocaleString()}</td>
-						</tr>
-					{/each}
-				</tbody>
+			<DataTable data={blocklistItems} columns={blocklistColumns} searchable pageSize={50} noun="actions">
+				{#snippet row(entry)}
+					<T.Row>
+						<T.Cell class="text-foreground max-w-xs truncate" title={entry.title}>{entry.title}</T.Cell>
+						<T.Cell><Badge variant={reasonVariant(entry.reason)}>{reasonLabel(entry.reason)}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground text-xs">{new Date(entry.blocklisted_at).toLocaleString()}</T.Cell>
+					</T.Row>
+				{/snippet}
 			</DataTable>
 		{/if}
 
@@ -344,26 +337,15 @@
 		{:else if importItems.length === 0}
 			<EmptyState icon={History} title="No imports recorded" description="Auto-import actions for {appDisplayName(importApp)} will appear here." />
 		{:else}
-			<p class="text-sm text-muted-foreground">{importItems.length} recent actions</p>
-			<DataTable>
-				<thead class="bg-muted/50 text-muted-foreground text-xs uppercase">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium">Media</th>
-						<th class="px-4 py-3 text-left font-medium">Action</th>
-						<th class="px-4 py-3 text-left font-medium">Reason</th>
-						<th class="px-4 py-3 text-left font-medium">Date</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-border">
-					{#each importItems as entry}
-						<tr class="hover:bg-muted/30 transition-colors">
-							<td class="px-4 py-3 text-foreground">{entry.media_title}</td>
-							<td class="px-4 py-3"><Badge>{entry.action}</Badge></td>
-							<td class="px-4 py-3 text-muted-foreground text-sm">{entry.reason}</td>
-							<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(entry.created_at).toLocaleString()}</td>
-						</tr>
-					{/each}
-				</tbody>
+			<DataTable data={importItems} columns={importColumns} searchable pageSize={50} noun="imports">
+				{#snippet row(entry)}
+					<T.Row>
+						<T.Cell class="text-foreground">{entry.media_title}</T.Cell>
+						<T.Cell><Badge>{entry.action}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground">{entry.reason}</T.Cell>
+						<T.Cell class="text-muted-foreground text-xs">{new Date(entry.created_at).toLocaleString()}</T.Cell>
+					</T.Row>
+				{/snippet}
 			</DataTable>
 		{/if}
 	{/if}

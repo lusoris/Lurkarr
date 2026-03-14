@@ -8,7 +8,8 @@
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
+	import * as T from '$lib/components/ui/table';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
@@ -200,6 +201,32 @@
 	function formatDate(iso: string): string {
 		return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 	}
+
+	// --- Column definitions ---
+
+	const overlapColumns = $derived<Column<CrossInstanceMedia>[]>([
+		{ key: 'title', header: 'Media', sortable: true },
+		{ key: 'external_id', header: 'External ID', headerClass: 'text-xs' },
+		...memberInstances.map((m): Column<CrossInstanceMedia> => ({
+			key: `inst_${m.instance_id}`,
+			header: m.instance_name ?? m.instance_id.slice(0, 8),
+			headerClass: 'text-center text-xs whitespace-nowrap'
+		}))
+	]);
+
+	const dupColumns: Column<DuplicateFlag>[] = [
+		{ key: 'media_title', header: 'Title', sortable: true },
+		{ key: 'request_type', header: 'Type', headerClass: 'text-xs', sortable: true },
+		{ key: 'requested_by', header: 'Requested By', headerClass: 'text-xs' },
+		{ key: 'reason', header: 'Reason', headerClass: 'text-xs' }
+	];
+
+	const actionColumns: Column<CrossInstanceAction>[] = [
+		{ key: 'title', header: 'Title', sortable: true },
+		{ key: 'action', header: 'Action', headerClass: 'text-xs', sortable: true },
+		{ key: 'reason', header: 'Reason', headerClass: 'text-xs' },
+		{ key: 'executed_at', header: 'When', headerClass: 'text-xs', sortable: true }
+	];
 </script>
 
 <svelte:head><title>Dedup Dashboard - Lurkarr</title></svelte:head>
@@ -291,45 +318,30 @@
 							<p class="text-xs text-muted-foreground mt-1">All media in this group is unique to each instance.</p>
 						</div>
 					{:else}
-						<DataTable>
-							{#snippet children()}
-								<thead>
-									<tr class="border-b border-border bg-muted/30">
-										<th class="px-3 py-2 text-left font-medium text-muted-foreground">Media</th>
-										<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">External ID</th>
-										{#each memberInstances as member}
-											<th class="px-3 py-2 text-center font-medium text-muted-foreground text-xs whitespace-nowrap">
-												{member.instance_name ?? member.instance_id.slice(0, 8)}
-											</th>
-										{/each}
-									</tr>
-								</thead>
-								<tbody>
-									{#each overlaps as media}
-										<tr class="border-b border-border/50 hover:bg-muted/20 transition-colors">
-											<td class="px-3 py-2 font-medium text-foreground max-w-[200px] truncate" title={media.title}>
-												{media.title}
-											</td>
-											<td class="px-3 py-2 text-xs text-muted-foreground font-mono">{media.external_id}</td>
-											{#each memberInstances as member}
-												{@const p = presenceCell(media, member.instance_id)}
-												<td class="px-3 py-2 text-center">
-													<span class="inline-flex items-center justify-center w-full rounded px-2 py-0.5 text-xs font-medium {cellColor(p, member)}">
-														{#if !p}
-															<Minus class="h-3 w-3" />
-														{:else if p.has_file}
-															<CheckCircle class="h-3 w-3 mr-1" />file
-														{:else if p.monitored}
-															<AlertTriangle class="h-3 w-3 mr-1" />mon
-														{:else}
-															<XCircle class="h-3 w-3" />
-														{/if}
-													</span>
-												</td>
-											{/each}
-										</tr>
+						<DataTable data={overlaps} columns={overlapColumns} searchable searchPlaceholder="Search media..." pageSize={50} noun="items">
+							{#snippet row(media)}
+								<T.Row>
+									<T.Cell class="font-medium text-foreground max-w-[200px] truncate" title={media.title}>
+										{media.title}
+									</T.Cell>
+									<T.Cell class="text-xs text-muted-foreground font-mono">{media.external_id}</T.Cell>
+									{#each memberInstances as member}
+										{@const p = presenceCell(media, member.instance_id)}
+										<T.Cell class="text-center">
+											<span class="inline-flex items-center justify-center w-full rounded px-2 py-0.5 text-xs font-medium {cellColor(p, member)}">
+												{#if !p}
+													<Minus class="h-3 w-3" />
+												{:else if p.has_file}
+													<CheckCircle class="h-3 w-3 mr-1" />file
+												{:else if p.monitored}
+													<AlertTriangle class="h-3 w-3 mr-1" />mon
+												{:else}
+													<XCircle class="h-3 w-3" />
+												{/if}
+											</span>
+										</T.Cell>
 									{/each}
-								</tbody>
+								</T.Row>
 							{/snippet}
 						</DataTable>
 
@@ -354,32 +366,20 @@
 							<p class="text-sm text-foreground">No duplicates found</p>
 						</div>
 					{:else}
-						<DataTable>
-							{#snippet children()}
-								<thead>
-									<tr class="border-b border-border bg-muted/30">
-										<th class="px-3 py-2 text-left font-medium text-muted-foreground">Title</th>
-										<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Type</th>
-										<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Requested By</th>
-										<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Reason</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each scanResult?.duplicates ?? [] as dup}
-										<tr class="border-b border-border/50 hover:bg-muted/20 transition-colors">
-											<td class="px-3 py-2 font-medium text-foreground">{dup.media_title}</td>
-											<td class="px-3 py-2">
-												<Badge variant={dup.is4k ? 'info' : 'default'}>
-													{#snippet children()}{dup.request_type}{dup.is4k ? ' 4K' : ''}{/snippet}
-												</Badge>
-											</td>
-											<td class="px-3 py-2 text-sm text-muted-foreground">{dup.requested_by}</td>
-											<td class="px-3 py-2 text-xs text-muted-foreground max-w-[250px] truncate" title={dup.reason}>{dup.reason}</td>
-										</tr>
-									{/each}
-								</tbody>
-							{/snippet}
-						</DataTable>
+						<DataTable data={scanResult?.duplicates ?? []} columns={dupColumns} searchable pageSize={25} noun="duplicates">
+						{#snippet row(dup)}
+							<T.Row>
+								<T.Cell class="font-medium text-foreground">{dup.media_title}</T.Cell>
+								<T.Cell>
+									<Badge variant={dup.is4k ? 'info' : 'default'}>
+										{#snippet children()}{dup.request_type}{dup.is4k ? ' 4K' : ''}{/snippet}
+									</Badge>
+								</T.Cell>
+								<T.Cell class="text-sm text-muted-foreground">{dup.requested_by}</T.Cell>
+								<T.Cell class="text-xs text-muted-foreground max-w-[250px] truncate" title={dup.reason}>{dup.reason}</T.Cell>
+							</T.Row>
+						{/snippet}
+					</DataTable>
 					{/if}
 				</div>
 			</Card>
@@ -390,32 +390,20 @@
 			<Card>
 				<div class="space-y-4">
 					<h3 class="text-sm font-semibold text-foreground">Recent Routing Actions</h3>
-					<DataTable>
-						{#snippet children()}
-							<thead>
-								<tr class="border-b border-border bg-muted/30">
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Title</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Action</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Reason</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground text-xs">When</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each actions as action}
-									<tr class="border-b border-border/50 hover:bg-muted/20 transition-colors">
-										<td class="px-3 py-2 font-medium text-foreground">{action.title}</td>
-										<td class="px-3 py-2">
-											<Badge variant={action.action === 'decline' ? 'error' : action.action === 'approve' ? 'success' : 'default'}>
-												{#snippet children()}{action.action}{/snippet}
-											</Badge>
-										</td>
-										<td class="px-3 py-2 text-xs text-muted-foreground max-w-[250px] truncate" title={action.reason}>{action.reason}</td>
-										<td class="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(action.executed_at)}</td>
-									</tr>
-								{/each}
-							</tbody>
-						{/snippet}
-					</DataTable>
+					<DataTable data={actions} columns={actionColumns} searchable pageSize={25} noun="actions">
+					{#snippet row(action)}
+						<T.Row>
+							<T.Cell class="font-medium text-foreground">{action.title}</T.Cell>
+							<T.Cell>
+								<Badge variant={action.action === 'decline' ? 'error' : action.action === 'approve' ? 'success' : 'default'}>
+									{#snippet children()}{action.action}{/snippet}
+								</Badge>
+							</T.Cell>
+							<T.Cell class="text-xs text-muted-foreground max-w-[250px] truncate" title={action.reason}>{action.reason}</T.Cell>
+							<T.Cell class="text-xs text-muted-foreground whitespace-nowrap">{formatDate(action.executed_at)}</T.Cell>
+						</T.Row>
+					{/snippet}
+				</DataTable>
 				</div>
 			</Card>
 		{/if}

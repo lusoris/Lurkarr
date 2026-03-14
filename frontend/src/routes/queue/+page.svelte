@@ -14,6 +14,8 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
+	import * as T from '$lib/components/ui/table';
 
 	const toasts = getToasts();
 	const store = getInstances();
@@ -313,6 +315,29 @@
 		{ id: 'imports', label: 'Import Log' }
 	];
 
+	// --- Column definitions ---
+
+	const blocklistLogColumns: Column<BlocklistLog>[] = [
+		{ key: 'title', header: 'Title', sortable: true },
+		{ key: 'reason', header: 'Reason', sortable: true },
+		{ key: 'blocklisted_at', header: 'Date', sortable: true }
+	];
+
+	const importLogColumns: Column<AutoImportLog>[] = [
+		{ key: 'media_title', header: 'Media', sortable: true },
+		{ key: 'action', header: 'Action', sortable: true },
+		{ key: 'reason', header: 'Reason' },
+		{ key: 'created_at', header: 'Date', sortable: true }
+	];
+
+	const ruleColumns: Column<BlocklistRule>[] = [
+		{ key: 'pattern', header: 'Pattern', sortable: true },
+		{ key: 'pattern_type', header: 'Type', sortable: true },
+		{ key: 'reason', header: 'Reason' },
+		{ key: 'source_id', header: 'Source' },
+		{ key: '_actions', header: 'Actions', headerClass: 'text-right' }
+	];
+
 
 </script>
 
@@ -519,26 +544,15 @@
 		{:else if blocklist.length === 0}
 			<EmptyState title="No blocklist entries" description="Items removed from the queue will appear here." />
 		{:else}
-			<div class="rounded-xl border border-border overflow-hidden">
-				<table class="w-full text-sm">
-					<thead class="bg-card text-muted-foreground text-xs uppercase">
-						<tr>
-							<th class="px-4 py-3 text-left">Title</th>
-							<th class="px-4 py-3 text-left">Reason</th>
-							<th class="px-4 py-3 text-left">Date</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-border">
-						{#each blocklist as entry}
-							<tr class="hover:bg-muted/30 transition-colors">
-								<td class="px-4 py-3 text-foreground max-w-xs truncate">{entry.title}</td>
-								<td class="px-4 py-3"><Badge variant="error">{entry.reason}</Badge></td>
-								<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(entry.blocklisted_at).toLocaleString()}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+			<DataTable data={blocklist} columns={blocklistLogColumns} searchable pageSize={50} noun="entries">
+				{#snippet row(entry)}
+					<T.Row>
+						<T.Cell class="text-foreground max-w-xs truncate">{entry.title}</T.Cell>
+						<T.Cell><Badge variant="error">{entry.reason}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground text-xs">{new Date(entry.blocklisted_at).toLocaleString()}</T.Cell>
+					</T.Row>
+				{/snippet}
+			</DataTable>
 		{/if}
 		</div>
 	{:else if activeTab === 'imports'}
@@ -548,28 +562,16 @@
 		{:else if imports.length === 0}
 			<EmptyState title="No import entries" description="Auto-imported items will appear here." />
 		{:else}
-			<div class="rounded-xl border border-border overflow-hidden">
-				<table class="w-full text-sm">
-					<thead class="bg-card text-muted-foreground text-xs uppercase">
-						<tr>
-							<th class="px-4 py-3 text-left">Media</th>
-							<th class="px-4 py-3 text-left">Action</th>
-							<th class="px-4 py-3 text-left">Reason</th>
-							<th class="px-4 py-3 text-left">Date</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-border">
-						{#each imports as entry}
-							<tr class="hover:bg-muted/30 transition-colors">
-								<td class="px-4 py-3 text-foreground">{entry.media_title}</td>
-								<td class="px-4 py-3"><Badge variant="info">{entry.action}</Badge></td>
-								<td class="px-4 py-3 text-muted-foreground max-w-xs truncate">{entry.reason}</td>
-								<td class="px-4 py-3 text-muted-foreground text-xs">{new Date(entry.created_at).toLocaleString()}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+			<DataTable data={imports} columns={importLogColumns} searchable pageSize={50} noun="imports">
+				{#snippet row(entry)}
+					<T.Row>
+						<T.Cell class="text-foreground">{entry.media_title}</T.Cell>
+						<T.Cell><Badge variant="info">{entry.action}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground max-w-xs truncate">{entry.reason}</T.Cell>
+						<T.Cell class="text-muted-foreground text-xs">{new Date(entry.created_at).toLocaleString()}</T.Cell>
+					</T.Row>
+				{/snippet}
+			</DataTable>
 		{/if}
 		</div>
 	{/if}
@@ -686,52 +688,39 @@
 			{:else if rules.length === 0}
 				<p class="text-sm text-muted-foreground py-4 text-center">No custom rules</p>
 			{:else}
-				<div class="rounded-xl border border-border overflow-hidden">
-					<table class="w-full text-sm">
-						<thead class="bg-card text-muted-foreground text-xs uppercase">
-							<tr>
-								<th class="px-4 py-3 text-left">Pattern</th>
-								<th class="px-4 py-3 text-left">Type</th>
-								<th class="px-4 py-3 text-left">Reason</th>
-								<th class="px-4 py-3 text-left">Source</th>
-								<th class="px-4 py-3 text-right">Actions</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-border">
-							{#each rules as rule}
-								<tr class="hover:bg-muted/30 transition-colors">
-									<td class="px-4 py-3 text-foreground font-mono text-xs max-w-xs truncate">{rule.pattern}</td>
-									<td class="px-4 py-3"><Badge variant="default">{rule.pattern_type.replace('_', ' ')}</Badge></td>
-									<td class="px-4 py-3 text-muted-foreground text-xs max-w-xs truncate">{rule.reason || '—'}</td>
-									<td class="px-4 py-3 text-muted-foreground text-xs">
-										{#if rule.source_id}
-											{@const srcName = sources.find(s => s.id === rule.source_id)?.name}
-											<Badge variant="info">{srcName ?? 'synced'}</Badge>
-										{:else}
-											<Badge variant="warning">manual</Badge>
-										{/if}
-									</td>
-									<td class="px-4 py-3 text-right">
-										{#if !rule.source_id}
-											{#if confirmDeleteRule === rule.id}
-												<span class="flex items-center gap-1">
-													<button onclick={() => { deleteRule(rule.id); confirmDeleteRule = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
-													<button onclick={() => confirmDeleteRule = null} class="rounded px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] hover:bg-muted">No</button>
-												</span>
-											{:else}
-												<button onclick={() => confirmDeleteRule = rule.id} class="text-muted-foreground hover:text-red-400 transition-colors" title="Delete">
+				<DataTable data={rules} columns={ruleColumns} searchable pageSize={50} noun="rules">
+					{#snippet row(rule)}
+						<T.Row>
+							<T.Cell class="text-foreground font-mono text-xs max-w-xs truncate">{rule.pattern}</T.Cell>
+							<T.Cell><Badge variant="default">{rule.pattern_type.replace('_', ' ')}</Badge></T.Cell>
+							<T.Cell class="text-muted-foreground text-xs max-w-xs truncate">{rule.reason || '—'}</T.Cell>
+							<T.Cell class="text-muted-foreground text-xs">
+								{#if rule.source_id}
+									{@const srcName = sources.find(s => s.id === rule.source_id)?.name}
+									<Badge variant="info">{srcName ?? 'synced'}</Badge>
+								{:else}
+									<Badge variant="warning">manual</Badge>
+								{/if}
+							</T.Cell>
+							<T.Cell class="text-right">
+								{#if !rule.source_id}
+									{#if confirmDeleteRule === rule.id}
+										<span class="flex items-center justify-end gap-1">
+											<button onclick={() => { deleteRule(rule.id); confirmDeleteRule = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
+											<button onclick={() => confirmDeleteRule = null} class="rounded px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] hover:bg-muted">No</button>
+										</span>
+									{:else}
+										<button onclick={() => confirmDeleteRule = rule.id} class="text-muted-foreground hover:text-red-400 transition-colors" title="Delete">
 											<Trash2 class="w-4 h-4" />
-												</button>
-											{/if}
-										{:else}
-											<span class="text-muted-foreground/50 text-xs">synced</span>
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
+										</button>
+									{/if}
+								{:else}
+									<span class="text-muted-foreground/50 text-xs">synced</span>
+								{/if}
+							</T.Cell>
+						</T.Row>
+					{/snippet}
+				</DataTable>
 			{/if}
 		</Card>
 	</div>
