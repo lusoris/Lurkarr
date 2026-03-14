@@ -132,6 +132,11 @@ type Store interface {
 	ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]database.CrossInstanceMedia, error)
 	ListCrossInstanceActions(ctx context.Context, limit int) ([]database.CrossInstanceAction, error)
 
+	// Split Season Rules
+	ListSplitSeasonRules(ctx context.Context, groupID uuid.UUID) ([]database.SplitSeasonRule, error)
+	CreateSplitSeasonRule(ctx context.Context, r database.SplitSeasonRule) (*database.SplitSeasonRule, error)
+	DeleteSplitSeasonRule(ctx context.Context, id uuid.UUID) error
+
 	// WebAuthn Credentials
 	CreateWebAuthnCredential(ctx context.Context, c *database.WebAuthnCredential) error
 	ListWebAuthnCredentials(ctx context.Context, userID uuid.UUID) ([]database.WebAuthnCredential, error)

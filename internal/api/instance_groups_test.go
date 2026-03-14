@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -427,3 +428,138 @@ func TestHandleListActions_Error(t *testing.T) {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
 }
+
+// --- Split Season Rule Tests ---
+
+func TestHandleListSeasonRules(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	gid := uuid.New()
+	store.EXPECT().ListSplitSeasonRules(gomock.Any(), gid).Return([]database.SplitSeasonRule{
+		{ID: uuid.New(), GroupID: gid, ExternalID: "tvdb:123", Title: "Test Show", SeasonFrom: 1, SeasonTo: intPtr(3)},
+	}, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/instance-groups/by-id/"+gid.String()+"/season-rules", http.NoBody)
+	r.SetPathValue("id", gid.String())
+	h.HandleListSeasonRules(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListSeasonRules_BadID(t *testing.T) {
+	h := &InstanceGroupsHandler{}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/instance-groups/by-id/bad/season-rules", http.NoBody)
+	r.SetPathValue("id", "bad")
+	h.HandleListSeasonRules(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleListSeasonRules_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	gid := uuid.New()
+	store.EXPECT().ListSplitSeasonRules(gomock.Any(), gid).Return(nil, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/instance-groups/by-id/"+gid.String()+"/season-rules", http.NoBody)
+	r.SetPathValue("id", gid.String())
+	h.HandleListSeasonRules(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if w.Body.String() != "[]\n" {
+		t.Fatalf("expected empty array, got %s", w.Body.String())
+	}
+}
+
+func TestHandleCreateSeasonRule(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	gid := uuid.New()
+	iid := uuid.New()
+	to := 3
+	store.EXPECT().CreateSplitSeasonRule(gomock.Any(), gomock.Any()).Return(&database.SplitSeasonRule{
+		ID: uuid.New(), GroupID: gid, ExternalID: "tvdb:123", Title: "Breaking Bad",
+		InstanceID: iid, SeasonFrom: 1, SeasonTo: &to,
+	}, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	body, _ := json.Marshal(map[string]any{
+		"external_id": "tvdb:123", "title": "Breaking Bad",
+		"instance_id": iid.String(), "season_from": 1, "season_to": 3,
+	})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instance-groups/by-id/"+gid.String()+"/season-rules", bytes.NewReader(body))
+	r.SetPathValue("id", gid.String())
+	h.HandleCreateSeasonRule(w, r)
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleCreateSeasonRule_MissingFields(t *testing.T) {
+	h := &InstanceGroupsHandler{}
+	gid := uuid.New()
+	body, _ := json.Marshal(map[string]any{"external_id": "", "season_from": 0})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instance-groups/by-id/"+gid.String()+"/season-rules", bytes.NewReader(body))
+	r.SetPathValue("id", gid.String())
+	h.HandleCreateSeasonRule(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateSeasonRule_InvalidRange(t *testing.T) {
+	h := &InstanceGroupsHandler{}
+	gid := uuid.New()
+	body, _ := json.Marshal(map[string]any{
+		"external_id": "tvdb:123", "instance_id": uuid.New().String(),
+		"season_from": 5, "season_to": 2,
+	})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instance-groups/by-id/"+gid.String()+"/season-rules", bytes.NewReader(body))
+	r.SetPathValue("id", gid.String())
+	h.HandleCreateSeasonRule(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteSeasonRule(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	rid := uuid.New()
+	store.EXPECT().DeleteSplitSeasonRule(gomock.Any(), rid).Return(nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api/instance-groups/by-id/x/season-rules/"+rid.String(), http.NoBody)
+	r.SetPathValue("id", uuid.New().String())
+	r.SetPathValue("ruleId", rid.String())
+	h.HandleDeleteSeasonRule(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteSeasonRule_NotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	rid := uuid.New()
+	store.EXPECT().DeleteSplitSeasonRule(gomock.Any(), rid).Return(errors.New("not found"))
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api/instance-groups/by-id/x/season-rules/"+rid.String(), http.NoBody)
+	r.SetPathValue("id", uuid.New().String())
+	r.SetPathValue("ruleId", rid.String())
+	h.HandleDeleteSeasonRule(w, r)
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func intPtr(v int) *int { return &v }

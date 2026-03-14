@@ -141,6 +141,18 @@ type CrossInstanceAction struct {
 	ExecutedAt       time.Time  `json:"executed_at"`
 }
 
+// SplitSeasonRule assigns a season range of a series to a specific instance.
+type SplitSeasonRule struct {
+	ID         uuid.UUID `json:"id"`
+	GroupID    uuid.UUID `json:"group_id"`
+	ExternalID string    `json:"external_id"`
+	Title      string    `json:"title"`
+	InstanceID uuid.UUID `json:"instance_id"`
+	SeasonFrom int       `json:"season_from"`
+	SeasonTo   *int      `json:"season_to,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type AppSettings struct {
 	AppType           AppType `json:"app_type"`
 	LurkMissingCount  int     `json:"lurk_missing_count"`

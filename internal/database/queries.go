@@ -1342,3 +1342,53 @@ func (db *DB) ListCrossInstanceActions(ctx context.Context, limit int) ([]CrossI
 	}
 	return actions, nil
 }
+
+// --- Split Season Rules ---
+
+// ListSplitSeasonRules returns all split-season rules for a group.
+func (db *DB) ListSplitSeasonRules(ctx context.Context, groupID uuid.UUID) ([]SplitSeasonRule, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, group_id, external_id, title, instance_id, season_from, season_to, created_at
+		 FROM split_season_rules WHERE group_id = $1 ORDER BY external_id, season_from`, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("list split season rules: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []SplitSeasonRule
+	for rows.Next() {
+		var r SplitSeasonRule
+		if err := rows.Scan(&r.ID, &r.GroupID, &r.ExternalID, &r.Title, &r.InstanceID,
+			&r.SeasonFrom, &r.SeasonTo, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan split season rule: %w", err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, nil
+}
+
+// CreateSplitSeasonRule inserts a new split-season rule.
+func (db *DB) CreateSplitSeasonRule(ctx context.Context, r SplitSeasonRule) (*SplitSeasonRule, error) {
+	err := db.Pool.QueryRow(ctx,
+		`INSERT INTO split_season_rules (group_id, external_id, title, instance_id, season_from, season_to)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, created_at`,
+		r.GroupID, r.ExternalID, r.Title, r.InstanceID, r.SeasonFrom, r.SeasonTo,
+	).Scan(&r.ID, &r.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("create split season rule: %w", err)
+	}
+	return &r, nil
+}
+
+// DeleteSplitSeasonRule deletes a single rule by ID.
+func (db *DB) DeleteSplitSeasonRule(ctx context.Context, id uuid.UUID) error {
+	tag, err := db.Pool.Exec(ctx, `DELETE FROM split_season_rules WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete split season rule: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("split season rule not found")
+	}
+	return nil
+}

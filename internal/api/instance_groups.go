@@ -99,9 +99,9 @@ func (h *InstanceGroupsHandler) HandleUpdateGroup(w http.ResponseWriter, r *http
 		}
 	}
 	if req.Mode != "" {
-		validModes := map[string]bool{"quality_hierarchy": true, "overlap_detect": true}
+		validModes := map[string]bool{"quality_hierarchy": true, "overlap_detect": true, "split_season": true}
 		if !validModes[req.Mode] {
-			writeJSON(w, http.StatusBadRequest, errorResponse("mode must be quality_hierarchy or overlap_detect"))
+			writeJSON(w, http.StatusBadRequest, errorResponse("mode must be quality_hierarchy, overlap_detect, or split_season"))
 			return
 		}
 		if err := h.DB.UpdateInstanceGroupMode(r.Context(), id, req.Mode); err != nil {
@@ -217,4 +217,79 @@ func (h *InstanceGroupsHandler) HandleListActions(w http.ResponseWriter, r *http
 		actions = []database.CrossInstanceAction{}
 	}
 	writeJSON(w, http.StatusOK, actions)
+}
+
+// HandleListSeasonRules returns split-season rules for a group.
+func (h *InstanceGroupsHandler) HandleListSeasonRules(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+		return
+	}
+	rules, err := h.DB.ListSplitSeasonRules(r.Context(), id)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list season rules"))
+		return
+	}
+	if rules == nil {
+		rules = []database.SplitSeasonRule{}
+	}
+	writeJSON(w, http.StatusOK, rules)
+}
+
+// HandleCreateSeasonRule creates a split-season rule for a group.
+func (h *InstanceGroupsHandler) HandleCreateSeasonRule(w http.ResponseWriter, r *http.Request) {
+	limitBody(w, r)
+	groupID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+		return
+	}
+	var req struct {
+		ExternalID string    `json:"external_id"`
+		Title      string    `json:"title"`
+		InstanceID uuid.UUID `json:"instance_id"`
+		SeasonFrom int       `json:"season_from"`
+		SeasonTo   *int      `json:"season_to"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+		return
+	}
+	if req.ExternalID == "" || req.InstanceID == uuid.Nil || req.SeasonFrom < 1 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("external_id, instance_id, and season_from (>= 1) are required"))
+		return
+	}
+	if req.SeasonTo != nil && *req.SeasonTo < req.SeasonFrom {
+		writeJSON(w, http.StatusBadRequest, errorResponse("season_to must be >= season_from"))
+		return
+	}
+
+	rule, err := h.DB.CreateSplitSeasonRule(r.Context(), database.SplitSeasonRule{
+		GroupID:    groupID,
+		ExternalID: req.ExternalID,
+		Title:      req.Title,
+		InstanceID: req.InstanceID,
+		SeasonFrom: req.SeasonFrom,
+		SeasonTo:   req.SeasonTo,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create season rule"))
+		return
+	}
+	writeJSON(w, http.StatusCreated, rule)
+}
+
+// HandleDeleteSeasonRule deletes a split-season rule.
+func (h *InstanceGroupsHandler) HandleDeleteSeasonRule(w http.ResponseWriter, r *http.Request) {
+	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid rule ID"))
+		return
+	}
+	if err := h.DB.DeleteSplitSeasonRule(r.Context(), ruleID); err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("season rule not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
