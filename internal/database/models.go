@@ -88,6 +88,24 @@ func (a *AppInstance) MaskedAPIKey() string {
 	return "****" + a.APIKey[len(a.APIKey)-4:]
 }
 
+// InstanceGroup represents a named collection of instances with quality tiers.
+type InstanceGroup struct {
+	ID        uuid.UUID             `json:"id"`
+	AppType   AppType               `json:"app_type"`
+	Name      string                `json:"name"`
+	CreatedAt time.Time             `json:"created_at"`
+	Members   []InstanceGroupMember `json:"members,omitempty"`
+}
+
+// InstanceGroupMember links an instance to a group with a quality rank.
+// Lower rank means higher quality (e.g., 1 = 4K, 2 = 1080p, 3 = 720p).
+type InstanceGroupMember struct {
+	GroupID      uuid.UUID `json:"group_id"`
+	InstanceID   uuid.UUID `json:"instance_id"`
+	InstanceName string    `json:"instance_name,omitempty"`
+	QualityRank  int       `json:"quality_rank"`
+}
+
 type AppSettings struct {
 	AppType           AppType `json:"app_type"`
 	LurkMissingCount  int     `json:"lurk_missing_count"`

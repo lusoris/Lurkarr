@@ -118,6 +118,15 @@ type Store interface {
 	GetOIDCSettings(ctx context.Context) (*database.OIDCSettings, error)
 	UpdateOIDCSettings(ctx context.Context, s *database.OIDCSettings) error
 
+	// Instance Groups
+	ListInstanceGroups(ctx context.Context, appType database.AppType) ([]database.InstanceGroup, error)
+	GetInstanceGroup(ctx context.Context, id uuid.UUID) (*database.InstanceGroup, error)
+	CreateInstanceGroup(ctx context.Context, appType database.AppType, name string) (*database.InstanceGroup, error)
+	UpdateInstanceGroup(ctx context.Context, id uuid.UUID, name string) error
+	DeleteInstanceGroup(ctx context.Context, id uuid.UUID) error
+	SetGroupMembers(ctx context.Context, groupID uuid.UUID, members []database.InstanceGroupMember) error
+	GetInstanceGroupForInstance(ctx context.Context, instanceID uuid.UUID) (*database.InstanceGroup, error)
+
 	// WebAuthn Credentials
 	CreateWebAuthnCredential(ctx context.Context, c *database.WebAuthnCredential) error
 	ListWebAuthnCredentials(ctx context.Context, userID uuid.UUID) ([]database.WebAuthnCredential, error)

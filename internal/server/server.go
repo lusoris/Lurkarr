@@ -81,6 +81,17 @@ func csrfInjectToken(next http.Handler) http.Handler {
 	})
 }
 
+// csrfPlaintextHTTP marks requests as plaintext HTTP for gorilla/csrf so that
+// it does not enforce strict Referer/Origin checks meant for TLS connections.
+func csrfPlaintextHTTP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https" {
+			r = csrf.PlaintextHTTPRequest(r)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // spaHandler serves an SPA from an fs.FS. It tries the exact path first,
 // then falls back to index.html for client-side routing.
 func spaHandler(fsys fs.FS) http.Handler {
@@ -106,7 +117,7 @@ func spaHandler(fsys fs.FS) http.Handler {
 }
 
 // New creates a new Server with all routes registered.
-func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *notifications.Manager) *Server {
+func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *notifications.Manager) *Server {
 	// Set trusted proxies for rate limiter IP extraction.
 	middleware.TrustedProxies = cfg.TrustedProxies
 
@@ -138,6 +149,7 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	sessionH := &api.SessionHandler{DB: db}
 	adminH := &api.AdminHandler{DB: db}
 	oidcSettingsH := &api.OIDCSettingsHandler{DB: db}
+	groupsH := &api.InstanceGroupsHandler{DB: db}
 
 	// WebAuthn / Passkeys
 	var passkeyH *api.PasskeyHandler
@@ -147,16 +159,15 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 			RPDisplayName: cfg.WebAuthnRPDisplayName,
 			RPOrigins:     cfg.WebAuthnRPOrigins,
 			AuthenticatorSelection: protocol.AuthenticatorSelection{
-				RequireResidentKey: protocol.ResidentKeyRequired(),
-				ResidentKey:        protocol.ResidentKeyRequirementRequired,
-				UserVerification:   protocol.VerificationPreferred,
+				ResidentKey:      protocol.ResidentKeyRequirementPreferred,
+				UserVerification: protocol.VerificationPreferred,
 			},
 		}
 		wa, waErr := webauthn.New(waConfig)
 		if waErr != nil {
 			slog.Error("failed to create WebAuthn", "error", waErr)
 		} else {
-			passkeyH = api.NewPasskeyHandler(db, authMw, wa)
+			passkeyH = api.NewPasskeyHandler(ctx, db, authMw, wa)
 		}
 	}
 
@@ -393,6 +404,8 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("PUT /api/download-clients/{id}", dlClientH.HandleUpdate)
 	protected.HandleFunc("DELETE /api/download-clients/{id}", dlClientH.HandleDelete)
 	protected.HandleFunc("GET /api/download-clients/{id}/health", dlClientH.HandleHealthCheck)
+	protected.HandleFunc("GET /api/download-clients/{id}/status", dlClientH.HandleStatus)
+	protected.HandleFunc("GET /api/download-clients/{id}/items", dlClientH.HandleItems)
 	protected.HandleFunc("POST /api/download-clients/test", dlClientH.HandleTest)
 
 	// Seerr
@@ -406,8 +419,18 @@ func New(cfg Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *noti
 	protected.HandleFunc("GET /api/oidc/settings", oidcSettingsH.HandleGetSettings)
 	protected.HandleFunc("PUT /api/oidc/settings", oidcSettingsH.HandleUpdateSettings)
 
-	// Mount protected routes with auth + CSRF + token injection
-	mux.Handle("/api/", authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected))))
+	// Instance Groups
+	protected.HandleFunc("GET /api/instance-groups/{app}", groupsH.HandleListGroups)
+	protected.HandleFunc("POST /api/instance-groups/{app}", groupsH.HandleCreateGroup)
+	protected.HandleFunc("GET /api/instance-groups/by-id/{id}", groupsH.HandleGetGroup)
+	protected.HandleFunc("PUT /api/instance-groups/by-id/{id}", groupsH.HandleUpdateGroup)
+	protected.HandleFunc("DELETE /api/instance-groups/by-id/{id}", groupsH.HandleDeleteGroup)
+	protected.HandleFunc("PUT /api/instance-groups/by-id/{id}/members", groupsH.HandleSetMembers)
+
+	// Mount protected routes with auth + CSRF + token injection.
+	// csrfPlaintextHTTP must wrap the CSRF middleware so gorilla/csrf knows when
+	// the request arrives over plain HTTP (no TLS, no X-Forwarded-Proto: https).
+	mux.Handle("/api/", csrfPlaintextHTTP(authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected)))))
 
 	// Serve embedded frontend SPA (if built).
 	if cfg.FrontendFS != nil {

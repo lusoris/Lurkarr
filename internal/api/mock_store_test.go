@@ -101,6 +101,21 @@ func (mr *MockStoreMockRecorder) CreateInstance(ctx, appType, name, apiURL, apiK
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateInstance", reflect.TypeOf((*MockStore)(nil).CreateInstance), ctx, appType, name, apiURL, apiKey)
 }
 
+// CreateInstanceGroup mocks base method.
+func (m *MockStore) CreateInstanceGroup(ctx context.Context, appType database.AppType, name string) (*database.InstanceGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateInstanceGroup", ctx, appType, name)
+	ret0, _ := ret[0].(*database.InstanceGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateInstanceGroup indicates an expected call of CreateInstanceGroup.
+func (mr *MockStoreMockRecorder) CreateInstanceGroup(ctx, appType, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateInstanceGroup", reflect.TypeOf((*MockStore)(nil).CreateInstanceGroup), ctx, appType, name)
+}
+
 // CreateNotificationProvider mocks base method.
 func (m *MockStore) CreateNotificationProvider(ctx context.Context, p *database.NotificationProvider) error {
 	m.ctrl.T.Helper()
@@ -240,6 +255,20 @@ func (m *MockStore) DeleteInstance(ctx context.Context, id uuid.UUID) error {
 func (mr *MockStoreMockRecorder) DeleteInstance(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstance", reflect.TypeOf((*MockStore)(nil).DeleteInstance), ctx, id)
+}
+
+// DeleteInstanceGroup mocks base method.
+func (m *MockStore) DeleteInstanceGroup(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteInstanceGroup", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteInstanceGroup indicates an expected call of DeleteInstanceGroup.
+func (mr *MockStoreMockRecorder) DeleteInstanceGroup(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstanceGroup", reflect.TypeOf((*MockStore)(nil).DeleteInstanceGroup), ctx, id)
 }
 
 // DeleteNotificationProvider mocks base method.
@@ -490,6 +519,36 @@ func (mr *MockStoreMockRecorder) GetInstance(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstance", reflect.TypeOf((*MockStore)(nil).GetInstance), ctx, id)
 }
 
+// GetInstanceGroup mocks base method.
+func (m *MockStore) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*database.InstanceGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetInstanceGroup", ctx, id)
+	ret0, _ := ret[0].(*database.InstanceGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetInstanceGroup indicates an expected call of GetInstanceGroup.
+func (mr *MockStoreMockRecorder) GetInstanceGroup(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstanceGroup", reflect.TypeOf((*MockStore)(nil).GetInstanceGroup), ctx, id)
+}
+
+// GetInstanceGroupForInstance mocks base method.
+func (m *MockStore) GetInstanceGroupForInstance(ctx context.Context, instanceID uuid.UUID) (*database.InstanceGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetInstanceGroupForInstance", ctx, instanceID)
+	ret0, _ := ret[0].(*database.InstanceGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetInstanceGroupForInstance indicates an expected call of GetInstanceGroupForInstance.
+func (mr *MockStoreMockRecorder) GetInstanceGroupForInstance(ctx, instanceID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstanceGroupForInstance", reflect.TypeOf((*MockStore)(nil).GetInstanceGroupForInstance), ctx, instanceID)
+}
+
 // GetLastReset mocks base method.
 func (m *MockStore) GetLastReset(ctx context.Context, appType database.AppType, instanceID uuid.UUID) (*time.Time, error) {
 	m.ctrl.T.Helper()
@@ -730,6 +789,21 @@ func (mr *MockStoreMockRecorder) ListEnabledNotificationProviders(ctx any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledNotificationProviders", reflect.TypeOf((*MockStore)(nil).ListEnabledNotificationProviders), ctx)
 }
 
+// ListInstanceGroups mocks base method.
+func (m *MockStore) ListInstanceGroups(ctx context.Context, appType database.AppType) ([]database.InstanceGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListInstanceGroups", ctx, appType)
+	ret0, _ := ret[0].([]database.InstanceGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListInstanceGroups indicates an expected call of ListInstanceGroups.
+func (mr *MockStoreMockRecorder) ListInstanceGroups(ctx, appType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstanceGroups", reflect.TypeOf((*MockStore)(nil).ListInstanceGroups), ctx, appType)
+}
+
 // ListInstances mocks base method.
 func (m *MockStore) ListInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error) {
 	m.ctrl.T.Helper()
@@ -893,6 +967,20 @@ func (mr *MockStoreMockRecorder) ResetStats(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetStats", reflect.TypeOf((*MockStore)(nil).ResetStats), ctx)
 }
 
+// SetGroupMembers mocks base method.
+func (m *MockStore) SetGroupMembers(ctx context.Context, groupID uuid.UUID, members []database.InstanceGroupMember) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetGroupMembers", ctx, groupID, members)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetGroupMembers indicates an expected call of SetGroupMembers.
+func (mr *MockStoreMockRecorder) SetGroupMembers(ctx, groupID, members any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGroupMembers", reflect.TypeOf((*MockStore)(nil).SetGroupMembers), ctx, groupID, members)
+}
+
 // SetRecoveryCodes mocks base method.
 func (m *MockStore) SetRecoveryCodes(ctx context.Context, id uuid.UUID, codes []string) error {
 	m.ctrl.T.Helper()
@@ -989,6 +1077,20 @@ func (m *MockStore) UpdateInstance(ctx context.Context, id uuid.UUID, name, apiU
 func (mr *MockStoreMockRecorder) UpdateInstance(ctx, id, name, apiURL, apiKey, enabled any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstance", reflect.TypeOf((*MockStore)(nil).UpdateInstance), ctx, id, name, apiURL, apiKey, enabled)
+}
+
+// UpdateInstanceGroup mocks base method.
+func (m *MockStore) UpdateInstanceGroup(ctx context.Context, id uuid.UUID, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateInstanceGroup", ctx, id, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateInstanceGroup indicates an expected call of UpdateInstanceGroup.
+func (mr *MockStoreMockRecorder) UpdateInstanceGroup(ctx, id, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstanceGroup", reflect.TypeOf((*MockStore)(nil).UpdateInstanceGroup), ctx, id, name)
 }
 
 // UpdateNotificationProvider mocks base method.

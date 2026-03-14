@@ -940,3 +940,167 @@ func (db *DB) SetCSRFKey(ctx context.Context, key string) error {
 	)
 	return err
 }
+
+// --- Instance Groups ---
+
+// CreateInstanceGroup creates a new instance group for the given app type.
+func (db *DB) CreateInstanceGroup(ctx context.Context, appType AppType, name string) (*InstanceGroup, error) {
+	var g InstanceGroup
+	err := db.Pool.QueryRow(ctx,
+		`INSERT INTO instance_groups (app_type, name) VALUES ($1, $2)
+		 RETURNING id, app_type, name, created_at`,
+		appType, name,
+	).Scan(&g.ID, &g.AppType, &g.Name, &g.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("create instance group: %w", err)
+	}
+	return &g, nil
+}
+
+// GetInstanceGroup returns a single instance group by ID with its members.
+func (db *DB) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*InstanceGroup, error) {
+	var g InstanceGroup
+	err := db.Pool.QueryRow(ctx,
+		`SELECT id, app_type, name, created_at FROM instance_groups WHERE id = $1`,
+		id,
+	).Scan(&g.ID, &g.AppType, &g.Name, &g.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get instance group: %w", err)
+	}
+
+	rows, err := db.Pool.Query(ctx,
+		`SELECT m.group_id, m.instance_id, i.name, m.quality_rank
+		 FROM instance_group_members m
+		 JOIN app_instances i ON i.id = m.instance_id
+		 WHERE m.group_id = $1
+		 ORDER BY m.quality_rank`, id)
+	if err != nil {
+		return nil, fmt.Errorf("get instance group members: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var m InstanceGroupMember
+		if err := rows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank); err != nil {
+			return nil, fmt.Errorf("scan instance group member: %w", err)
+		}
+		g.Members = append(g.Members, m)
+	}
+	return &g, nil
+}
+
+// ListInstanceGroups returns all groups for a given app type with members.
+func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]InstanceGroup, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, app_type, name, created_at FROM instance_groups
+		 WHERE app_type = $1 ORDER BY name`, appType)
+	if err != nil {
+		return nil, fmt.Errorf("list instance groups: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []InstanceGroup
+	for rows.Next() {
+		var g InstanceGroup
+		if err := rows.Scan(&g.ID, &g.AppType, &g.Name, &g.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan instance group: %w", err)
+		}
+		groups = append(groups, g)
+	}
+
+	// Load members for each group in a single query
+	if len(groups) > 0 {
+		groupIDs := make([]uuid.UUID, len(groups))
+		groupMap := make(map[uuid.UUID]*InstanceGroup, len(groups))
+		for i := range groups {
+			groupIDs[i] = groups[i].ID
+			groupMap[groups[i].ID] = &groups[i]
+		}
+
+		mRows, err := db.Pool.Query(ctx,
+			`SELECT m.group_id, m.instance_id, i.name, m.quality_rank
+			 FROM instance_group_members m
+			 JOIN app_instances i ON i.id = m.instance_id
+			 WHERE m.group_id = ANY($1)
+			 ORDER BY m.quality_rank`, groupIDs)
+		if err != nil {
+			return nil, fmt.Errorf("list instance group members: %w", err)
+		}
+		defer mRows.Close()
+
+		for mRows.Next() {
+			var m InstanceGroupMember
+			if err := mRows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank); err != nil {
+				return nil, fmt.Errorf("scan instance group member: %w", err)
+			}
+			if g, ok := groupMap[m.GroupID]; ok {
+				g.Members = append(g.Members, m)
+			}
+		}
+	}
+	return groups, nil
+}
+
+// UpdateInstanceGroup renames an instance group.
+func (db *DB) UpdateInstanceGroup(ctx context.Context, id uuid.UUID, name string) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE instance_groups SET name = $1 WHERE id = $2`,
+		name, id)
+	if err != nil {
+		return fmt.Errorf("update instance group: %w", err)
+	}
+	return nil
+}
+
+// DeleteInstanceGroup deletes a group and its member associations.
+func (db *DB) DeleteInstanceGroup(ctx context.Context, id uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx,
+		`DELETE FROM instance_groups WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete instance group: %w", err)
+	}
+	return nil
+}
+
+// SetGroupMembers replaces all members of a group with the provided list.
+// Each member specifies an instance ID and quality rank.
+func (db *DB) SetGroupMembers(ctx context.Context, groupID uuid.UUID, members []InstanceGroupMember) error {
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	_, err = tx.Exec(ctx, `DELETE FROM instance_group_members WHERE group_id = $1`, groupID)
+	if err != nil {
+		return fmt.Errorf("clear group members: %w", err)
+	}
+
+	for _, m := range members {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO instance_group_members (group_id, instance_id, quality_rank)
+			 VALUES ($1, $2, $3)`,
+			groupID, m.InstanceID, m.QualityRank)
+		if err != nil {
+			return fmt.Errorf("insert group member: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// GetInstanceGroupForInstance returns the group an instance belongs to, or nil.
+func (db *DB) GetInstanceGroupForInstance(ctx context.Context, instanceID uuid.UUID) (*InstanceGroup, error) {
+	var groupID uuid.UUID
+	err := db.Pool.QueryRow(ctx,
+		`SELECT group_id FROM instance_group_members WHERE instance_id = $1`,
+		instanceID,
+	).Scan(&groupID)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get group for instance: %w", err)
+	}
+	return db.GetInstanceGroup(ctx, groupID)
+}
