@@ -389,7 +389,7 @@ func TestHasImportFailureVariants(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasImportFailure(tt.record)
+			got := hasImportFailure(tt.record, nil)
 			if got != tt.want {
 				t.Errorf("hasImportFailure() = %v, want %v", got, tt.want)
 			}

@@ -476,8 +476,17 @@ func isPrivateTracker(record arrclient.QueueRecord) bool {
 
 // cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
 func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord) {
+	// Parse user-configured patterns (empty = use built-in defaults).
+	var patterns []string
+	for _, p := range strings.Split(settings.FailedImportPatterns, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			patterns = append(patterns, strings.ToLower(p))
+		}
+	}
+
 	for _, record := range records {
-		if !hasImportFailure(record) {
+		if !hasImportFailure(record, patterns) {
 			continue
 		}
 
@@ -509,7 +518,9 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 }
 
 // hasImportFailure checks if a queue record has import failure messages.
-func hasImportFailure(record arrclient.QueueRecord) bool {
+// When patterns is non-empty, only messages containing one of the patterns match.
+// When patterns is empty, built-in defaults are used.
+func hasImportFailure(record arrclient.QueueRecord, patterns []string) bool {
 	if record.TrackedDownloadStatus != "warning" {
 		return false
 	}
@@ -519,12 +530,20 @@ func hasImportFailure(record arrclient.QueueRecord) bool {
 	for _, sm := range record.StatusMessages {
 		for _, msg := range sm.Messages {
 			lower := strings.ToLower(msg)
-			if strings.Contains(lower, "import failed") ||
-				strings.Contains(lower, "unable to import") ||
-				strings.Contains(lower, "no files found") ||
-				strings.Contains(lower, "sample") ||
-				strings.Contains(lower, "not a valid") {
-				return true
+			if len(patterns) > 0 {
+				for _, p := range patterns {
+					if strings.Contains(lower, p) {
+						return true
+					}
+				}
+			} else {
+				if strings.Contains(lower, "import failed") ||
+					strings.Contains(lower, "unable to import") ||
+					strings.Contains(lower, "no files found") ||
+					strings.Contains(lower, "sample") ||
+					strings.Contains(lower, "not a valid") {
+					return true
+				}
 			}
 		}
 	}

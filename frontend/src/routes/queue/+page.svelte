@@ -57,6 +57,7 @@
 		ignore_above_bytes: number;
 		tag_instead_of_delete: boolean;
 		obsolete_tag_label: string;
+		failed_import_patterns: string;
 	}
 
 	interface ScoringProfile {
@@ -402,6 +403,7 @@
 					<div class="space-y-2">
 						<Toggle bind:checked={settings.failed_import_remove} label="Remove Failed Imports" />
 						<Toggle bind:checked={settings.failed_import_blocklist} label="Blocklist Failed Imports" />
+						<Input bind:value={settings.failed_import_patterns} label="Message Patterns" hint="Comma-separated substrings to match (empty = built-in defaults: import failed, no files found, etc.)" />
 					</div>
 				</Card>
 

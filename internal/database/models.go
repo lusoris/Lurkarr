@@ -269,6 +269,8 @@ type QueueCleanerSettings struct {
 	// Tag instead of delete
 	TagInsteadOfDelete bool   `json:"tag_instead_of_delete"` // Tag media with obsolete label instead of removing from queue
 	ObsoleteTagLabel   string `json:"obsolete_tag_label"`    // Label for the tag applied to media on removal (e.g. "lurkarr-obsolete")
+	// Failed import message patterns
+	FailedImportPatterns string `json:"failed_import_patterns"` // Comma-separated substrings; only remove failed imports matching these (empty = all failures)
 }
 
 // QueueStrike represents a strike against a problematic download.
