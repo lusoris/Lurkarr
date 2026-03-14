@@ -217,6 +217,14 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		obsoleteTagID = resolveTagID(ctx, log, client, apiVersion, settings.ObsoleteTagLabel)
 	}
 
+	// Per-run search budget: when MaxSearchesPerRun > 0, limits how many
+	// re-searches fire in a single cleanup cycle for this instance.
+	var searchBudget *int
+	if settings.MaxSearchesPerRun > 0 {
+		b := settings.MaxSearchesPerRun
+		searchBudget = &b
+	}
+
 	var removed []removal
 
 	// 0. Blocklist rule matching — remove items matching user/community blocklist
@@ -258,7 +266,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours)
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget)
 			}
 		}
 	}
@@ -365,14 +373,14 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours)
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget)
 			}
 		}
 	}
 
 	// 3. Failed import cleanup
 	if settings.FailedImportRemove {
-		c.cleanFailedImports(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
+		c.cleanFailedImports(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, searchBudget)
 	}
 
 	// 4. Seeding enforcement — remove completed torrents exceeding ratio/time limits
@@ -482,7 +490,7 @@ func isPrivateTracker(record arrclient.QueueRecord) bool {
 }
 
 // cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
-func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord) {
+func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, searchBudget *int) {
 	// Parse user-configured patterns (empty = use built-in defaults).
 	var patterns []string
 	for _, p := range strings.Split(settings.FailedImportPatterns, ",") {
@@ -518,7 +526,7 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)
 		if settings.SearchOnRemove {
 			if l := lurking.LurkerFor(appType); l != nil {
-				c.triggerReSearch(ctx, log, l, client, record, appType, inst.ID, settings.SearchCooldownHours)
+				c.triggerReSearch(ctx, log, l, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget)
 			}
 		}
 	}
@@ -543,14 +551,12 @@ func hasImportFailure(record arrclient.QueueRecord, patterns []string) bool {
 						return true
 					}
 				}
-			} else {
-				if strings.Contains(lower, "import failed") ||
-					strings.Contains(lower, "unable to import") ||
-					strings.Contains(lower, "no files found") ||
-					strings.Contains(lower, "sample") ||
-					strings.Contains(lower, "not a valid") {
-					return true
-				}
+			} else if strings.Contains(lower, "import failed") ||
+				strings.Contains(lower, "unable to import") ||
+				strings.Contains(lower, "no files found") ||
+				strings.Contains(lower, "sample") ||
+				strings.Contains(lower, "not a valid") {
+				return true
 			}
 		}
 	}
@@ -1261,10 +1267,16 @@ func filterIgnoredIndexers(log *slog.Logger, ignoredCSV string, records []arrcli
 // triggerReSearch asks the arr instance to search for a replacement after a
 // queue item is removed. It is a best-effort operation — failures are logged
 // but do not interrupt the cleanup loop. When cooldownHours > 0, recently
-// searched media is skipped.
-func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord, appType database.AppType, instID uuid.UUID, cooldownHours int) {
+// searched media is skipped. When searchBudget is non-nil and points to a
+// positive value, it is decremented on each search; when it reaches zero,
+// further searches are skipped. Pass nil to disable budget tracking.
+func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord, appType database.AppType, instID uuid.UUID, cooldownHours int, searchBudget *int) {
 	mediaID := record.MediaID()
 	if mediaID <= 0 {
+		return
+	}
+	if searchBudget != nil && *searchBudget <= 0 {
+		log.Debug("skipping re-search (per-run budget exhausted)", "title", record.Title, "media_id", mediaID)
 		return
 	}
 	if cooldownHours > 0 {
@@ -1280,6 +1292,9 @@ func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker 
 		log.Warn("re-search failed", "title", record.Title, "media_id", mediaID, "error", err)
 	} else {
 		log.Info("re-search triggered", "title", record.Title, "media_id", mediaID)
+		if searchBudget != nil {
+			*searchBudget--
+		}
 		if cooldownHours > 0 {
 			if err := c.db.RecordSearch(ctx, appType, instID, mediaID); err != nil {
 				log.Warn("failed to record search cooldown", "media_id", mediaID, "error", err)

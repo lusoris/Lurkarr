@@ -61,6 +61,7 @@
 		strike_queued: boolean;
 		max_strikes_queued: number;
 		search_cooldown_hours: number;
+		max_searches_per_run: number;
 	}
 
 	interface ScoringProfile {
@@ -398,6 +399,7 @@
 						<Toggle bind:checked={settings.search_on_remove} label="Re-search on Remove" hint="Trigger a new search when an item is removed (blocklist, stalled, failed import)" />
 						{#if settings.search_on_remove}
 							<Input bind:value={settings.search_cooldown_hours} type="number" label="Search Cooldown (hours)" hint="Min hours between re-searches for the same media (0 = no cooldown)" />
+							<Input bind:value={settings.max_searches_per_run} type="number" label="Max Searches per Run" hint="Limit re-searches per cleanup cycle per instance (0 = unlimited)" />
 						{/if}
 						<Toggle bind:checked={settings.tag_instead_of_delete} label="Tag Media on Removal" hint="Apply an obsolete tag to the media item when removing from queue" />
 						{#if settings.tag_instead_of_delete}

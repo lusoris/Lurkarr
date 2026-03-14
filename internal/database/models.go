@@ -276,6 +276,7 @@ type QueueCleanerSettings struct {
 	MaxStrikesQueued int  `json:"max_strikes_queued"` // Override max_strikes for queued items (0 = use global)
 	// Search cooldown
 	SearchCooldownHours int `json:"search_cooldown_hours"` // Minimum hours between re-searches for the same media (0 = no cooldown)
+	MaxSearchesPerRun   int `json:"max_searches_per_run"`  // Max re-searches per cleanup run per instance (0 = unlimited)
 }
 
 // QueueStrike represents a strike against a problematic download.
