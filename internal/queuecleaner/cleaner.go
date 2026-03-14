@@ -209,6 +209,12 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 	apiVersion := apiVersionFor(appType)
 
+	// Resolve obsolete tag ID once per instance when tag-instead-of-delete is enabled.
+	var obsoleteTagID int
+	if settings.TagInsteadOfDelete && settings.ObsoleteTagLabel != "" && !settings.DryRun {
+		obsoleteTagID = resolveTagID(ctx, log, client, apiVersion, settings.ObsoleteTagLabel)
+	}
+
 	var removed []removal
 
 	// 0. Blocklist rule matching — remove items matching user/community blocklist
@@ -338,6 +344,13 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 		if count >= effectiveMaxStrikes(reason, settings) {
 			log.Warn("max strikes reached, removing", "title", record.Title, "download_id", record.DownloadID)
+			if obsoleteTagID > 0 {
+				if mid := record.TaggableMediaID(); mid > 0 {
+					if err := client.TagMedia(ctx, apiVersion, string(appType), mid, obsoleteTagID); err != nil {
+						log.Warn("failed to tag media as obsolete", "title", record.Title, "error", err)
+					}
+				}
+			}
 			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, settings.BlocklistOnRemove); err != nil {
 				log.Error("failed to remove struck item", "error", err)
 				continue
@@ -1143,6 +1156,28 @@ func effectiveMaxStrikes(reason string, settings *database.QueueCleanerSettings)
 		}
 	}
 	return settings.MaxStrikes
+}
+
+// resolveTagID finds or creates a tag with the given label, returning its ID.
+// Returns 0 if the tag cannot be resolved.
+func resolveTagID(ctx context.Context, log *slog.Logger, client *arrclient.Client, apiVersion, label string) int {
+	tags, err := client.GetTags(ctx, apiVersion)
+	if err != nil {
+		log.Warn("failed to get tags for obsolete tagging", "error", err)
+		return 0
+	}
+	lower := strings.ToLower(label)
+	for _, t := range tags {
+		if strings.ToLower(t.Label) == lower {
+			return t.ID
+		}
+	}
+	tag, err := client.CreateTag(ctx, apiVersion, label)
+	if err != nil {
+		log.Warn("failed to create obsolete tag", "label", label, "error", err)
+		return 0
+	}
+	return tag.ID
 }
 
 func isBandwidthSaturated(log *slog.Logger, settings *database.QueueCleanerSettings, records []arrclient.QueueRecord) bool {

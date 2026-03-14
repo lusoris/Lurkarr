@@ -1,6 +1,7 @@
 package arrclient
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -82,6 +83,15 @@ func (c *Client) post(ctx context.Context, path string, body io.Reader, result a
 
 func (c *Client) del(ctx context.Context, path string) error {
 	resp, err := c.doRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return nil
+}
+
+func (c *Client) put(ctx context.Context, path string, body io.Reader) error {
+	resp, err := c.doRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return err
 	}
@@ -207,7 +217,9 @@ type QueueRecord struct {
 	SeriesID              int             `json:"seriesId,omitempty"`
 	EpisodeID             int             `json:"episodeId,omitempty"`
 	AlbumID               int             `json:"albumId,omitempty"`
+	ArtistID              int             `json:"artistId,omitempty"`
 	BookID                int             `json:"bookId,omitempty"`
+	AuthorID              int             `json:"authorId,omitempty"`
 	Quality               *QualityInfo    `json:"quality,omitempty"`
 
 	// Enriched fields (populated when queue is fetched with include* params).
@@ -295,6 +307,24 @@ func (q *QueueRecord) MediaID() int {
 	return 0
 }
 
+// TaggableMediaID returns the ID of the entity that supports tags in the *arr API.
+// Radarr/Eros: MovieID, Sonarr/Whisparr: SeriesID, Lidarr: ArtistID, Readarr: AuthorID.
+func (q *QueueRecord) TaggableMediaID() int {
+	if q.MovieID > 0 {
+		return q.MovieID
+	}
+	if q.SeriesID > 0 {
+		return q.SeriesID
+	}
+	if q.ArtistID > 0 {
+		return q.ArtistID
+	}
+	if q.AuthorID > 0 {
+		return q.AuthorID
+	}
+	return 0
+}
+
 // MediaKey returns a cross-instance media identifier from enriched queue data.
 // For Radarr/Eros: "tmdb:12345"
 // For Sonarr/Whisparr: "tvdb:67890:s02" (series + season)
@@ -347,6 +377,45 @@ func (c *Client) GetTags(ctx context.Context, apiVersion string) ([]Tag, error) 
 		return nil, fmt.Errorf("get tags: %w", err)
 	}
 	return tags, nil
+}
+
+// CreateTag creates a new tag and returns it.
+func (c *Client) CreateTag(ctx context.Context, apiVersion, label string) (*Tag, error) {
+	body, _ := json.Marshal(map[string]string{"label": label})
+	var tag Tag
+	if err := c.post(ctx, "/api/"+apiVersion+"/tag", bytes.NewReader(body), &tag); err != nil {
+		return nil, fmt.Errorf("create tag %q: %w", label, err)
+	}
+	return &tag, nil
+}
+
+// TagMedia applies a tag to a media item using the bulk editor endpoint.
+// appType determines the media path (movie/series/artist/author).
+func (c *Client) TagMedia(ctx context.Context, apiVersion, appType string, mediaID, tagID int) error {
+	var path string
+	var idsKey string
+	switch appType {
+	case "radarr", "eros":
+		path = "/api/" + apiVersion + "/movie/editor"
+		idsKey = "movieIds"
+	case "sonarr", "whisparr":
+		path = "/api/" + apiVersion + "/series/editor"
+		idsKey = "seriesIds"
+	case "lidarr":
+		path = "/api/" + apiVersion + "/artist/editor"
+		idsKey = "artistIds"
+	case "readarr":
+		path = "/api/" + apiVersion + "/author/editor"
+		idsKey = "authorIds"
+	default:
+		return fmt.Errorf("unsupported app type for tagging: %s", appType)
+	}
+	body, _ := json.Marshal(map[string]any{
+		idsKey:     []int{mediaID},
+		"tags":     []int{tagID},
+		"applyTags": "add",
+	})
+	return c.put(ctx, path, bytes.NewReader(body))
 }
 
 // QueueResponse wraps a paginated queue response.

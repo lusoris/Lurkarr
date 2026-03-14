@@ -266,6 +266,9 @@ type QueueCleanerSettings struct {
 	MaxStrikesPaused   int `json:"max_strikes_paused"`   // Override max_strikes for paused items (0 = use global)
 	// Global size-based ignore
 	IgnoreAboveBytes int64 `json:"ignore_above_bytes"` // Skip stalled/slow/metadata checks for items above this size (0 = disabled)
+	// Tag instead of delete
+	TagInsteadOfDelete bool   `json:"tag_instead_of_delete"` // Tag media with obsolete label instead of removing from queue
+	ObsoleteTagLabel   string `json:"obsolete_tag_label"`    // Label for the tag applied to media on removal (e.g. "lurkarr-obsolete")
 }
 
 // QueueStrike represents a strike against a problematic download.

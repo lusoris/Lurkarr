@@ -55,6 +55,8 @@
 		max_strikes_metadata: number;
 		max_strikes_paused: number;
 		ignore_above_bytes: number;
+		tag_instead_of_delete: boolean;
+		obsolete_tag_label: string;
 	}
 
 	interface ScoringProfile {
@@ -388,6 +390,10 @@
 						<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
 						<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" />
 						<Toggle bind:checked={settings.search_on_remove} label="Re-search on Remove" hint="Trigger a new search when an item is removed (blocklist, stalled, failed import)" />
+						<Toggle bind:checked={settings.tag_instead_of_delete} label="Tag Media on Removal" hint="Apply an obsolete tag to the media item when removing from queue" />
+						{#if settings.tag_instead_of_delete}
+							<Input bind:value={settings.obsolete_tag_label} label="Obsolete Tag Label" hint="Tag name applied in the *arr app (e.g. lurkarr-obsolete)" />
+						{/if}
 					</div>
 				</Card>
 

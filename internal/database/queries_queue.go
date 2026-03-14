@@ -25,7 +25,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        protected_tags, search_on_remove, ignored_indexers,
 		        bandwidth_limit_bytes_per_sec,
 		        max_strikes_stalled, max_strikes_slow, max_strikes_metadata, max_strikes_paused,
-		        ignore_above_bytes
+		        ignore_above_bytes,
+		        tag_instead_of_delete, obsolete_tag_label
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -39,7 +40,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.ProtectedTags, &s.SearchOnRemove, &s.IgnoredIndexers,
 		&s.BandwidthLimitBytesPerSec,
 		&s.MaxStrikesStalled, &s.MaxStrikesSlow, &s.MaxStrikesMetadata, &s.MaxStrikesPaused,
-		&s.IgnoreAboveBytes)
+		&s.IgnoreAboveBytes,
+		&s.TagInsteadOfDelete, &s.ObsoleteTagLabel)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -63,7 +65,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        bandwidth_limit_bytes_per_sec = $33,
 		        max_strikes_stalled = $34, max_strikes_slow = $35,
 		        max_strikes_metadata = $36, max_strikes_paused = $37,
-		        ignore_above_bytes = $38
+		        ignore_above_bytes = $38,
+		        tag_instead_of_delete = $39, obsolete_tag_label = $40
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -77,7 +80,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.ProtectedTags, s.SearchOnRemove, s.IgnoredIndexers,
 		s.BandwidthLimitBytesPerSec,
 		s.MaxStrikesStalled, s.MaxStrikesSlow, s.MaxStrikesMetadata, s.MaxStrikesPaused,
-		s.IgnoreAboveBytes)
+		s.IgnoreAboveBytes,
+		s.TagInsteadOfDelete, s.ObsoleteTagLabel)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}
