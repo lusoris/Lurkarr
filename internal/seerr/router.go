@@ -36,7 +36,7 @@ func (r *RequestRouter) Evaluate(ctx context.Context, req MediaRequest) RoutingD
 	}
 
 	// Build canonical external ID from Seerr media metadata.
-	externalID := buildExternalID(req)
+	externalID := BuildExternalID(req)
 	if externalID == "" {
 		return RoutingDecision{Action: "approve", Reason: "no external ID available"}
 	}
@@ -113,7 +113,7 @@ func (r *RequestRouter) LogAction(ctx context.Context, req MediaRequest, decisio
 		return
 	}
 
-	externalID := buildExternalID(req)
+	externalID := BuildExternalID(req)
 	title := req.Media.MediaType
 	if req.Type != "" {
 		title = req.Type
@@ -134,9 +134,9 @@ func (r *RequestRouter) LogAction(ctx context.Context, req MediaRequest, decisio
 	}
 }
 
-// buildExternalID converts a Seerr request's media IDs into the canonical format
+// BuildExternalID converts a Seerr request's media IDs into the canonical format
 // used by the cross-instance scanner (tmdb:X or tvdb:X).
-func buildExternalID(req MediaRequest) string {
+func BuildExternalID(req MediaRequest) string {
 	switch req.Type {
 	case "movie":
 		if req.Media.TmdbID > 0 {

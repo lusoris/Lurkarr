@@ -416,6 +416,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("GET /api/seerr/requests", seerrH.HandleGetRequests)
 	protected.HandleFunc("GET /api/seerr/requests/count", seerrH.HandleGetRequestCount)
 	protected.HandleFunc("POST /api/seerr/scan-duplicates", seerrH.HandleScanDuplicates)
+	protected.HandleFunc("POST /api/seerr/requests/{id}/reassign", seerrH.HandleReassignRequest)
 
 	// OIDC Settings
 	protected.HandleFunc("GET /api/oidc/settings", oidcSettingsH.HandleGetSettings)

@@ -2,6 +2,7 @@
 package seerr
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -239,8 +240,34 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, out an
 	return nil
 }
 
+// ModifyRequest updates a Seerr request's target server and quality profile.
+func (c *Client) ModifyRequest(ctx context.Context, id, serverID, profileID int, rootFolder string) (*MediaRequest, error) {
+	body := map[string]any{
+		"serverId":  serverID,
+		"profileId": profileID,
+	}
+	if rootFolder != "" {
+		body["rootFolder"] = rootFolder
+	}
+
+	var result MediaRequest
+	if err := c.putJSON(ctx, fmt.Sprintf("/api/v1/request/%d", id), body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteRequest removes a Seerr request by ID.
+func (c *Client) DeleteRequest(ctx context.Context, id int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/request/%d", id))
+}
+
 func (c *Client) post(ctx context.Context, path string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, http.NoBody)
+	return c.doRequest(ctx, http.MethodPost, path)
+}
+
+func (c *Client) doRequest(ctx context.Context, method, path string) error {
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -255,6 +282,43 @@ func (c *Client) post(ctx context.Context, path string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func (c *Client) putJSON(ctx context.Context, path string, payload, out any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	if out != nil {
+		if err := json.Unmarshal(body, out); err != nil {
+			return fmt.Errorf("decode response: %w", err)
+		}
 	}
 	return nil
 }

@@ -148,7 +148,7 @@ func TestEvaluate_MultiInstanceDuplicate_Decline(t *testing.T) {
 }
 
 func TestBuildExternalID_Movie(t *testing.T) {
-	id := buildExternalID(MediaRequest{Type: "movie", Media: Media{TmdbID: 42}})
+	id := BuildExternalID(MediaRequest{Type: "movie", Media: Media{TmdbID: 42}})
 	if id != "tmdb:42" {
 		t.Fatalf("expected tmdb:42, got %s", id)
 	}
@@ -156,21 +156,21 @@ func TestBuildExternalID_Movie(t *testing.T) {
 
 func TestBuildExternalID_TV_TVDB(t *testing.T) {
 	tvdbID := 99
-	id := buildExternalID(MediaRequest{Type: "tv", Media: Media{TvdbID: &tvdbID}})
+	id := BuildExternalID(MediaRequest{Type: "tv", Media: Media{TvdbID: &tvdbID}})
 	if id != "tvdb:99" {
 		t.Fatalf("expected tvdb:99, got %s", id)
 	}
 }
 
 func TestBuildExternalID_TV_FallbackTMDB(t *testing.T) {
-	id := buildExternalID(MediaRequest{Type: "tv", Media: Media{TmdbID: 77}})
+	id := BuildExternalID(MediaRequest{Type: "tv", Media: Media{TmdbID: 77}})
 	if id != "tmdb:77" {
 		t.Fatalf("expected tmdb:77, got %s", id)
 	}
 }
 
 func TestBuildExternalID_Unknown(t *testing.T) {
-	id := buildExternalID(MediaRequest{Type: "music"})
+	id := BuildExternalID(MediaRequest{Type: "music"})
 	if id != "" {
 		t.Fatalf("expected empty, got %s", id)
 	}

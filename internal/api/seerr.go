@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/lusoris/lurkarr/internal/seerr"
@@ -184,4 +186,48 @@ func (h *SeerrHandler) HandleScanDuplicates(w http.ResponseWriter, r *http.Reque
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleReassignRequest handles POST /api/seerr/requests/{id}/reassign.
+// It modifies a Seerr request to target a different server/quality profile.
+func (h *SeerrHandler) HandleReassignRequest(w http.ResponseWriter, r *http.Request) {
+	limitBody(w, r)
+
+	idStr := r.PathValue("id")
+	requestID, err := strconv.Atoi(idStr)
+	if err != nil || requestID <= 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request ID"))
+		return
+	}
+
+	var body struct {
+		ServerID   int    `json:"server_id"`
+		ProfileID  int    `json:"profile_id"`
+		RootFolder string `json:"root_folder"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+		return
+	}
+	if body.ServerID <= 0 || body.ProfileID <= 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("server_id and profile_id are required"))
+		return
+	}
+
+	settings, err := h.DB.GetSeerrSettings(r.Context())
+	if err != nil || settings.URL == "" || settings.APIKey == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("seerr not configured"))
+		return
+	}
+
+	client := seerr.NewClient(settings.URL, settings.APIKey, 15*time.Second)
+
+	// Apply the reassignment via the Seerr API.
+	updated, err := client.ModifyRequest(r.Context(), requestID, body.ServerID, body.ProfileID, body.RootFolder)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, errorResponse(fmt.Sprintf("failed to reassign request: %v", err)))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updated)
 }

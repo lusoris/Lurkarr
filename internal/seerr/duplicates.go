@@ -47,7 +47,7 @@ func (r *RequestRouter) ScanForDuplicates(ctx context.Context, client *Client) (
 				result.Duplicates = append(result.Duplicates, DuplicateFlag{
 					RequestID:   req.ID,
 					MediaTitle:  mediaTitle(req),
-					ExternalID:  buildExternalID(req),
+					ExternalID:  BuildExternalID(req),
 					RequestType: req.Type,
 					Is4K:        req.Is4K,
 					RequestedBy: req.RequestedBy.DisplayName,
