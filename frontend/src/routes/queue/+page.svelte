@@ -50,6 +50,10 @@
 		search_on_remove: boolean;
 		ignored_indexers: string;
 		bandwidth_limit_bytes_per_sec: number;
+		max_strikes_stalled: number;
+		max_strikes_slow: number;
+		max_strikes_metadata: number;
+		max_strikes_paused: number;
 	}
 
 	interface ScoringProfile {
@@ -359,8 +363,15 @@
 				<Card>
 					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Strike System</h3>
 					<div class="grid grid-cols-2 gap-3 mb-3">
-						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes" hint="Before removal" />
+						<Input bind:value={settings.max_strikes} type="number" label="Max Strikes (global)" hint="Default for all reasons" />
 						<Input bind:value={settings.strike_window_hours} type="number" label="Window (hours)" hint="Expiry time" />
+					</div>
+					<p class="text-xs text-muted-foreground mb-2">Per-reason overrides (0 = use global)</p>
+					<div class="grid grid-cols-2 gap-3 mb-3">
+						<Input bind:value={settings.max_strikes_stalled} type="number" label="Stalled" hint="Stalled torrents" />
+						<Input bind:value={settings.max_strikes_slow} type="number" label="Slow" hint="Below speed threshold" />
+						<Input bind:value={settings.max_strikes_metadata} type="number" label="Metadata Stuck" hint="No size info" />
+						<Input bind:value={settings.max_strikes_paused} type="number" label="Paused" hint="Paused in SABnzbd" />
 					</div>
 					<div class="space-y-2">
 						<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" />

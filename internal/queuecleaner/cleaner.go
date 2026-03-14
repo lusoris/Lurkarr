@@ -323,7 +323,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		}
 
 		if settings.DryRun {
-			log.Info("[DRY-RUN] would strike", "title", record.Title, "reason", reason, "max", settings.MaxStrikes)
+			log.Info("[DRY-RUN] would strike", "title", record.Title, "reason", reason, "max", effectiveMaxStrikes(reason, settings))
 			continue
 		}
 
@@ -334,9 +334,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		}
 		metrics.QueueCleanerStrikes.WithLabelValues(string(appType), inst.Name).Inc()
 
-		log.Info("strike added", "title", record.Title, "reason", reason, "strikes", count, "max", settings.MaxStrikes)
+		log.Info("strike added", "title", record.Title, "reason", reason, "strikes", count, "max", effectiveMaxStrikes(reason, settings))
 
-		if count >= settings.MaxStrikes {
+		if count >= effectiveMaxStrikes(reason, settings) {
 			log.Warn("max strikes reached, removing", "title", record.Title, "download_id", record.DownloadID)
 			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, settings.BlocklistOnRemove); err != nil {
 				log.Error("failed to remove struck item", "error", err)
@@ -1116,6 +1116,30 @@ func filterProtectedTags(ctx context.Context, log *slog.Logger, client *arrclien
 // isBandwidthSaturated estimates total download bandwidth from queue records and
 // returns true when usage exceeds 80% of the configured limit. When true, slow
 // detection is suppressed to avoid false positives from a full pipe.
+// effectiveMaxStrikes returns the per-reason override if set (> 0), otherwise
+// falls back to the global MaxStrikes setting.
+func effectiveMaxStrikes(reason string, settings *database.QueueCleanerSettings) int {
+	switch reason {
+	case "stalled":
+		if settings.MaxStrikesStalled > 0 {
+			return settings.MaxStrikesStalled
+		}
+	case "slow":
+		if settings.MaxStrikesSlow > 0 {
+			return settings.MaxStrikesSlow
+		}
+	case "metadata_stuck":
+		if settings.MaxStrikesMetadata > 0 {
+			return settings.MaxStrikesMetadata
+		}
+	case "paused_in_sabnzbd":
+		if settings.MaxStrikesPaused > 0 {
+			return settings.MaxStrikesPaused
+		}
+	}
+	return settings.MaxStrikes
+}
+
 func isBandwidthSaturated(log *slog.Logger, settings *database.QueueCleanerSettings, records []arrclient.QueueRecord) bool {
 	if settings.BandwidthLimitBytesPerSec <= 0 || settings.SlowThresholdBytesPerSec <= 0 {
 		return false

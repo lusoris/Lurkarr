@@ -23,7 +23,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        orphan_enabled, orphan_grace_minutes, orphan_delete_files, orphan_excluded_categories,
 		        hardlink_protection, skip_cross_seeds, cross_arr_sync, dry_run,
 		        protected_tags, search_on_remove, ignored_indexers,
-		        bandwidth_limit_bytes_per_sec
+		        bandwidth_limit_bytes_per_sec,
+		        max_strikes_stalled, max_strikes_slow, max_strikes_metadata, max_strikes_paused
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -35,7 +36,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.OrphanEnabled, &s.OrphanGraceMinutes, &s.OrphanDeleteFiles, &s.OrphanExcludedCategories,
 		&s.HardlinkProtection, &s.SkipCrossSeeds, &s.CrossArrSync, &s.DryRun,
 		&s.ProtectedTags, &s.SearchOnRemove, &s.IgnoredIndexers,
-		&s.BandwidthLimitBytesPerSec)
+		&s.BandwidthLimitBytesPerSec,
+		&s.MaxStrikesStalled, &s.MaxStrikesSlow, &s.MaxStrikesMetadata, &s.MaxStrikesPaused)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -56,7 +58,9 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        orphan_excluded_categories = $25, hardlink_protection = $26,
 		        skip_cross_seeds = $27, cross_arr_sync = $28, dry_run = $29,
 		        protected_tags = $30, search_on_remove = $31, ignored_indexers = $32,
-		        bandwidth_limit_bytes_per_sec = $33
+		        bandwidth_limit_bytes_per_sec = $33,
+		        max_strikes_stalled = $34, max_strikes_slow = $35,
+		        max_strikes_metadata = $36, max_strikes_paused = $37
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -68,7 +72,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.OrphanEnabled, s.OrphanGraceMinutes, s.OrphanDeleteFiles, s.OrphanExcludedCategories,
 		s.HardlinkProtection, s.SkipCrossSeeds, s.CrossArrSync, s.DryRun,
 		s.ProtectedTags, s.SearchOnRemove, s.IgnoredIndexers,
-		s.BandwidthLimitBytesPerSec)
+		s.BandwidthLimitBytesPerSec,
+		s.MaxStrikesStalled, s.MaxStrikesSlow, s.MaxStrikesMetadata, s.MaxStrikesPaused)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

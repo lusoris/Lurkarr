@@ -259,6 +259,11 @@ type QueueCleanerSettings struct {
 	IgnoredIndexers string `json:"ignored_indexers"` // Comma-separated indexer names; items from these indexers skip all cleanup
 	// Adaptive speed detection
 	BandwidthLimitBytesPerSec int64 `json:"bandwidth_limit_bytes_per_sec"` // Connection speed limit; skip slow detection when >80% saturated (0 = disabled)
+	// Per-reason strike overrides (0 = use global max_strikes)
+	MaxStrikesStalled  int `json:"max_strikes_stalled"`  // Override max_strikes for stalled items (0 = use global)
+	MaxStrikesSlow     int `json:"max_strikes_slow"`     // Override max_strikes for slow items (0 = use global)
+	MaxStrikesMetadata int `json:"max_strikes_metadata"` // Override max_strikes for metadata-stuck items (0 = use global)
+	MaxStrikesPaused   int `json:"max_strikes_paused"`   // Override max_strikes for paused items (0 = use global)
 }
 
 // QueueStrike represents a strike against a problematic download.
