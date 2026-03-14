@@ -424,6 +424,11 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 		return "stalled"
 	}
 
+	// Check for items stuck in queued state (not actively downloading)
+	if settings.StrikeQueued && record.Status == "queued" {
+		return "queued"
+	}
+
 	// Check download speed for active downloads
 	if !pipeSaturated && record.Size > 0 && record.Sizeleft > 0 && record.Sizeleft < record.Size && settings.SlowThresholdBytesPerSec > 0 {
 		// Skip slow detection for large downloads if configured
@@ -1172,6 +1177,10 @@ func effectiveMaxStrikes(reason string, settings *database.QueueCleanerSettings)
 	case "paused_in_sabnzbd":
 		if settings.MaxStrikesPaused > 0 {
 			return settings.MaxStrikesPaused
+		}
+	case "queued":
+		if settings.MaxStrikesQueued > 0 {
+			return settings.MaxStrikesQueued
 		}
 	}
 	return settings.MaxStrikes

@@ -271,6 +271,9 @@ type QueueCleanerSettings struct {
 	ObsoleteTagLabel   string `json:"obsolete_tag_label"`    // Label for the tag applied to media on removal (e.g. "lurkarr-obsolete")
 	// Failed import message patterns
 	FailedImportPatterns string `json:"failed_import_patterns"` // Comma-separated substrings; only remove failed imports matching these (empty = all failures)
+	// Queued item strikes
+	StrikeQueued    bool `json:"strike_queued"`     // Strike items stuck in queued state (not downloading)
+	MaxStrikesQueued int  `json:"max_strikes_queued"` // Override max_strikes for queued items (0 = use global)
 }
 
 // QueueStrike represents a strike against a problematic download.

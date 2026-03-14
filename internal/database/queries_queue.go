@@ -27,7 +27,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        max_strikes_stalled, max_strikes_slow, max_strikes_metadata, max_strikes_paused,
 		        ignore_above_bytes,
 		        tag_instead_of_delete, obsolete_tag_label,
-		        failed_import_patterns
+		        failed_import_patterns,
+		        strike_queued, max_strikes_queued
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -43,7 +44,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.MaxStrikesStalled, &s.MaxStrikesSlow, &s.MaxStrikesMetadata, &s.MaxStrikesPaused,
 		&s.IgnoreAboveBytes,
 		&s.TagInsteadOfDelete, &s.ObsoleteTagLabel,
-		&s.FailedImportPatterns)
+		&s.FailedImportPatterns,
+		&s.StrikeQueued, &s.MaxStrikesQueued)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -69,7 +71,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        max_strikes_metadata = $36, max_strikes_paused = $37,
 		        ignore_above_bytes = $38,
 		        tag_instead_of_delete = $39, obsolete_tag_label = $40,
-		        failed_import_patterns = $41
+		        failed_import_patterns = $41,
+		        strike_queued = $42, max_strikes_queued = $43
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -85,7 +88,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.MaxStrikesStalled, s.MaxStrikesSlow, s.MaxStrikesMetadata, s.MaxStrikesPaused,
 		s.IgnoreAboveBytes,
 		s.TagInsteadOfDelete, s.ObsoleteTagLabel,
-		s.FailedImportPatterns)
+		s.FailedImportPatterns,
+		s.StrikeQueued, s.MaxStrikesQueued)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

@@ -58,6 +58,8 @@
 		tag_instead_of_delete: boolean;
 		obsolete_tag_label: string;
 		failed_import_patterns: string;
+		strike_queued: boolean;
+		max_strikes_queued: number;
 	}
 
 	interface ScoringProfile {
@@ -376,11 +378,13 @@
 						<Input bind:value={settings.max_strikes_slow} type="number" label="Slow" hint="Below speed threshold" />
 						<Input bind:value={settings.max_strikes_metadata} type="number" label="Metadata Stuck" hint="No size info" />
 						<Input bind:value={settings.max_strikes_paused} type="number" label="Paused" hint="Paused in SABnzbd" />
+						<Input bind:value={settings.max_strikes_queued} type="number" label="Queued" hint="Stuck in queue" />
 					</div>
 					<Input bind:value={settings.ignore_above_bytes} type="number" label="Ignore Above (bytes)" hint="Skip stalled/slow/metadata for items above this size (0 = disabled)" class="mb-3" />
 					<div class="space-y-2">
 						<Toggle bind:checked={settings.strike_public} label="Strike Public Trackers" />
 						<Toggle bind:checked={settings.strike_private} label="Strike Private Trackers" />
+						<Toggle bind:checked={settings.strike_queued} label="Strike Queued Items" hint="Flag items stuck in queued state" />
 					</div>
 				</Card>
 
