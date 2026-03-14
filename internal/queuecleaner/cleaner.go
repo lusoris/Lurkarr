@@ -199,6 +199,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		queue.Records = filterProtectedTags(ctx, log, client, appType, settings.ProtectedTags, queue.Records)
 	}
 
+	// Filter out records from ignored indexers.
+	if settings.IgnoredIndexers != "" {
+		queue.Records = filterIgnoredIndexers(log, settings.IgnoredIndexers, queue.Records)
+	}
+
 	// Get SABnzbd queue status for Usenet items
 	sabStatuses := c.getSABnzbdStatuses(ctx)
 
@@ -1103,6 +1108,31 @@ func filterProtectedTags(ctx context.Context, log *slog.Logger, client *arrclien
 		if !skip {
 			filtered = append(filtered, rec)
 		}
+	}
+	return filtered
+}
+
+// filterIgnoredIndexers removes queue records from indexers listed in the
+// comma-separated ignoredCSV setting.
+func filterIgnoredIndexers(log *slog.Logger, ignoredCSV string, records []arrclient.QueueRecord) []arrclient.QueueRecord {
+	ignored := make(map[string]struct{})
+	for _, raw := range strings.Split(ignoredCSV, ",") {
+		name := strings.TrimSpace(strings.ToLower(raw))
+		if name != "" {
+			ignored[name] = struct{}{}
+		}
+	}
+	if len(ignored) == 0 {
+		return records
+	}
+
+	filtered := make([]arrclient.QueueRecord, 0, len(records))
+	for _, rec := range records {
+		if _, ok := ignored[strings.ToLower(rec.Indexer)]; ok {
+			log.Info("skipping ignored indexer item", "title", rec.Title, "indexer", rec.Indexer)
+			continue
+		}
+		filtered = append(filtered, rec)
 	}
 	return filtered
 }

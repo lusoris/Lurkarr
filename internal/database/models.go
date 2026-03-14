@@ -256,6 +256,7 @@ type QueueCleanerSettings struct {
 	DryRun          bool   `json:"dry_run"`          // Log all actions without executing deletions (safe preview mode)
 	ProtectedTags   string `json:"protected_tags"`   // Comma-separated tag labels; tagged media is exempt from all cleanup
 	SearchOnRemove  bool   `json:"search_on_remove"` // Trigger arr re-search for the media item after removing a queue entry
+	IgnoredIndexers string `json:"ignored_indexers"` // Comma-separated indexer names; items from these indexers skip all cleanup
 }
 
 // QueueStrike represents a strike against a problematic download.

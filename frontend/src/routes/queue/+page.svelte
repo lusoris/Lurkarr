@@ -48,6 +48,7 @@
 		dry_run: boolean;
 		protected_tags: string;
 		search_on_remove: boolean;
+		ignored_indexers: string;
 	}
 
 	interface ScoringProfile {
@@ -336,6 +337,9 @@
 						</div>
 						<div class="mt-2">
 							<Input bind:value={settings.protected_tags} type="text" label="Protected Tags" hint="Comma-separated tag names — items with these tags are never removed" />
+						</div>
+						<div class="mt-2">
+							<Input bind:value={settings.ignored_indexers} type="text" label="Ignored Indexers" hint="Comma-separated indexer names — items from these indexers skip all cleanup" />
 						</div>
 					{/if}
 				</Card>
