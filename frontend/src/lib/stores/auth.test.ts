@@ -14,7 +14,7 @@ vi.mock('$lib/api', () => {
 import { getAuth } from '$lib/stores/auth.svelte';
 import { api } from '$lib/api';
 
-const mockApi = api as {
+const mockApi = api as unknown as {
 	get: ReturnType<typeof vi.fn>;
 	post: ReturnType<typeof vi.fn>;
 };

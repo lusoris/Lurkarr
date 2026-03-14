@@ -7,7 +7,7 @@
 	import {
 		LayoutDashboard, Cable, Flame, CalendarDays, History, Download,
 		ListOrdered, Bell, Activity, Settings, Users, UserCircle,
-		ChevronLeft, Menu, X, Heart
+		ChevronLeft, Menu, X, Heart, LogOut, Layers
 	} from 'lucide-svelte';
 
 	const auth = getAuth();
@@ -27,6 +27,7 @@
 		{ href: '/history', label: 'History', icon: History },
 		{ href: '/downloads', label: 'Downloads', icon: Download },
 		{ href: '/queue', label: 'Queue', icon: ListOrdered },
+		{ href: '/dedup', label: 'Dedup', icon: Layers },
 		{ href: '/notifications', label: 'Notifications', icon: Bell },
 		{ href: '/monitoring', label: 'Monitoring', icon: Activity },
 		{ href: '/settings', label: 'Settings', icon: Settings },
@@ -41,6 +42,11 @@
 
 	function isActive(href: string): boolean {
 		return page.url.pathname === href || (href !== '/' && page.url.pathname.startsWith(href));
+	}
+
+	async function handleLogout() {
+		await auth.logout();
+		window.location.href = '/login';
 	}
 </script>
 
@@ -78,35 +84,52 @@
 				{/if}
 			</a>
 		{/each}
+
+		<!-- Sign Out (inside scrollable nav) -->
+		<div class="!mt-3 pt-3 mx-2 border-t border-sidebar-border/50">
+			<button
+				onclick={handleLogout}
+				class={cn(
+					'flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm transition-colors text-sidebar-foreground/60 hover:text-destructive hover:bg-destructive/10',
+					collapsed && 'justify-center'
+				)}
+				title="Sign out"
+			>
+				<LogOut class="h-5 w-5 shrink-0" />
+				{#if !collapsed}
+					<span>Sign Out</span>
+				{/if}
+			</button>
+		</div>
 	</nav>
 
-	<!-- Footer -->
-	<div class={cn(
-		'border-t border-sidebar-border text-muted-foreground transition-all',
-		collapsed ? 'flex flex-col items-center gap-1.5 py-2' : 'px-3 py-2 text-center text-[10px] leading-relaxed'
-	)}>
-		{#if collapsed}
-			<a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" title="© lusoris · AGPL-3.0" class="hover:text-foreground transition-colors text-xs">©</a>
-			<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" title="Support on Ko-fi" class="text-[#FF5E5B] hover:text-[#FF7674] transition-colors">
-				<Heart class="h-4 w-4" />
-			</a>
-		{:else}
-			<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">AGPL-3.0</a></p>
-			<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 text-[#FF5E5B] hover:text-[#FF7674] transition-colors mt-1">
-				<Heart class="h-3.5 w-3.5" />
-				Support on Ko-fi
-			</a>
-		{/if}
+	<!-- Footer + Collapse -->
+	<div class="flex items-center border-t border-sidebar-border">
+		<div class={cn(
+			'flex-1 text-muted-foreground transition-all',
+			collapsed ? 'flex flex-col items-center gap-0.5 py-1.5' : 'px-3 py-1.5 text-center text-[10px] leading-relaxed'
+		)}>
+			{#if collapsed}
+				<a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" title="© lusoris · AGPL-3.0" class="hover:text-foreground transition-colors text-xs">©</a>
+				<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" title="Support on Ko-fi" class="text-[#FF5E5B] hover:text-[#FF7674] transition-colors">
+					<Heart class="h-3 w-3" />
+				</a>
+			{:else}
+				<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">AGPL-3.0</a></p>
+				<a href="https://ko-fi.com/lusoris" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1 text-[#FF5E5B] hover:text-[#FF7674] transition-colors">
+					<Heart class="h-3 w-3" />
+					Support on Ko-fi
+				</a>
+			{/if}
+		</div>
+		<button
+			onclick={() => collapsed = !collapsed}
+			aria-label="Toggle sidebar"
+			class="shrink-0 flex items-center justify-center w-10 h-10 text-muted-foreground hover:text-foreground transition-colors"
+		>
+			<ChevronLeft class={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')} />
+		</button>
 	</div>
-
-	<!-- Collapse toggle -->
-	<button
-		onclick={() => collapsed = !collapsed}
-		aria-label="Toggle sidebar"
-		class="flex items-center justify-center h-12 border-t border-sidebar-border text-muted-foreground hover:text-foreground transition-colors"
-	>
-		<ChevronLeft class={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')} />
-	</button>
 </aside>
 
 <!-- Mobile top bar -->
@@ -156,6 +179,15 @@
 					</a>
 				{/each}
 			</div>
+
+			<!-- Logout -->
+			<button
+				onclick={handleLogout}
+				class="flex items-center gap-3 mx-2 px-3 py-2 rounded-md text-sm transition-colors text-sidebar-foreground/60 hover:text-destructive hover:bg-destructive/10"
+			>
+				<LogOut class="h-5 w-5 shrink-0" />
+				<span>Sign Out</span>
+			</button>
 
 			<div class="px-4 py-3 border-t border-sidebar-border text-[10px] text-muted-foreground leading-relaxed text-center">
 				<p>&copy; <a href="https://github.com/lusoris" target="_blank" rel="noopener noreferrer" class="hover:text-foreground">lusoris</a> &middot; <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" class="hover:text-foreground">AGPL-3.0</a></p>

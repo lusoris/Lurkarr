@@ -172,8 +172,8 @@
 			.replace(/max strikes$/, '(max strikes)');
 	}
 
-	function reasonVariant(reason: string): 'default' | 'warning' | 'info' | 'destructive' {
-		if (reason.includes('max_strikes')) return 'destructive';
+	function reasonVariant(reason: string): 'default' | 'warning' | 'info' | 'error' {
+		if (reason.includes('max_strikes')) return 'error';
 		if (reason.includes('duplicate')) return 'warning';
 		if (reason.includes('blocklist')) return 'info';
 		return 'default';
