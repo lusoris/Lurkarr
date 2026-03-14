@@ -371,6 +371,8 @@ type QueueCleanerSettings struct {
 	MismatchEnabled    bool `json:"mismatch_enabled"`     // Detect and strike downloads with wrong metadata (wrong series/movie/episode)
 	MaxStrikesMismatch int  `json:"max_strikes_mismatch"` // Override max_strikes for mismatch items (0 = use global)
 	BlocklistMismatch  bool `json:"blocklist_mismatch"`   // Blocklist when removing mismatched items
+	// Keep archives for unpackerr
+	KeepArchives bool `json:"keep_archives"` // Preserve download files for unpackerr when removing (override removeFromClient to false)
 }
 
 // QueueStrike represents a strike against a problematic download.

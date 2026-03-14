@@ -306,7 +306,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				"title", record.Title,
 				"rule_type", result.Rule.PatternType,
 				"pattern", result.Rule.Pattern)
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, true); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), true); err != nil {
 				log.Error("failed to remove blocklisted item", "error", err)
 				continue
 			}
@@ -350,7 +350,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			log.Info("removing duplicate",
 				"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
 				"keep", d.KeepTitle, "keep_score", d.KeepScore)
-			if err := client.DeleteQueueItem(ctx, apiVersion, d.RemoveQueueID, settings.RemoveFromClient, shouldBlocklist("duplicate", settings)); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, d.RemoveQueueID, effectiveRemoveFromClient(settings), shouldBlocklist("duplicate", settings)); err != nil {
 				log.Error("failed to remove duplicate", "error", err)
 				continue
 			}
@@ -413,7 +413,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 					}
 				}
 			}
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, shouldBlocklist(reason, settings)); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), shouldBlocklist(reason, settings)); err != nil {
 				log.Error("failed to remove struck item", "error", err)
 				continue
 			}
@@ -656,7 +656,7 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 
 		log.Warn("removing failed import", "title", record.Title, "reason", reason, "download_id", record.DownloadID)
 
-		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, settings.FailedImportBlocklist); err != nil {
+		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), settings.FailedImportBlocklist); err != nil {
 			log.Error("failed to remove failed import", "error", err)
 			continue
 		}
@@ -868,6 +868,9 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 		}
 
 		deleteFiles := settings.SeedingDeleteFiles
+		if deleteFiles && settings.KeepArchives {
+			deleteFiles = false
+		}
 		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
 			log.Info("hardlinks detected, skipping file deletion", "title", record.Title, "path", item.SavePath)
 			deleteFiles = false
@@ -1026,7 +1029,7 @@ func (c *Cleaner) cleanDeletedMedia(ctx context.Context, log *slog.Logger, appTy
 
 		log.Warn("media file deleted externally, removing queue item",
 			"title", record.Title, "media_id", record.MediaID())
-		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, false); err != nil {
+		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), false); err != nil {
 			log.Error("failed to remove deleted-media item", "title", record.Title, "error", err)
 			continue
 		}
@@ -1063,7 +1066,7 @@ func (c *Cleaner) cleanUnmonitored(ctx context.Context, log *slog.Logger, appTyp
 
 		log.Warn("media unmonitored, removing queue item",
 			"title", record.Title, "media_id", record.MediaID())
-		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, false); err != nil {
+		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), false); err != nil {
 			log.Error("failed to remove unmonitored item", "title", record.Title, "error", err)
 			continue
 		}
@@ -1106,7 +1109,7 @@ func (c *Cleaner) cleanMismatches(ctx context.Context, log *slog.Logger, appType
 
 		if count >= maxStrikes {
 			log.Warn("metadata mismatch — max strikes reached, removing", "title", record.Title, "download_id", record.DownloadID)
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, shouldBlocklist("mismatch", settings)); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), shouldBlocklist("mismatch", settings)); err != nil {
 				log.Error("failed to remove mismatched item", "title", record.Title, "error", err)
 				continue
 			}
@@ -1205,7 +1208,7 @@ func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, app
 				continue
 			}
 
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, true); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), true); err != nil {
 				log.Error("cross-arr sync: failed to remove item",
 					"instance", inst.Name, "title", record.Title, "error", err)
 				continue
@@ -1324,6 +1327,9 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 		}
 
 		deleteFiles := settings.OrphanDeleteFiles
+		if deleteFiles && settings.KeepArchives {
+			deleteFiles = false
+		}
 		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
 			log.Info("hardlinks detected, skipping file deletion for orphan", "name", item.Name, "path", item.SavePath)
 			deleteFiles = false
@@ -1574,6 +1580,16 @@ func shouldBlocklist(reason string, settings *database.QueueCleanerSettings) boo
 		return settings.BlocklistMismatch
 	}
 	return settings.BlocklistOnRemove
+}
+
+// effectiveRemoveFromClient returns false when KeepArchives is enabled,
+// preserving downloaded files for unpackerr. Otherwise returns the user's
+// configured RemoveFromClient preference.
+func effectiveRemoveFromClient(settings *database.QueueCleanerSettings) bool {
+	if settings.KeepArchives {
+		return false
+	}
+	return settings.RemoveFromClient
 }
 
 // resolveTagID finds or creates a tag with the given label, returning its ID.

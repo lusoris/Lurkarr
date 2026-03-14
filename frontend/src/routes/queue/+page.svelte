@@ -76,6 +76,7 @@
 		mismatch_enabled: boolean;
 		max_strikes_mismatch: number;
 		blocklist_mismatch: boolean;
+		keep_archives: boolean;
 	}
 
 	interface ScoringProfile {
@@ -430,6 +431,7 @@
 					<div class="space-y-2">
 						<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" />
 						<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
+						<Toggle bind:checked={settings.keep_archives} label="Keep Archives" hint="Preserve downloaded files for unpackerr — overrides 'Remove from Download Client' to keep files on disk" />
 						<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove (global default)" hint="Fallback for reasons without a specific toggle below" />
 						<details class="mt-1 pl-1 border-l-2 border-border">
 							<summary class="text-xs text-muted-foreground cursor-pointer select-none py-1">Per-reason blocklist overrides</summary>
