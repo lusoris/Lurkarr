@@ -36,6 +36,7 @@ type Store interface {
 	ResetStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string) error
 	AddStrike(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID, title, reason string) error
 	CountStrikes(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID string, windowHours int) (int, error)
+	AddStrikeAndCount(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID, title, reason string, windowHours int) (int, error)
 	GetSABnzbdSettings(ctx context.Context) (*database.SABnzbdSettings, error)
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
 	ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error)
@@ -258,17 +259,12 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			continue
 		}
 
-		if err := c.db.AddStrike(ctx, appType, inst.ID, record.DownloadID, record.Title, reason); err != nil {
+		count, err := c.db.AddStrikeAndCount(ctx, appType, inst.ID, record.DownloadID, record.Title, reason, settings.StrikeWindowHours)
+		if err != nil {
 			log.Error("failed to add strike", "error", err)
 			continue
 		}
 		metrics.QueueCleanerStrikes.WithLabelValues(string(appType), inst.Name).Inc()
-
-		count, err := c.db.CountStrikes(ctx, appType, inst.ID, record.DownloadID, settings.StrikeWindowHours)
-		if err != nil {
-			log.Error("failed to count strikes", "error", err)
-			continue
-		}
 
 		log.Info("strike added", "title", record.Title, "reason", reason, "strikes", count, "max", settings.MaxStrikes)
 

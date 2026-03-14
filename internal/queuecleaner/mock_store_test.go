@@ -71,6 +71,21 @@ func (mr *MockStoreMockRecorder) CountStrikes(ctx, appType, instanceID, download
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountStrikes", reflect.TypeOf((*MockStore)(nil).CountStrikes), ctx, appType, instanceID, downloadID, windowHours)
 }
 
+// AddStrikeAndCount mocks base method.
+func (m *MockStore) AddStrikeAndCount(ctx context.Context, appType database.AppType, instanceID uuid.UUID, downloadID, title, reason string, windowHours int) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddStrikeAndCount", ctx, appType, instanceID, downloadID, title, reason, windowHours)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddStrikeAndCount indicates an expected call of AddStrikeAndCount.
+func (mr *MockStoreMockRecorder) AddStrikeAndCount(ctx, appType, instanceID, downloadID, title, reason, windowHours any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStrikeAndCount", reflect.TypeOf((*MockStore)(nil).AddStrikeAndCount), ctx, appType, instanceID, downloadID, title, reason, windowHours)
+}
+
 // GetDownloadClientSettings mocks base method.
 func (m *MockStore) GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error) {
 	m.ctrl.T.Helper()

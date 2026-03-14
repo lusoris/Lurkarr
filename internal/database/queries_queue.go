@@ -92,6 +92,26 @@ func (db *DB) CountStrikes(ctx context.Context, appType AppType, instanceID uuid
 	return count, nil
 }
 
+// AddStrikeAndCount atomically inserts a strike and returns the total count
+// within the time window using a CTE, preventing race conditions.
+func (db *DB) AddStrikeAndCount(ctx context.Context, appType AppType, instanceID uuid.UUID, downloadID, title, reason string, windowHours int) (int, error) {
+	var count int
+	err := db.Pool.QueryRow(ctx,
+		`WITH ins AS (
+			INSERT INTO queue_strikes (app_type, instance_id, download_id, title, reason)
+			VALUES ($1, $2, $3, $4, $5)
+		)
+		SELECT COUNT(*) FROM queue_strikes
+		WHERE app_type = $1 AND instance_id = $2 AND download_id = $3
+		  AND struck_at > NOW() - make_interval(hours => $6)`,
+		appType, instanceID, downloadID, title, reason, windowHours,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("add strike and count: %w", err)
+	}
+	return count, nil
+}
+
 func (db *DB) PruneStrikes(ctx context.Context, olderThan time.Duration) error {
 	_, err := db.Pool.Exec(ctx,
 		`DELETE FROM queue_strikes WHERE struck_at < $1`, time.Now().Add(-olderThan))

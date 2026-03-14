@@ -188,8 +188,7 @@ func TestCleanInstance_StalledItem(t *testing.T) {
 	store.EXPECT().GetScoringProfile(gomock.Any(), database.AppSonarr).Return(&database.ScoringProfile{}, nil)
 	store.EXPECT().ListEnabledDownloadClientInstances(gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(&database.SABnzbdSettings{Enabled: false}, nil)
-	store.EXPECT().AddStrike(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any(), gomock.Any()).Return(nil)
-	store.EXPECT().CountStrikes(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any()).Return(3, nil)
+	store.EXPECT().AddStrikeAndCount(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any(), gomock.Any(), gomock.Any()).Return(3, nil)
 	store.EXPECT().LogBlocklist(gomock.Any(), database.AppSonarr, instID, "dl-1", gomock.Any(), gomock.Any()).Return(nil)
 
 	logger := newTestLogger()
