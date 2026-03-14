@@ -63,6 +63,16 @@ func (c *Client) RadarrGetQueue(ctx context.Context) (*QueueResponse, error) {
 	return &resp, nil
 }
 
+// RadarrGetQueueEnriched returns the queue with embedded movie data.
+// Used for cross-arr sync to match by TMDB ID instead of title.
+func (c *Client) RadarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, radarrAPI+"/queue?pageSize=1000&includeMovie=true", &resp); err != nil {
+		return nil, fmt.Errorf("radarr get enriched queue: %w", err)
+	}
+	return &resp, nil
+}
+
 // RadarrTestConnection tests the Radarr API connection.
 func (c *Client) RadarrTestConnection(ctx context.Context) (*SystemStatus, error) {
 	return c.TestConnection(ctx, "v3")

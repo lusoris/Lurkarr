@@ -65,6 +65,15 @@ func (c *Client) ReadarrGetQueue(ctx context.Context) (*QueueResponse, error) {
 	return &resp, nil
 }
 
+// ReadarrGetQueueEnriched returns the queue with embedded book data.
+func (c *Client) ReadarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, readarrAPI+"/queue?pageSize=1000&includeBook=true", &resp); err != nil {
+		return nil, fmt.Errorf("readarr get enriched queue: %w", err)
+	}
+	return &resp, nil
+}
+
 // ReadarrTestConnection tests the Readarr API connection.
 func (c *Client) ReadarrTestConnection(ctx context.Context) (*SystemStatus, error) {
 	return c.TestConnection(ctx, "v1")

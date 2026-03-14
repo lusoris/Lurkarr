@@ -2,6 +2,7 @@ package arrclient
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,9 @@ type Client struct {
 func NewClient(baseURL, apiKey string, timeout time.Duration, sslVerify bool) *Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	if !sslVerify {
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
+		}
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 	return &Client{
@@ -205,6 +209,44 @@ type QueueRecord struct {
 	AlbumID               int             `json:"albumId,omitempty"`
 	BookID                int             `json:"bookId,omitempty"`
 	Quality               *QualityInfo    `json:"quality,omitempty"`
+
+	// Enriched fields (populated when queue is fetched with include* params).
+	Movie   *QueueMovie   `json:"movie,omitempty"`
+	Series  *QueueSeries  `json:"series,omitempty"`
+	Episode *QueueEpisode `json:"episode,omitempty"`
+	Album   *QueueAlbum   `json:"album,omitempty"`
+	Book    *QueueBook    `json:"book,omitempty"`
+}
+
+// QueueMovie holds enriched movie data from Radarr/Eros queue responses.
+type QueueMovie struct {
+	TmdbID int    `json:"tmdbId"`
+	ImdbID string `json:"imdbId"`
+	Title  string `json:"title"`
+}
+
+// QueueSeries holds enriched series data from Sonarr/Whisparr queue responses.
+type QueueSeries struct {
+	TvdbID int    `json:"tvdbId"`
+	Title  string `json:"title"`
+}
+
+// QueueEpisode holds enriched episode data from Sonarr/Whisparr queue responses.
+type QueueEpisode struct {
+	SeasonNumber  int `json:"seasonNumber"`
+	EpisodeNumber int `json:"episodeNumber"`
+}
+
+// QueueAlbum holds enriched album data from Lidarr queue responses.
+type QueueAlbum struct {
+	ForeignAlbumID string `json:"foreignAlbumId"`
+	Title          string `json:"title"`
+}
+
+// QueueBook holds enriched book data from Readarr queue responses.
+type QueueBook struct {
+	ForeignBookID string `json:"foreignBookId"`
+	Title         string `json:"title"`
 }
 
 // StatusMessage from arr queue items for detecting import issues.
@@ -247,6 +289,28 @@ func (q *QueueRecord) MediaID() int {
 		return q.SeriesID
 	}
 	return 0
+}
+
+// MediaKey returns a cross-instance media identifier from enriched queue data.
+// For Radarr/Eros: "tmdb:12345"
+// For Sonarr/Whisparr: "tvdb:67890:s02" (series + season)
+// For Lidarr: "album:foreignId"
+// For Readarr: "book:foreignId"
+// Returns empty string if enriched data is not available.
+func (q *QueueRecord) MediaKey() string {
+	if q.Movie != nil && q.Movie.TmdbID > 0 {
+		return fmt.Sprintf("tmdb:%d", q.Movie.TmdbID)
+	}
+	if q.Series != nil && q.Series.TvdbID > 0 && q.Episode != nil {
+		return fmt.Sprintf("tvdb:%d:s%02d", q.Series.TvdbID, q.Episode.SeasonNumber)
+	}
+	if q.Album != nil && q.Album.ForeignAlbumID != "" {
+		return "album:" + q.Album.ForeignAlbumID
+	}
+	if q.Book != nil && q.Book.ForeignBookID != "" {
+		return "book:" + q.Book.ForeignBookID
+	}
+	return ""
 }
 
 // QueueResponse wraps a paginated queue response.

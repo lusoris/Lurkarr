@@ -66,6 +66,15 @@ func (c *Client) LidarrGetQueue(ctx context.Context) (*QueueResponse, error) {
 	return &resp, nil
 }
 
+// LidarrGetQueueEnriched returns the queue with embedded album data.
+func (c *Client) LidarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, lidarrAPI+"/queue?pageSize=1000&includeAlbum=true", &resp); err != nil {
+		return nil, fmt.Errorf("lidarr get enriched queue: %w", err)
+	}
+	return &resp, nil
+}
+
 // LidarrTestConnection tests the Lidarr API connection.
 func (c *Client) LidarrTestConnection(ctx context.Context) (*SystemStatus, error) {
 	return c.TestConnection(ctx, "v1")

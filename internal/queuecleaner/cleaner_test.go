@@ -588,7 +588,8 @@ func TestIsCrossSeeded(t *testing.T) {
 }
 
 func TestSyncBlocklistAcross(t *testing.T) {
-	// Create a mock arr server for instance B that has a matching title in its queue.
+	// Create a mock arr server for instance B that has the same movie (by TMDB ID)
+	// but with a different release title (different quality profile).
 	var deleteCount atomic.Int32
 	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -596,8 +597,18 @@ func TestSyncBlocklistAcross(t *testing.T) {
 			json.NewEncoder(w).Encode(arrclient.QueueResponse{
 				TotalRecords: 2,
 				Records: []arrclient.QueueRecord{
-					{ID: 10, DownloadID: "dl-10", Title: "Bad.Release.2024.x264-BADGROUP", Status: "downloading"},
-					{ID: 11, DownloadID: "dl-11", Title: "Good.Release.2024.x265-GOODGROUP", Status: "downloading"},
+					{
+						ID: 10, DownloadID: "dl-10",
+						Title: "Bad.Movie.2024.1080p.BluRay-OTHER", Status: "downloading",
+						MovieID: 5,
+						Movie:   &arrclient.QueueMovie{TmdbID: 99001, Title: "Bad Movie"},
+					},
+					{
+						ID: 11, DownloadID: "dl-11",
+						Title: "Good.Movie.2024.1080p.WEB-DL-GOOD", Status: "downloading",
+						MovieID: 6,
+						Movie:   &arrclient.QueueMovie{TmdbID: 99002, Title: "Good Movie"},
+					},
 				},
 			})
 		case strings.HasPrefix(r.URL.Path, "/api/v3/queue/") && r.Method == http.MethodDelete:
@@ -617,9 +628,9 @@ func TestSyncBlocklistAcross(t *testing.T) {
 		{ID: instB, AppType: database.AppRadarr, Name: "Radarr-2", APIURL: serverB.URL, APIKey: "key2", Enabled: true},
 	}
 
-	// Instance A removed "Bad.Release.2024.x264-BADGROUP" — should propagate to B.
-	removals := map[uuid.UUID][]string{
-		instA: {"Bad.Release.2024.x264-BADGROUP"},
+	// Instance A removed TMDB 99001 (different release title) — should propagate to B by media key.
+	removals := map[uuid.UUID][]removal{
+		instA: {{Title: "Bad.Movie.2024.2160p.WEB-DL-GROUP", MediaKey: "tmdb:99001"}},
 	}
 
 	ctrl := gomock.NewController(t)
@@ -628,7 +639,7 @@ func TestSyncBlocklistAcross(t *testing.T) {
 		APITimeout: 10,
 		SSLVerify:  true,
 	}, nil)
-	store.EXPECT().LogBlocklist(gomock.Any(), database.AppRadarr, instB, "dl-10", "Bad.Release.2024.x264-BADGROUP", "cross_arr_sync").Return(nil)
+	store.EXPECT().LogBlocklist(gomock.Any(), database.AppRadarr, instB, "dl-10", "Bad.Movie.2024.1080p.BluRay-OTHER", "cross_arr_sync").Return(nil)
 
 	logger := logging.New()
 	defer logger.Close()
@@ -641,14 +652,14 @@ func TestSyncBlocklistAcross(t *testing.T) {
 
 	c.syncBlocklistAcross(context.Background(), slog.Default(), database.AppRadarr, settings, instances, removals)
 
-	// Should have deleted exactly 1 item (Bad.Release matching from instance B).
+	// Should have deleted exactly 1 item (same TMDB ID from instance B, despite different title).
 	if got := deleteCount.Load(); got != 1 {
 		t.Errorf("delete count = %d, want 1", got)
 	}
 }
 
 func TestSyncBlocklistAcrossSkipsOwnRemovals(t *testing.T) {
-	// Instance A removed a title, and that same title is also in A's queue
+	// Instance A removed a movie, and that same movie is also in A's queue
 	// (shouldn't happen in practice, but verifies skip logic).
 	var deleteCount atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -657,7 +668,12 @@ func TestSyncBlocklistAcrossSkipsOwnRemovals(t *testing.T) {
 			json.NewEncoder(w).Encode(arrclient.QueueResponse{
 				TotalRecords: 1,
 				Records: []arrclient.QueueRecord{
-					{ID: 20, DownloadID: "dl-20", Title: "Removed.Release.2024", Status: "downloading"},
+					{
+						ID: 20, DownloadID: "dl-20",
+						Title: "Removed.Movie.2024.1080p", Status: "downloading",
+						MovieID: 1,
+						Movie:   &arrclient.QueueMovie{TmdbID: 55555, Title: "Removed Movie"},
+					},
 				},
 			})
 		case strings.HasPrefix(r.URL.Path, "/api/v3/queue/") && r.Method == http.MethodDelete:
@@ -675,9 +691,9 @@ func TestSyncBlocklistAcrossSkipsOwnRemovals(t *testing.T) {
 		{ID: instA, AppType: database.AppRadarr, Name: "Radarr-1", APIURL: server.URL, APIKey: "key1", Enabled: true},
 	}
 
-	// Instance A removed "Removed.Release.2024" — should NOT re-delete from A's queue.
-	removals := map[uuid.UUID][]string{
-		instA: {"Removed.Release.2024"},
+	// Instance A removed TMDB 55555 — should NOT re-delete from A's own queue.
+	removals := map[uuid.UUID][]removal{
+		instA: {{Title: "Removed.Movie.2024.2160p", MediaKey: "tmdb:55555"}},
 	}
 
 	ctrl := gomock.NewController(t)

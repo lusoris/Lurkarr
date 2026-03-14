@@ -4,6 +4,7 @@ package queuecleaner
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -41,6 +42,15 @@ type Store interface {
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
 	ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error)
 	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
+}
+
+// removal tracks a removed queue item with both its title and media key for
+// cross-instance matching. MediaKey uses external IDs (TMDB, TVDB+season) so
+// different releases of the same media can be matched across instances that use
+// different quality profiles or custom format scores.
+type removal struct {
+	Title    string // release title (e.g., "Movie.2024.2160p.x264-GROUP")
+	MediaKey string // external media key (e.g., "tmdb:12345" or "tvdb:67890:s02")
 }
 
 // Cleaner monitors download queues and removes stalled/slow/duplicate items.
@@ -113,7 +123,7 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 			continue
 		}
 
-		removals := make(map[uuid.UUID][]string) // instanceID -> removed titles
+		removals := make(map[uuid.UUID][]removal) // instanceID -> removed items
 		for _, inst := range instances {
 			if ctx.Err() != nil {
 				return
@@ -142,7 +152,7 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 	}
 }
 
-func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance) []string {
+func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance) []removal {
 	log = log.With("instance", inst.Name)
 
 	lurker := lurking.LurkerFor(appType)
@@ -162,7 +172,14 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		genSettings.SSLVerify,
 	)
 
-	queue, err := lurker.GetQueue(ctx, client)
+	// Use enriched queue when cross-arr sync is enabled so we get external IDs
+	// (TMDB, TVDB+season) for proper media matching across instances.
+	var queue *arrclient.QueueResponse
+	if settings.CrossArrSync {
+		queue, err = getEnrichedQueue(ctx, client, appType)
+	} else {
+		queue, err = lurker.GetQueue(ctx, client)
+	}
 	if err != nil {
 		log.Error("failed to get queue", "error", err)
 		return nil
@@ -177,7 +194,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 	apiVersion := apiVersionFor(appType)
 
-	var removed []string
+	var removed []removal
 
 	// 0. Blocklist rule matching — remove items matching user/community blocklist
 	blRules, err := c.db.ListEnabledBlocklistRules(ctx)
@@ -205,11 +222,17 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason); err != nil {
 				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
 			}
-			removed = append(removed, record.Title)
+			removed = append(removed, removal{Title: record.Title, MediaKey: record.MediaKey()})
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
 		}
+	}
+
+	// Build queue ID → record lookup for dedup media key resolution.
+	recordByQueueID := make(map[int]*arrclient.QueueRecord, len(queue.Records))
+	for i := range queue.Records {
+		recordByQueueID[queue.Records[i].ID] = &queue.Records[i]
 	}
 
 	// 1. Queue deduplication
@@ -229,7 +252,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score"); err != nil {
 				log.Warn("failed to log blocklist", "title", d.RemoveTitle, "error", err)
 			}
-			removed = append(removed, d.RemoveTitle)
+			var mediaKey string
+			if rec, ok := recordByQueueID[d.RemoveQueueID]; ok {
+				mediaKey = rec.MediaKey()
+			}
+			removed = append(removed, removal{Title: d.RemoveTitle, MediaKey: mediaKey})
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, d.RemoveTitle, "duplicate_lower_score")
@@ -277,7 +304,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes"); err != nil {
 				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
 			}
-			removed = append(removed, record.Title)
+			removed = append(removed, removal{Title: record.Title, MediaKey: record.MediaKey()})
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
@@ -643,17 +670,23 @@ func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, i
 }
 
 // syncBlocklistAcross propagates removals to sibling instances of the same app type.
-// When a release is removed from one instance, this checks all other instances
-// for queue items with the same title and removes them with blocklist=true.
-func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, instances []database.AppInstance, removals map[uuid.UUID][]string) {
-	// Build a set of all removed titles across all instances.
+// Matching uses external media IDs (TMDB for Radarr, TVDB+season for Sonarr, etc.)
+// so that different releases of the same media are correctly matched across instances
+// with different quality profiles or custom format scores. Falls back to title
+// matching only when enriched media data is unavailable.
+func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, instances []database.AppInstance, removals map[uuid.UUID][]removal) {
+	// Build sets of removed media keys and titles across all instances.
+	removedMediaKeys := make(map[string]bool)
 	removedTitles := make(map[string]bool)
-	for _, titles := range removals {
-		for _, t := range titles {
-			removedTitles[t] = true
+	for _, items := range removals {
+		for _, r := range items {
+			if r.MediaKey != "" {
+				removedMediaKeys[r.MediaKey] = true
+			}
+			removedTitles[strings.ToLower(strings.TrimSpace(r.Title))] = true
 		}
 	}
-	if len(removedTitles) == 0 {
+	if len(removedMediaKeys) == 0 && len(removedTitles) == 0 {
 		return
 	}
 
@@ -670,15 +703,14 @@ func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, app
 			return
 		}
 
-		// Skip instances that had their own removals — those titles are already gone.
-		ownRemovals := make(map[string]bool)
-		for _, t := range removals[inst.ID] {
-			ownRemovals[t] = true
-		}
-
-		lurker := lurking.LurkerFor(appType)
-		if lurker == nil {
-			continue
+		// Build sets of this instance's own removals so we skip them.
+		ownMediaKeys := make(map[string]bool)
+		ownTitles := make(map[string]bool)
+		for _, r := range removals[inst.ID] {
+			if r.MediaKey != "" {
+				ownMediaKeys[r.MediaKey] = true
+			}
+			ownTitles[strings.ToLower(strings.TrimSpace(r.Title))] = true
 		}
 
 		client := arrclient.NewClient(
@@ -687,18 +719,31 @@ func (c *Cleaner) syncBlocklistAcross(ctx context.Context, log *slog.Logger, app
 			genSettings.SSLVerify,
 		)
 
-		queue, err := lurker.GetQueue(ctx, client)
+		// Fetch enriched queue to get external media IDs for matching.
+		queue, err := getEnrichedQueue(ctx, client, appType)
 		if err != nil {
-			log.Warn("cross-arr sync: failed to get queue", "instance", inst.Name, "error", err)
+			log.Warn("cross-arr sync: failed to get enriched queue", "instance", inst.Name, "error", err)
 			continue
 		}
 
 		for _, record := range queue.Records {
-			if !removedTitles[record.Title] || ownRemovals[record.Title] {
+			mediaKey := record.MediaKey()
+			normalTitle := strings.ToLower(strings.TrimSpace(record.Title))
+
+			// Prefer media key matching; fall back to title if no key available.
+			matched := false
+			if mediaKey != "" && removedMediaKeys[mediaKey] && !ownMediaKeys[mediaKey] {
+				matched = true
+			} else if mediaKey == "" && removedTitles[normalTitle] && !ownTitles[normalTitle] {
+				// Title fallback only when enriched data is unavailable.
+				matched = true
+			}
+			if !matched {
 				continue
 			}
+
 			log.Info("cross-arr sync: removing matching item",
-				"instance", inst.Name, "title", record.Title)
+				"instance", inst.Name, "title", record.Title, "media_key", mediaKey)
 			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, true); err != nil {
 				log.Error("cross-arr sync: failed to remove item",
 					"instance", inst.Name, "title", record.Title, "error", err)
@@ -926,6 +971,27 @@ func (c *Cleaner) getSABnzbdStatuses(ctx context.Context) map[string]string {
 		statuses[slot.NzoID] = slot.Status
 	}
 	return statuses
+}
+
+// getEnrichedQueue fetches the queue with embedded media data (movie, series+episode,
+// album, book) so QueueRecord.MediaKey() returns external IDs for cross-arr matching.
+func getEnrichedQueue(ctx context.Context, client *arrclient.Client, appType database.AppType) (*arrclient.QueueResponse, error) {
+	switch appType {
+	case database.AppSonarr:
+		return client.SonarrGetQueueEnriched(ctx)
+	case database.AppRadarr:
+		return client.RadarrGetQueueEnriched(ctx)
+	case database.AppLidarr:
+		return client.LidarrGetQueueEnriched(ctx)
+	case database.AppReadarr:
+		return client.ReadarrGetQueueEnriched(ctx)
+	case database.AppWhisparr:
+		return client.WhisparrGetQueueEnriched(ctx)
+	case database.AppEros:
+		return client.ErosGetQueueEnriched(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported app type for enriched queue: %s", appType)
+	}
 }
 
 func apiVersionFor(appType database.AppType) string {

@@ -67,6 +67,15 @@ func (c *Client) WhisparrGetQueue(ctx context.Context) (*QueueResponse, error) {
 	return &resp, nil
 }
 
+// WhisparrGetQueueEnriched returns the queue with embedded series+episode data.
+func (c *Client) WhisparrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, whisparrAPI+"/queue?pageSize=1000&includeSeries=true&includeEpisode=true", &resp); err != nil {
+		return nil, fmt.Errorf("whisparr get enriched queue: %w", err)
+	}
+	return &resp, nil
+}
+
 // WhisparrTestConnection tests the Whisparr v2 API connection.
 func (c *Client) WhisparrTestConnection(ctx context.Context) (*SystemStatus, error) {
 	return c.TestConnection(ctx, "v3")

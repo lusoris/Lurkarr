@@ -105,6 +105,16 @@ func (c *Client) SonarrGetQueue(ctx context.Context) (*QueueResponse, error) {
 	return &resp, nil
 }
 
+// SonarrGetQueueEnriched returns the queue with embedded series+episode data.
+// Used for cross-arr sync to match by TVDB ID + season instead of title.
+func (c *Client) SonarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, sonarrAPI+"/queue?pageSize=1000&includeSeries=true&includeEpisode=true", &resp); err != nil {
+		return nil, fmt.Errorf("sonarr get enriched queue: %w", err)
+	}
+	return &resp, nil
+}
+
 // SonarrTestConnection tests the Sonarr API connection.
 func (c *Client) SonarrTestConnection(ctx context.Context) (*SystemStatus, error) {
 	return c.TestConnection(ctx, "v3")

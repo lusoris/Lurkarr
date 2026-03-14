@@ -62,6 +62,15 @@ func (c *Client) ErosGetQueue(ctx context.Context) (*QueueResponse, error) {
 	return &resp, nil
 }
 
+// ErosGetQueueEnriched returns the queue with embedded movie data.
+func (c *Client) ErosGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
+	var resp QueueResponse
+	if err := c.get(ctx, erosAPI+"/queue?pageSize=1000&includeMovie=true", &resp); err != nil {
+		return nil, fmt.Errorf("eros get enriched queue: %w", err)
+	}
+	return &resp, nil
+}
+
 // ErosTestConnection tests the Eros (Whisparr v3) API connection.
 func (c *Client) ErosTestConnection(ctx context.Context) (*SystemStatus, error) {
 	return c.TestConnection(ctx, "v3")
