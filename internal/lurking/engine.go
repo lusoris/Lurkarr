@@ -76,6 +76,10 @@ func (e *Engine) Stop() {
 func (e *Engine) lurkLoop(ctx context.Context, appType database.AppType) {
 	log := e.logger.ForApp(string(appType))
 	consecutiveErrors := 0
+	// Per-instance backoff: track consecutive errors per instance so one failing
+	// instance doesn't slow down the entire app type.
+	instanceErrors := make(map[uuid.UUID]int)
+	instanceLastRun := make(map[uuid.UUID]time.Time)
 	for {
 		settings, err := e.db.GetAppSettings(ctx, appType)
 		if err != nil {
@@ -110,10 +114,23 @@ func (e *Engine) lurkLoop(ctx context.Context, appType database.AppType) {
 			if ctx.Err() != nil {
 				return
 			}
+			// Per-instance backoff: skip if this instance is still cooling down.
+			if errCount := instanceErrors[inst.ID]; errCount > 0 {
+				cooldown := backoff(errCount)
+				if last, ok := instanceLastRun[inst.ID]; ok && time.Since(last) < cooldown {
+					log.Debug("instance on backoff, skipping",
+						"instance", inst.Name, "errors", errCount, "cooldown", cooldown)
+					continue
+				}
+			}
 			start := time.Now()
+			instanceLastRun[inst.ID] = start
 			if err := e.lurkInstance(ctx, log, appType, settings, inst); err != nil {
 				hadError = true
+				instanceErrors[inst.ID]++
 				metrics.LurkErrors.WithLabelValues(string(appType), inst.Name).Inc()
+			} else {
+				instanceErrors[inst.ID] = 0
 			}
 			metrics.LurkDuration.WithLabelValues(string(appType), inst.Name).Observe(time.Since(start).Seconds())
 		}
