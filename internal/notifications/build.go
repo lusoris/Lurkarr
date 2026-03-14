@@ -14,12 +14,13 @@ type ProviderConfig struct {
 }
 
 // BuildProvider constructs a notification Provider from a type and raw JSON config.
-func BuildProvider(cfg ProviderConfig) (Provider, ProviderType, []EventType, error) {
+// It also returns any custom title/body template strings from the config.
+func BuildProvider(cfg ProviderConfig) (Provider, ProviderType, []EventType, string, string, error) {
 	pt := ProviderType(cfg.Type)
 
 	var raw map[string]any
 	if err := json.Unmarshal(cfg.Config, &raw); err != nil {
-		return nil, "", nil, fmt.Errorf("unmarshal provider config: %w", err)
+		return nil, "", nil, "", "", fmt.Errorf("unmarshal provider config: %w", err)
 	}
 
 	str := func(key string) string {
@@ -34,6 +35,9 @@ func BuildProvider(cfg ProviderConfig) (Provider, ProviderType, []EventType, err
 		v, _ := raw[key].(bool)
 		return v
 	}
+
+	titleTpl := str("title_template")
+	bodyTpl := str("body_template")
 
 	var p Provider
 	switch pt {
@@ -78,7 +82,7 @@ func BuildProvider(cfg ProviderConfig) (Provider, ProviderType, []EventType, err
 		}
 		p = NewWebhook(str("url"), headers)
 	default:
-		return nil, "", nil, fmt.Errorf("unsupported provider type: %s", cfg.Type)
+		return nil, "", nil, "", "", fmt.Errorf("unsupported provider type: %s", cfg.Type)
 	}
 
 	var events []EventType
@@ -86,7 +90,7 @@ func BuildProvider(cfg ProviderConfig) (Provider, ProviderType, []EventType, err
 		events = append(events, EventType(e))
 	}
 
-	return p, pt, events, nil
+	return p, pt, events, titleTpl, bodyTpl, nil
 }
 
 // LoadProviders registers all providers from the given configs, replacing any
@@ -100,7 +104,7 @@ func (m *Manager) LoadProviders(configs []ProviderConfig) error {
 
 	var firstErr error
 	for _, cfg := range configs {
-		p, pt, events, err := BuildProvider(cfg)
+		p, pt, events, titleTpl, bodyTpl, err := BuildProvider(cfg)
 		if err != nil {
 			slog.Error("failed to build notification provider", "type", cfg.Type, "error", err)
 			if firstErr == nil {
@@ -108,7 +112,7 @@ func (m *Manager) LoadProviders(configs []ProviderConfig) error {
 			}
 			continue
 		}
-		m.Register(pt, p, events)
+		m.RegisterWithTemplates(pt, p, events, titleTpl, bodyTpl)
 		slog.Info("registered notification provider", "type", pt, "events", len(events))
 	}
 	return firstErr

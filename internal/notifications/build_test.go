@@ -83,7 +83,7 @@ func TestBuildProviderAllTypes(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			p, pt, _, err := BuildProvider(ProviderConfig{
+			p, pt, _, _, _, err := BuildProvider(ProviderConfig{
 				Type:   tt.provType,
 				Config: cfgBytes,
 				Events: []string{"lurk_completed", "error"},
@@ -111,7 +111,7 @@ func TestBuildProviderAllTypes(t *testing.T) {
 
 func TestBuildProviderEvents(t *testing.T) {
 	cfg, _ := json.Marshal(map[string]any{"webhook_url": "https://discord.com/wh"})
-	_, _, events, err := BuildProvider(ProviderConfig{
+	_, _, events, _, _, err := BuildProvider(ProviderConfig{
 		Type:   "discord",
 		Config: cfg,
 		Events: []string{"lurk_completed", "error", "download_stuck"},
@@ -125,7 +125,7 @@ func TestBuildProviderEvents(t *testing.T) {
 }
 
 func TestBuildProviderInvalidJSON(t *testing.T) {
-	_, _, _, err := BuildProvider(ProviderConfig{
+	_, _, _, _, _, err := BuildProvider(ProviderConfig{
 		Type:   "discord",
 		Config: json.RawMessage(`{invalid`),
 	})

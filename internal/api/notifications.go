@@ -151,7 +151,7 @@ func (h *NotificationHandler) HandleTestProvider(w http.ResponseWriter, r *http.
 		return
 	}
 
-	p, _, _, err := notifications.BuildProvider(notifications.ProviderConfig{
+	p, _, _, _, _, err := notifications.BuildProvider(notifications.ProviderConfig{
 		Type:   provider.Type,
 		Config: provider.Config,
 		Events: provider.Events,

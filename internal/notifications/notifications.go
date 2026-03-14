@@ -3,10 +3,12 @@
 package notifications
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/lusoris/lurkarr/internal/metrics"
@@ -96,6 +98,8 @@ type HistoryEntry struct {
 type providerEntry struct {
 	provider Provider
 	events   map[EventType]bool // which events this provider subscribes to
+	titleTpl *template.Template // optional custom title template
+	bodyTpl  *template.Template // optional custom body template
 }
 
 // NewManager creates a notification manager.
@@ -115,6 +119,12 @@ func (m *Manager) SetRecorder(r HistoryRecorder) {
 // Register adds a provider that will receive the specified event types.
 // If events is nil, the provider receives all events.
 func (m *Manager) Register(pt ProviderType, p Provider, events []EventType) {
+	m.RegisterWithTemplates(pt, p, events, "", "")
+}
+
+// RegisterWithTemplates adds a provider with optional Go text/template strings
+// for customising the title and body of notifications.
+func (m *Manager) RegisterWithTemplates(pt ProviderType, p Provider, events []EventType, titleTpl, bodyTpl string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -132,7 +142,23 @@ func (m *Manager) Register(pt ProviderType, p Provider, events []EventType) {
 	// Test event is always allowed.
 	evSet[EventTestNotification] = true
 
-	m.providers[pt] = providerEntry{provider: p, events: evSet}
+	entry := providerEntry{provider: p, events: evSet}
+	if titleTpl != "" {
+		if t, err := template.New("title").Parse(titleTpl); err == nil {
+			entry.titleTpl = t
+		} else {
+			slog.Warn("invalid title template, using default", "provider", pt, "error", err)
+		}
+	}
+	if bodyTpl != "" {
+		if t, err := template.New("body").Parse(bodyTpl); err == nil {
+			entry.bodyTpl = t
+		} else {
+			slog.Warn("invalid body template, using default", "provider", pt, "error", err)
+		}
+	}
+
+	m.providers[pt] = entry
 }
 
 // Unregister removes a provider.
@@ -166,9 +192,25 @@ func (m *Manager) Notify(ctx context.Context, event Event) {
 		wg.Add(1)
 		go func(pt ProviderType, e providerEntry) {
 			defer wg.Done()
+
+			// Apply per-provider templates to a copy of the event.
+			ev := event
+			if e.titleTpl != nil {
+				var buf bytes.Buffer
+				if err := e.titleTpl.Execute(&buf, event); err == nil {
+					ev.Title = buf.String()
+				}
+			}
+			if e.bodyTpl != nil {
+				var buf bytes.Buffer
+				if err := e.bodyTpl.Execute(&buf, event); err == nil {
+					ev.Message = buf.String()
+				}
+			}
+
 			start := time.Now()
 			name := e.provider.Name()
-			sendErr := e.provider.Send(ctx, event)
+			sendErr := e.provider.Send(ctx, ev)
 			dur := time.Since(start)
 
 			if sendErr != nil {

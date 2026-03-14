@@ -67,6 +67,8 @@
 	let formEnabled = $state(true);
 	let formConfig = $state<Record<string, string>>({});
 	let formEvents = $state<string[]>([]);
+	let formTitleTemplate = $state('');
+	let formBodyTemplate = $state('');
 
 	const selectedProvider = $derived(providerTypes.find(p => p.value === formType));
 
@@ -146,6 +148,8 @@
 		const defaultFields = providerTypes.find(p => p.value === 'discord')?.fields ?? [];
 		formConfig = Object.fromEntries(defaultFields.map(f => [f, '']));
 		formEvents = [...allEvents];
+		formTitleTemplate = '';
+		formBodyTemplate = '';
 		showModal = true;
 	}
 
@@ -157,6 +161,8 @@
 		const fields = providerTypes.find(pt => pt.value === p.type)?.fields ?? [];
 		formConfig = Object.fromEntries(fields.map(f => [f, p.config[f] ?? '']));
 		formEvents = [...p.events];
+		formTitleTemplate = p.config['title_template'] ?? '';
+		formBodyTemplate = p.config['body_template'] ?? '';
 		showModal = true;
 	}
 
@@ -171,11 +177,15 @@
 	async function save() {
 		saving = true;
 		try {
+			const config: Record<string, string> = { ...formConfig };
+			if (formTitleTemplate.trim()) config['title_template'] = formTitleTemplate.trim();
+			if (formBodyTemplate.trim()) config['body_template'] = formBodyTemplate.trim();
+
 			const body = {
 				type: formType,
 				name: formName,
 				enabled: formEnabled,
-				config: formConfig,
+				config,
 				events: formEvents
 			};
 
@@ -422,6 +432,26 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Templates -->
+		<div class="border-t border-border pt-4">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="text-sm font-medium text-muted-foreground">Templates</h3>
+			</div>
+			<p class="text-xs text-muted-foreground mb-3">
+				Customise notification text with Go templates. Available: {'{{.Title}}'}, {'{{.Message}}'}, {'{{.AppType}}'}, {'{{.Instance}}'}, {'{{.Type}}'}, {'{{index .Fields "key"}}'}.
+			</p>
+			<div class="space-y-3">
+				<div>
+					<label for="title-tpl" class="block text-sm font-medium text-foreground mb-1">Title Template</label>
+					<input id="title-tpl" bind:value={formTitleTemplate} placeholder="Leave blank for default" class="w-full rounded-md bg-muted border border-border px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+				</div>
+				<div>
+					<label for="body-tpl" class="block text-sm font-medium text-foreground mb-1">Body Template</label>
+					<textarea id="body-tpl" bind:value={formBodyTemplate} placeholder="Leave blank for default" rows={3} class="w-full rounded-md bg-muted border border-border px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"></textarea>
+				</div>
+			</div>
+		</div>
 
 		<!-- Events -->
 		<div class="border-t border-border pt-4">
