@@ -46,6 +46,7 @@
 		skip_cross_seeds: boolean;
 		cross_arr_sync: boolean;
 		dry_run: boolean;
+		protected_tags: string;
 	}
 
 	interface ScoringProfile {
@@ -331,6 +332,9 @@
 					{#if settings.enabled}
 						<div class="mt-2">
 							<Toggle bind:checked={settings.dry_run} label="Dry-Run Mode" hint="Preview what would be removed without actually deleting anything — check your logs" />
+						</div>
+						<div class="mt-2">
+							<Input bind:value={settings.protected_tags} type="text" label="Protected Tags" hint="Comma-separated tag names — items with these tags are never removed" />
 						</div>
 					{/if}
 				</Card>

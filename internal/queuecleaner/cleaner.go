@@ -176,10 +176,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		genSettings.SSLVerify,
 	)
 
-	// Use enriched queue when cross-arr sync is enabled so we get external IDs
-	// (TMDB, TVDB+season) for proper media matching across instances.
+	// Use enriched queue when cross-arr sync or protected tags are enabled so we
+	// get external IDs and media tags from the enriched response.
+	needEnriched := settings.CrossArrSync || settings.ProtectedTags != ""
 	var queue *arrclient.QueueResponse
-	if settings.CrossArrSync {
+	if needEnriched {
 		queue, err = getEnrichedQueue(ctx, client, appType)
 	} else {
 		queue, err = lurker.GetQueue(ctx, client)
@@ -191,6 +192,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 	if len(queue.Records) == 0 {
 		return nil
+	}
+
+	// Filter out records whose media has a protected tag.
+	if settings.ProtectedTags != "" {
+		queue.Records = filterProtectedTags(ctx, log, client, appType, settings.ProtectedTags, queue.Records)
 	}
 
 	// Get SABnzbd queue status for Usenet items
@@ -1041,6 +1047,53 @@ func getEnrichedQueue(ctx context.Context, client *arrclient.Client, appType dat
 	default:
 		return nil, fmt.Errorf("unsupported app type for enriched queue: %s", appType)
 	}
+}
+
+// filterProtectedTags resolves the comma-separated tag labels to IDs via the
+// instance's tag API and removes any queue records whose media has a matching tag.
+func filterProtectedTags(ctx context.Context, log *slog.Logger, client *arrclient.Client, appType database.AppType, protectedCSV string, records []arrclient.QueueRecord) []arrclient.QueueRecord {
+	labels := make(map[string]struct{})
+	for _, raw := range strings.Split(protectedCSV, ",") {
+		label := strings.TrimSpace(strings.ToLower(raw))
+		if label != "" {
+			labels[label] = struct{}{}
+		}
+	}
+	if len(labels) == 0 {
+		return records
+	}
+
+	tags, err := client.GetTags(ctx, apiVersionFor(appType))
+	if err != nil {
+		log.Warn("failed to fetch tags for protected-tag filtering, skipping filter", "error", err)
+		return records
+	}
+
+	protectedIDs := make(map[int]struct{})
+	for _, t := range tags {
+		if _, ok := labels[strings.ToLower(t.Label)]; ok {
+			protectedIDs[t.ID] = struct{}{}
+		}
+	}
+	if len(protectedIDs) == 0 {
+		return records
+	}
+
+	filtered := make([]arrclient.QueueRecord, 0, len(records))
+	for _, rec := range records {
+		skip := false
+		for _, tagID := range rec.MediaTags() {
+			if _, ok := protectedIDs[tagID]; ok {
+				log.Info("skipping protected item", "title", rec.Title, "tag_id", tagID)
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			filtered = append(filtered, rec)
+		}
+	}
+	return filtered
 }
 
 func apiVersionFor(appType database.AppType) string {

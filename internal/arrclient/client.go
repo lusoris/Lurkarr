@@ -223,12 +223,14 @@ type QueueMovie struct {
 	TmdbID int    `json:"tmdbId"`
 	ImdbID string `json:"imdbId"`
 	Title  string `json:"title"`
+	Tags   []int  `json:"tags"`
 }
 
 // QueueSeries holds enriched series data from Sonarr/Whisparr queue responses.
 type QueueSeries struct {
 	TvdbID int    `json:"tvdbId"`
 	Title  string `json:"title"`
+	Tags   []int  `json:"tags"`
 }
 
 // QueueEpisode holds enriched episode data from Sonarr/Whisparr queue responses.
@@ -241,12 +243,14 @@ type QueueEpisode struct {
 type QueueAlbum struct {
 	ForeignAlbumID string `json:"foreignAlbumId"`
 	Title          string `json:"title"`
+	Tags           []int  `json:"tags"`
 }
 
 // QueueBook holds enriched book data from Readarr queue responses.
 type QueueBook struct {
 	ForeignBookID string `json:"foreignBookId"`
 	Title         string `json:"title"`
+	Tags          []int  `json:"tags"`
 }
 
 // StatusMessage from arr queue items for detecting import issues.
@@ -311,6 +315,38 @@ func (q *QueueRecord) MediaKey() string {
 		return "book:" + q.Book.ForeignBookID
 	}
 	return ""
+}
+
+// MediaTags returns the tag IDs from the enriched media item, or nil if unavailable.
+func (q *QueueRecord) MediaTags() []int {
+	if q.Movie != nil {
+		return q.Movie.Tags
+	}
+	if q.Series != nil {
+		return q.Series.Tags
+	}
+	if q.Album != nil {
+		return q.Album.Tags
+	}
+	if q.Book != nil {
+		return q.Book.Tags
+	}
+	return nil
+}
+
+// Tag represents a tag from an *arr instance.
+type Tag struct {
+	ID    int    `json:"id"`
+	Label string `json:"label"`
+}
+
+// GetTags returns all tags from the *arr instance.
+func (c *Client) GetTags(ctx context.Context, apiVersion string) ([]Tag, error) {
+	var tags []Tag
+	if err := c.get(ctx, "/api/"+apiVersion+"/tag", &tags); err != nil {
+		return nil, fmt.Errorf("get tags: %w", err)
+	}
+	return tags, nil
 }
 
 // QueueResponse wraps a paginated queue response.

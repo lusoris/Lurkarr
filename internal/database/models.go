@@ -253,7 +253,8 @@ type QueueCleanerSettings struct {
 	// Cross-Arr blocklist sync
 	CrossArrSync bool `json:"cross_arr_sync"` // Propagate blocklist removals to all instances of the same app type
 	// Safety
-	DryRun bool `json:"dry_run"` // Log all actions without executing deletions (safe preview mode)
+	DryRun        bool   `json:"dry_run"`        // Log all actions without executing deletions (safe preview mode)
+	ProtectedTags string `json:"protected_tags"` // Comma-separated tag labels; tagged media is exempt from all cleanup
 }
 
 // QueueStrike represents a strike against a problematic download.
