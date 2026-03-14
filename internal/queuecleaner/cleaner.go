@@ -18,6 +18,7 @@ import (
 	downloadclient "github.com/lusoris/lurkarr/internal/downloadclients"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/deluge"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/rtorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/nzbget"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
@@ -762,6 +763,9 @@ func (c *Cleaner) getDownloadClient(ctx context.Context, appType database.AppTyp
 	case downloadclient.TypeNZBGet:
 		native := nzbget.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
 		return downloadclient.NewNZBGetAdapter(native)
+	case downloadclient.TypeRTorrent:
+		native := rtorrent.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
+		return downloadclient.NewRTorrentAdapter(native)
 	default:
 		return nil
 	}
@@ -925,6 +929,8 @@ func isPausedStatus(status string) bool {
 	case "stopped": // Transmission
 		return true
 	case "Paused": // Deluge
+		return true
+	case "paused": // rTorrent
 		return true
 	}
 	return false

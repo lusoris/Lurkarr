@@ -56,12 +56,13 @@
 		timeout: number;
 	}
 
-	const clientTypes = ['qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget'] as const;
+	const clientTypes = ['qbittorrent', 'transmission', 'deluge', 'rtorrent', 'sabnzbd', 'nzbget'] as const;
 
 	const clientDefaults: Record<string, { url: string; port: number }> = {
 		qbittorrent: { url: 'http://qbittorrent', port: 8080 },
 		transmission: { url: 'http://transmission', port: 9091 },
 		deluge: { url: 'http://deluge', port: 8112 },
+		rtorrent: { url: 'http://rtorrent', port: 8080 },
 		sabnzbd: { url: 'http://sabnzbd', port: 8080 },
 		nzbget: { url: 'http://nzbget', port: 6789 }
 	};

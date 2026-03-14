@@ -22,6 +22,7 @@ const displayNames: Record<string, string> = {
 	qbittorrent: 'qBittorrent',
 	transmission: 'Transmission',
 	deluge: 'Deluge',
+	rtorrent: 'rTorrent',
 	nzbget: 'NZBGet'
 };
 
@@ -50,11 +51,85 @@ const colors: Record<string, string> = {
 	eros: 'text-purple-400',
 	prowlarr: 'text-orange-400',
 	sabnzbd: 'text-yellow-400',
+	qbittorrent: 'text-blue-400',
+	transmission: 'text-red-400',
+	deluge: 'text-cyan-400',
+	rtorrent: 'text-teal-400',
+	nzbget: 'text-lime-400',
 	seerr: 'text-purple-400'
 };
 
 export function appColor(appType: string): string {
 	return colors[appType] ?? 'text-surface-300';
+}
+
+// Subtle accent border class per app — used on content areas to indicate the active app.
+const accentBorders: Record<string, string> = {
+	sonarr: 'border-l-sky-400',
+	radarr: 'border-l-amber-400',
+	lidarr: 'border-l-emerald-400',
+	readarr: 'border-l-rose-400',
+	whisparr: 'border-l-pink-400',
+	eros: 'border-l-purple-400',
+	prowlarr: 'border-l-orange-400',
+	sabnzbd: 'border-l-yellow-400',
+	qbittorrent: 'border-l-blue-400',
+	transmission: 'border-l-red-400',
+	deluge: 'border-l-cyan-400',
+	rtorrent: 'border-l-teal-400',
+	nzbget: 'border-l-lime-400',
+	seerr: 'border-l-purple-400'
+};
+
+export function appAccentBorder(appType: string): string {
+	return accentBorders[appType] ?? '';
+}
+
+// Background color class per app — used on selected buttons/tabs.
+const bgColors: Record<string, string> = {
+	sonarr: 'bg-sky-500',
+	radarr: 'bg-amber-500',
+	lidarr: 'bg-emerald-500',
+	readarr: 'bg-rose-500',
+	whisparr: 'bg-pink-500',
+	eros: 'bg-purple-500',
+	prowlarr: 'bg-orange-500',
+	sabnzbd: 'bg-yellow-500',
+	qbittorrent: 'bg-blue-500',
+	transmission: 'bg-red-500',
+	deluge: 'bg-cyan-500',
+	rtorrent: 'bg-teal-500',
+	nzbget: 'bg-lime-500',
+	seerr: 'bg-purple-500'
+};
+
+export function appBgColor(appType: string): string {
+	return bgColors[appType] ?? 'bg-primary';
+}
+
+// Hover background color per app — for button hover states.
+const hoverBgColors: Record<string, string> = {
+	sonarr: 'hover:bg-sky-600',
+	radarr: 'hover:bg-amber-600',
+	lidarr: 'hover:bg-emerald-600',
+	readarr: 'hover:bg-rose-600',
+	whisparr: 'hover:bg-pink-600',
+	eros: 'hover:bg-purple-600',
+	prowlarr: 'hover:bg-orange-600',
+	sabnzbd: 'hover:bg-yellow-600',
+	qbittorrent: 'hover:bg-blue-600',
+	transmission: 'hover:bg-red-600',
+	deluge: 'hover:bg-cyan-600',
+	rtorrent: 'hover:bg-teal-600',
+	nzbget: 'hover:bg-lime-600',
+	seerr: 'hover:bg-purple-600'
+};
+
+// Full button class for an app-colored action button (save, submit, etc.)
+export function appButtonClass(appType: string): string {
+	const bg = bgColors[appType] ?? 'bg-primary';
+	const hover = hoverBgColors[appType] ?? 'hover:bg-primary/90';
+	return `${bg} ${hover} text-white shadow-sm`;
 }
 
 // Logo paths for each app type (served from /logos/).
@@ -71,6 +146,7 @@ const logos: Record<string, string> = {
 	qbittorrent: '/logos/qbittorrent.svg',
 	transmission: '/logos/transmission.png',
 	deluge: '/logos/deluge.png',
+	rtorrent: '/logos/rtorrent.svg',
 	nzbget: '/logos/nzbget.png'
 };
 
@@ -92,6 +168,7 @@ const websites: Record<string, string> = {
 	qbittorrent: 'https://www.qbittorrent.org',
 	transmission: 'https://transmissionbt.com',
 	deluge: 'https://deluge-torrent.org',
+	rtorrent: 'https://rakshasa.github.io/rtorrent/',
 	nzbget: 'https://nzbget.com'
 };
 

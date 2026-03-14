@@ -10,6 +10,7 @@ import (
 	downloadclient "github.com/lusoris/lurkarr/internal/downloadclients"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/deluge"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/rtorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/nzbget"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
@@ -24,6 +25,7 @@ var validClientTypes = map[string]bool{
 	"qbittorrent":  true,
 	"transmission": true,
 	"deluge":       true,
+	"rtorrent":     true,
 	"sabnzbd":      true,
 	"nzbget":       true,
 }
@@ -359,6 +361,8 @@ func buildClient(clientType, url, apiKey, username, password string, timeout tim
 		return downloadclient.NewSABnzbdAdapter(sabnzbd.NewClient(url, apiKey, timeout))
 	case downloadclient.TypeNZBGet:
 		return downloadclient.NewNZBGetAdapter(nzbget.NewClient(url, username, password, timeout))
+	case downloadclient.TypeRTorrent:
+		return downloadclient.NewRTorrentAdapter(rtorrent.NewClient(url, username, password, timeout))
 	default:
 		return nil
 	}

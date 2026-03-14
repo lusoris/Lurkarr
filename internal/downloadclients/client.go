@@ -63,4 +63,5 @@ const (
 	TypeQBittorrent  ClientType = "qbittorrent"
 	TypeTransmission ClientType = "transmission"
 	TypeDeluge       ClientType = "deluge"
+	TypeRTorrent     ClientType = "rtorrent"
 )
