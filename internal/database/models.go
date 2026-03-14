@@ -274,6 +274,8 @@ type QueueCleanerSettings struct {
 	// Queued item strikes
 	StrikeQueued    bool `json:"strike_queued"`     // Strike items stuck in queued state (not downloading)
 	MaxStrikesQueued int  `json:"max_strikes_queued"` // Override max_strikes for queued items (0 = use global)
+	// Search cooldown
+	SearchCooldownHours int `json:"search_cooldown_hours"` // Minimum hours between re-searches for the same media (0 = no cooldown)
 }
 
 // QueueStrike represents a strike against a problematic download.

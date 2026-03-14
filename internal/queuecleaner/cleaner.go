@@ -42,6 +42,8 @@ type Store interface {
 	GetDownloadClientSettings(ctx context.Context, appType database.AppType) (*database.DownloadClientSettings, error)
 	ListEnabledDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error)
 	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
+	IsSearchOnCooldown(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, cooldownHours int) (bool, error)
+	RecordSearch(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
 }
 
 // removal tracks a removed queue item with both its title and media key for
@@ -256,7 +258,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
 			if settings.SearchOnRemove {
-				triggerReSearch(ctx, log, lurker, client, record)
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours)
 			}
 		}
 	}
@@ -363,7 +365,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
 			if settings.SearchOnRemove {
-				triggerReSearch(ctx, log, lurker, client, record)
+				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours)
 			}
 		}
 	}
@@ -516,7 +518,7 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)
 		if settings.SearchOnRemove {
 			if l := lurking.LurkerFor(appType); l != nil {
-				triggerReSearch(ctx, log, l, client, record)
+				c.triggerReSearch(ctx, log, l, client, record, appType, inst.ID, settings.SearchCooldownHours)
 			}
 		}
 	}
@@ -1258,16 +1260,31 @@ func filterIgnoredIndexers(log *slog.Logger, ignoredCSV string, records []arrcli
 
 // triggerReSearch asks the arr instance to search for a replacement after a
 // queue item is removed. It is a best-effort operation — failures are logged
-// but do not interrupt the cleanup loop.
-func triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord) {
+// but do not interrupt the cleanup loop. When cooldownHours > 0, recently
+// searched media is skipped.
+func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord, appType database.AppType, instID uuid.UUID, cooldownHours int) {
 	mediaID := record.MediaID()
 	if mediaID <= 0 {
 		return
+	}
+	if cooldownHours > 0 {
+		onCooldown, err := c.db.IsSearchOnCooldown(ctx, appType, instID, mediaID, cooldownHours)
+		if err != nil {
+			log.Warn("failed to check search cooldown", "media_id", mediaID, "error", err)
+		} else if onCooldown {
+			log.Debug("skipping re-search (cooldown active)", "title", record.Title, "media_id", mediaID)
+			return
+		}
 	}
 	if err := lurker.Search(ctx, client, mediaID); err != nil {
 		log.Warn("re-search failed", "title", record.Title, "media_id", mediaID, "error", err)
 	} else {
 		log.Info("re-search triggered", "title", record.Title, "media_id", mediaID)
+		if cooldownHours > 0 {
+			if err := c.db.RecordSearch(ctx, appType, instID, mediaID); err != nil {
+				log.Warn("failed to record search cooldown", "media_id", mediaID, "error", err)
+			}
+		}
 	}
 }
 

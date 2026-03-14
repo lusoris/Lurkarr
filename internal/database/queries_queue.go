@@ -28,7 +28,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        ignore_above_bytes,
 		        tag_instead_of_delete, obsolete_tag_label,
 		        failed_import_patterns,
-		        strike_queued, max_strikes_queued
+		        strike_queued, max_strikes_queued,
+		        search_cooldown_hours
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -45,7 +46,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.IgnoreAboveBytes,
 		&s.TagInsteadOfDelete, &s.ObsoleteTagLabel,
 		&s.FailedImportPatterns,
-		&s.StrikeQueued, &s.MaxStrikesQueued)
+		&s.StrikeQueued, &s.MaxStrikesQueued,
+		&s.SearchCooldownHours)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -72,7 +74,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        ignore_above_bytes = $38,
 		        tag_instead_of_delete = $39, obsolete_tag_label = $40,
 		        failed_import_patterns = $41,
-		        strike_queued = $42, max_strikes_queued = $43
+		        strike_queued = $42, max_strikes_queued = $43,
+		        search_cooldown_hours = $44
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -89,7 +92,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.IgnoreAboveBytes,
 		s.TagInsteadOfDelete, s.ObsoleteTagLabel,
 		s.FailedImportPatterns,
-		s.StrikeQueued, s.MaxStrikesQueued)
+		s.StrikeQueued, s.MaxStrikesQueued,
+		s.SearchCooldownHours)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}
@@ -273,6 +277,50 @@ func (db *DB) PruneBlocklistLog(ctx context.Context, olderThan time.Duration) er
 		`DELETE FROM blocklist_log WHERE blocklisted_at < $1`, time.Now().Add(-olderThan))
 	if err != nil {
 		return fmt.Errorf("prune blocklist log: %w", err)
+	}
+	return nil
+}
+
+// --- Search Cooldowns ---
+
+// IsSearchOnCooldown checks whether a media item was searched within the given
+// number of hours and should be skipped.
+func (db *DB) IsSearchOnCooldown(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID, cooldownHours int) (bool, error) {
+	if cooldownHours <= 0 {
+		return false, nil
+	}
+	var count int
+	err := db.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM search_cooldowns
+		 WHERE app_type = $1 AND instance_id = $2 AND media_id = $3
+		   AND searched_at > NOW() - make_interval(hours => $4)`,
+		appType, instanceID, mediaID, cooldownHours).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("check search cooldown: %w", err)
+	}
+	return count > 0, nil
+}
+
+// RecordSearch upserts a search timestamp for a media item.
+func (db *DB) RecordSearch(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID int) error {
+	_, err := db.Pool.Exec(ctx,
+		`INSERT INTO search_cooldowns (app_type, instance_id, media_id, searched_at)
+		 VALUES ($1, $2, $3, NOW())
+		 ON CONFLICT (app_type, instance_id, media_id) DO UPDATE SET searched_at = NOW()`,
+		appType, instanceID, mediaID)
+	if err != nil {
+		return fmt.Errorf("record search: %w", err)
+	}
+	return nil
+}
+
+// PruneSearchCooldowns removes search cooldown entries older than the given duration.
+func (db *DB) PruneSearchCooldowns(ctx context.Context, olderThan time.Duration) error {
+	_, err := db.Pool.Exec(ctx,
+		`DELETE FROM search_cooldowns WHERE searched_at < NOW() - $1::interval`,
+		olderThan.String())
+	if err != nil {
+		return fmt.Errorf("prune search cooldowns: %w", err)
 	}
 	return nil
 }

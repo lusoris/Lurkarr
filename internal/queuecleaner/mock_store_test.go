@@ -191,6 +191,35 @@ func (mr *MockStoreMockRecorder) ListEnabledDownloadClientInstances(ctx any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnabledDownloadClientInstances", reflect.TypeOf((*MockStore)(nil).ListEnabledDownloadClientInstances), ctx)
 }
 
+// IsSearchOnCooldown mocks base method.
+func (m *MockStore) IsSearchOnCooldown(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, cooldownHours int) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSearchOnCooldown", ctx, appType, instanceID, mediaID, cooldownHours)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsSearchOnCooldown indicates an expected call of IsSearchOnCooldown.
+func (mr *MockStoreMockRecorder) IsSearchOnCooldown(ctx, appType, instanceID, mediaID, cooldownHours any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSearchOnCooldown", reflect.TypeOf((*MockStore)(nil).IsSearchOnCooldown), ctx, appType, instanceID, mediaID, cooldownHours)
+}
+
+// RecordSearch mocks base method.
+func (m *MockStore) RecordSearch(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordSearch", ctx, appType, instanceID, mediaID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordSearch indicates an expected call of RecordSearch.
+func (mr *MockStoreMockRecorder) RecordSearch(ctx, appType, instanceID, mediaID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordSearch", reflect.TypeOf((*MockStore)(nil).RecordSearch), ctx, appType, instanceID, mediaID)
+}
+
 // ListEnabledInstances mocks base method.
 func (m *MockStore) ListEnabledInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error) {
 	m.ctrl.T.Helper()
