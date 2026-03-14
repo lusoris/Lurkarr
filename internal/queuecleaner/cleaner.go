@@ -253,6 +253,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		queue.Records = filterIgnoredIndexers(log, settings.IgnoredIndexers, queue.Records)
 	}
 
+	// Filter out records from ignored download clients.
+	if settings.IgnoredDownloadClients != "" {
+		queue.Records = filterIgnoredDownloadClients(log, settings.IgnoredDownloadClients, queue.Records)
+	}
+
 	// Get SABnzbd queue status for Usenet items
 	sabStatuses := c.getSABnzbdStatuses(ctx)
 
@@ -1541,6 +1546,31 @@ func filterIgnoredIndexers(log *slog.Logger, ignoredCSV string, records []arrcli
 	for _, rec := range records {
 		if _, ok := ignored[strings.ToLower(rec.Indexer)]; ok {
 			log.Info("skipping ignored indexer item", "title", rec.Title, "indexer", rec.Indexer)
+			continue
+		}
+		filtered = append(filtered, rec)
+	}
+	return filtered
+}
+
+// filterIgnoredDownloadClients removes queue records from download clients
+// listed in the comma-separated ignoredCSV setting.
+func filterIgnoredDownloadClients(log *slog.Logger, ignoredCSV string, records []arrclient.QueueRecord) []arrclient.QueueRecord {
+	ignored := make(map[string]struct{})
+	for _, raw := range strings.Split(ignoredCSV, ",") {
+		name := strings.TrimSpace(strings.ToLower(raw))
+		if name != "" {
+			ignored[name] = struct{}{}
+		}
+	}
+	if len(ignored) == 0 {
+		return records
+	}
+
+	filtered := make([]arrclient.QueueRecord, 0, len(records))
+	for _, rec := range records {
+		if _, ok := ignored[strings.ToLower(rec.DownloadClient)]; ok {
+			log.Info("skipping ignored download client item", "title", rec.Title, "client", rec.DownloadClient)
 			continue
 		}
 		filtered = append(filtered, rec)

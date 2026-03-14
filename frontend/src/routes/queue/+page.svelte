@@ -72,6 +72,7 @@
 		blocklist_metadata: boolean;
 		blocklist_duplicate: boolean;
 		blocklist_unregistered: boolean;
+		ignored_download_clients: string;
 	}
 
 	interface ScoringProfile {
@@ -381,6 +382,9 @@
 						</div>
 						<div class="mt-2">
 							<Input bind:value={settings.ignored_indexers} type="text" label="Ignored Indexers" hint="Comma-separated indexer names — items from these indexers skip all cleanup" />
+						</div>
+						<div class="mt-2">
+							<Input bind:value={settings.ignored_download_clients} type="text" label="Ignored Download Clients" hint="Comma-separated download client names — items from these clients skip all cleanup" />
 						</div>
 					{/if}
 				</Card>

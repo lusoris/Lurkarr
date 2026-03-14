@@ -365,6 +365,8 @@ type QueueCleanerSettings struct {
 	BlocklistMetadata     bool `json:"blocklist_metadata"`     // Blocklist when removing metadata-stuck items
 	BlocklistDuplicate    bool `json:"blocklist_duplicate"`    // Blocklist when removing lower-quality duplicates
 	BlocklistUnregistered bool `json:"blocklist_unregistered"` // Blocklist when removing unregistered torrents
+	// Ignore specific download clients
+	IgnoredDownloadClients string `json:"ignored_download_clients"` // Comma-separated download client names to skip during cleanup
 }
 
 // QueueStrike represents a strike against a problematic download.

@@ -37,7 +37,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        recheck_paused_enabled,
 		        recycle_bin_enabled, recycle_bin_path,
 		        blocklist_stalled, blocklist_slow, blocklist_metadata,
-		        blocklist_duplicate, blocklist_unregistered
+		        blocklist_duplicate, blocklist_unregistered,
+		        ignored_download_clients
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -63,7 +64,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.RecheckPausedEnabled,
 		&s.RecycleBinEnabled, &s.RecycleBinPath,
 		&s.BlocklistStalled, &s.BlocklistSlow, &s.BlocklistMetadata,
-		&s.BlocklistDuplicate, &s.BlocklistUnregistered)
+		&s.BlocklistDuplicate, &s.BlocklistUnregistered,
+		&s.IgnoredDownloadClients)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -99,7 +101,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        recheck_paused_enabled = $51,
 		        recycle_bin_enabled = $52, recycle_bin_path = $53,
 		        blocklist_stalled = $54, blocklist_slow = $55, blocklist_metadata = $56,
-		        blocklist_duplicate = $57, blocklist_unregistered = $58
+		        blocklist_duplicate = $57, blocklist_unregistered = $58,
+		        ignored_download_clients = $59
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -125,7 +128,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.RecheckPausedEnabled,
 		s.RecycleBinEnabled, s.RecycleBinPath,
 		s.BlocklistStalled, s.BlocklistSlow, s.BlocklistMetadata,
-		s.BlocklistDuplicate, s.BlocklistUnregistered)
+		s.BlocklistDuplicate, s.BlocklistUnregistered,
+		s.IgnoredDownloadClients)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}
