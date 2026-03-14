@@ -280,6 +280,10 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 	var removed []removal
 
+	// Group records by DownloadID so season packs (N records sharing one
+	// download) are treated as a single unit across all cleanup steps.
+	packs := GroupByDownloadID(queue.Records)
+
 	// 0. Blocklist rule matching — remove items matching user/community blocklist
 	blRules, err := c.db.ListEnabledBlocklistRules(ctx)
 	if err != nil {
@@ -289,37 +293,40 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			parsed := ParseRelease(title)
 			return blocklist.ReleaseInfo{ReleaseGroup: parsed.ReleaseGroup}
 		})
-		for _, record := range queue.Records {
-			result := matcher.Check(record)
+		for _, pack := range packs {
+			// All pack members share the same title — check the representative.
+			rep := pack.Representative()
+			result := matcher.Check(rep)
 			if !result.Matched {
 				continue
 			}
 			reason := "blocklist_" + result.Rule.PatternType + ":" + result.Rule.Pattern
 			if settings.DryRun {
 				log.Warn("[DRY-RUN] would remove blocklist match",
-					"title", record.Title,
+					"title", rep.Title,
 					"rule_type", result.Rule.PatternType,
-					"pattern", result.Rule.Pattern)
-				removed = append(removed, removal{Title: record.Title, MediaKey: record.MediaKey()})
+					"pattern", result.Rule.Pattern,
+					"pack_size", len(pack.Records))
+				removed = append(removed, removal{Title: rep.Title, MediaKey: rep.MediaKey()})
 				continue
 			}
 			log.Warn("blocklist match, removing",
-				"title", record.Title,
+				"title", rep.Title,
 				"rule_type", result.Rule.PatternType,
-				"pattern", result.Rule.Pattern)
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), true); err != nil {
-				log.Error("failed to remove blocklisted item", "error", err)
+				"pattern", result.Rule.Pattern,
+				"pack_size", len(pack.Records))
+			if !deletePackFromQueue(ctx, log, client, apiVersion, pack, effectiveRemoveFromClient(settings), true) {
 				continue
 			}
-			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason); err != nil {
-				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, rep.DownloadID, rep.Title, reason); err != nil {
+				log.Warn("failed to log blocklist", "title", rep.Title, "error", err)
 			}
-			removed = append(removed, removal{Title: record.Title, MediaKey: record.MediaKey()})
+			removed = append(removed, removal{Title: rep.Title, MediaKey: rep.MediaKey()})
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
-			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
+			c.notifyRemoval(ctx, appType, inst.Name, rep.Title, reason)
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+				c.triggerReSearch(ctx, log, lurker, client, rep, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
@@ -330,15 +337,63 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		recordByQueueID[queue.Records[i].ID] = &queue.Records[i]
 	}
 
-	// 1. Queue deduplication
+	// Build queue ID → pack lookup so dedup can operate on whole packs.
+	packByQueueID := make(map[int]*Pack, len(queue.Records))
+	for i := range packs {
+		for _, r := range packs[i].Records {
+			packByQueueID[r.ID] = &packs[i]
+		}
+	}
+
+	// 1. Queue deduplication — pack-aware: a pack is only removed when ALL its
+	// records are flagged as duplicates (every episode has a better alternative).
 	profile, err := c.db.GetScoringProfile(ctx, appType)
 	if err != nil {
 		log.Error("failed to load scoring profile", "error", err)
 	} else {
 		dupes := FindDuplicates(queue.Records, profile)
+
+		// Collect removal queue IDs per DownloadID.
+		removalsByDL := make(map[string][]DuplicateResult)
 		for _, d := range dupes {
+			if rec, ok := recordByQueueID[d.RemoveQueueID]; ok && rec.DownloadID != "" {
+				removalsByDL[rec.DownloadID] = append(removalsByDL[rec.DownloadID], d)
+			} else {
+				// No DownloadID — treat as standalone removal.
+				removalsByDL[""] = append(removalsByDL[""], d)
+			}
+		}
+
+		processedDL := make(map[string]bool)
+		for _, d := range dupes {
+			rec := recordByQueueID[d.RemoveQueueID]
+			dlID := ""
+			if rec != nil {
+				dlID = rec.DownloadID
+			}
+
+			// For packs, only remove when every episode in the pack is a loser.
+			if dlID != "" {
+				if processedDL[dlID] {
+					continue // already handled this pack
+				}
+				pack := packByQueueID[d.RemoveQueueID]
+				if pack != nil && pack.IsPack() {
+					// Check all records in the pack are flagged for removal.
+					if len(removalsByDL[dlID]) < len(pack.Records) {
+						log.Info("pack partially duplicated, keeping entire pack",
+							"title", d.RemoveTitle,
+							"flagged", len(removalsByDL[dlID]),
+							"pack_size", len(pack.Records))
+						processedDL[dlID] = true
+						continue
+					}
+				}
+				processedDL[dlID] = true
+			}
+
 			var mediaKey string
-			if rec, ok := recordByQueueID[d.RemoveQueueID]; ok {
+			if rec != nil {
 				mediaKey = rec.MediaKey()
 			}
 			if settings.DryRun {
@@ -348,14 +403,27 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 				removed = append(removed, removal{Title: d.RemoveTitle, MediaKey: mediaKey})
 				continue
 			}
-			log.Info("removing duplicate",
-				"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
-				"keep", d.KeepTitle, "keep_score", d.KeepScore)
-			if err := client.DeleteQueueItem(ctx, apiVersion, d.RemoveQueueID, effectiveRemoveFromClient(settings), shouldBlocklist("duplicate", settings)); err != nil {
-				log.Error("failed to remove duplicate", "error", err)
-				continue
+
+			// For packs, remove all queue records; for singles, just the one.
+			pack := packByQueueID[d.RemoveQueueID]
+			if pack != nil && pack.IsPack() {
+				log.Info("removing duplicate pack",
+					"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
+					"keep", d.KeepTitle, "keep_score", d.KeepScore,
+					"pack_size", len(pack.Records))
+				if !deletePackFromQueue(ctx, log, client, apiVersion, *pack, effectiveRemoveFromClient(settings), shouldBlocklist("duplicate", settings)) {
+					continue
+				}
+			} else {
+				log.Info("removing duplicate",
+					"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
+					"keep", d.KeepTitle, "keep_score", d.KeepScore)
+				if err := client.DeleteQueueItem(ctx, apiVersion, d.RemoveQueueID, effectiveRemoveFromClient(settings), shouldBlocklist("duplicate", settings)); err != nil {
+					log.Error("failed to remove duplicate", "error", err)
+					continue
+				}
 			}
-			if err := c.db.LogBlocklist(ctx, appType, inst.ID, "", d.RemoveTitle, "duplicate_lower_score"); err != nil {
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, dlID, d.RemoveTitle, "duplicate_lower_score"); err != nil {
 				log.Warn("failed to log blocklist", "title", d.RemoveTitle, "error", err)
 			}
 			removed = append(removed, removal{Title: d.RemoveTitle, MediaKey: mediaKey})
@@ -365,96 +433,98 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		}
 	}
 
-	// 2. Stalled/slow detection with strike system
+	// 2. Stalled/slow detection with strike system — pack-aware: evaluate the
+	// representative record (all pack members share the same download state),
+	// strike once per DownloadID, and remove all queue records on max strikes.
 	pipeSaturated := isBandwidthSaturated(log, settings, queue.Records)
-	for _, record := range queue.Records {
-		if record.TrackedDownloadState == "importPending" {
+	for _, pack := range packs {
+		rep := pack.Representative()
+		if rep.TrackedDownloadState == "importPending" {
 			continue // Don't strike items waiting for import
 		}
 
 		// Reset strikes for downloads that are making progress
-		if record.Size > 0 && record.Sizeleft < record.Size {
-			progress := float64(record.Size-record.Sizeleft) / float64(record.Size)
-			if progress > 0.5 && record.TrackedDownloadStatus != "warning" {
+		if rep.Size > 0 && rep.Sizeleft < rep.Size {
+			progress := float64(rep.Size-rep.Sizeleft) / float64(rep.Size)
+			if progress > 0.5 && rep.TrackedDownloadStatus != "warning" {
 				// Over 50% and healthy — clear any old strikes
 				if !settings.DryRun {
-					if err := c.db.ResetStrikes(ctx, appType, inst.ID, record.DownloadID); err != nil {
-						log.Warn("failed to reset strikes", "download_id", record.DownloadID, "error", err)
+					if err := c.db.ResetStrikes(ctx, appType, inst.ID, rep.DownloadID); err != nil {
+						log.Warn("failed to reset strikes", "download_id", rep.DownloadID, "error", err)
 					}
 				}
 				continue
 			}
 		}
 
-		reason := c.detectProblem(record, settings, sabStatuses, pipeSaturated)
+		reason := c.detectProblem(rep, settings, sabStatuses, pipeSaturated)
 		if reason == "" {
 			continue
 		}
 
 		if settings.DryRun {
-			log.Info("[DRY-RUN] would strike", "title", record.Title, "reason", reason, "max", effectiveMaxStrikes(reason, settings))
+			log.Info("[DRY-RUN] would strike", "title", rep.Title, "reason", reason, "max", effectiveMaxStrikes(reason, settings))
 			continue
 		}
 
-		count, err := c.db.AddStrikeAndCount(ctx, appType, inst.ID, record.DownloadID, record.Title, reason, settings.StrikeWindowHours)
+		count, err := c.db.AddStrikeAndCount(ctx, appType, inst.ID, rep.DownloadID, rep.Title, reason, settings.StrikeWindowHours)
 		if err != nil {
 			log.Error("failed to add strike", "error", err)
 			continue
 		}
 		metrics.QueueCleanerStrikes.WithLabelValues(string(appType), inst.Name).Inc()
 
-		log.Info("strike added", "title", record.Title, "reason", reason, "strikes", count, "max", effectiveMaxStrikes(reason, settings))
+		log.Info("strike added", "title", rep.Title, "reason", reason, "strikes", count, "max", effectiveMaxStrikes(reason, settings))
 
 		if count >= effectiveMaxStrikes(reason, settings) {
-			log.Warn("max strikes reached, removing", "title", record.Title, "download_id", record.DownloadID)
+			log.Warn("max strikes reached, removing", "title", rep.Title, "download_id", rep.DownloadID, "pack_size", len(pack.Records))
 			if obsoleteTagID > 0 {
-				if mid := record.TaggableMediaID(); mid > 0 {
+				if mid := rep.TaggableMediaID(); mid > 0 {
 					if err := client.TagMedia(ctx, apiVersion, string(appType), mid, obsoleteTagID); err != nil {
-						log.Warn("failed to tag media as obsolete", "title", record.Title, "error", err)
+						log.Warn("failed to tag media as obsolete", "title", rep.Title, "error", err)
 					}
 				}
 			}
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), shouldBlocklist(reason, settings)); err != nil {
-				log.Error("failed to remove struck item", "error", err)
+			if !deletePackFromQueue(ctx, log, client, apiVersion, pack, effectiveRemoveFromClient(settings), shouldBlocklist(reason, settings)) {
 				continue
 			}
-			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, reason+"_max_strikes"); err != nil {
-				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, rep.DownloadID, rep.Title, reason+"_max_strikes"); err != nil {
+				log.Warn("failed to log blocklist", "title", rep.Title, "error", err)
 			}
-			removed = append(removed, removal{Title: record.Title, MediaKey: record.MediaKey()})
+			removed = append(removed, removal{Title: rep.Title, MediaKey: rep.MediaKey()})
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
-			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
+			c.notifyRemoval(ctx, appType, inst.Name, rep.Title, reason+"_max_strikes")
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+				c.triggerReSearch(ctx, log, lurker, client, rep, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
 
 	// 3. Failed import cleanup
 	if settings.FailedImportRemove {
-		c.cleanFailedImports(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, searchBudget)
+		c.cleanFailedImports(ctx, log, appType, settings, inst, client, apiVersion, packs, searchBudget)
 	}
 
 	// 4. Seeding enforcement — remove completed torrents exceeding ratio/time limits
 	if settings.SeedingEnabled {
-		c.cleanSeeding(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
+		c.cleanSeeding(ctx, log, appType, settings, inst, client, apiVersion, packs)
 	}
 
 	// 4.5. Deletion detection — remove queue items whose media file was deleted externally
 	if settings.DeletionDetectionEnabled {
-		c.cleanDeletedMedia(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
+		c.cleanDeletedMedia(ctx, log, appType, settings, inst, client, apiVersion, packs, lurker, searchBudget)
 	}
 
 	// 4.6. Unmonitored cleanup — remove queue items for unmonitored media
 	if settings.UnmonitoredCleanupEnabled {
-		c.cleanUnmonitored(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
+		c.cleanUnmonitored(ctx, log, appType, settings, inst, client, apiVersion, packs, lurker, searchBudget)
 	}
 
 	// 4.8. Metadata mismatch detection — strike/remove items where download
 	// doesn't match the expected media (wrong series/movie/episode).
 	if settings.MismatchEnabled {
-		c.cleanMismatches(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
+		c.cleanMismatches(ctx, log, appType, settings, inst, client, apiVersion, packs, lurker, searchBudget)
 	}
 
 	// 4.7. Recheck paused torrents — verify integrity and auto-resume if complete
@@ -633,7 +703,7 @@ func isMismatchedRelease(record arrclient.QueueRecord) bool {
 }
 
 // cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
-func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, searchBudget *int) {
+func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, packs []Pack, searchBudget *int) {
 	// Parse user-configured patterns (empty = use built-in defaults).
 	var patterns []string
 	for _, p := range strings.Split(settings.FailedImportPatterns, ",") {
@@ -643,33 +713,34 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		}
 	}
 
-	for _, record := range records {
-		if !hasImportFailure(record, patterns) {
+	for _, pack := range packs {
+		if !pack.AnyHasImportFailure(patterns) {
 			continue
 		}
 
-		reason := importFailureReason(record)
+		failRec := pack.ImportFailureRecord(patterns)
+		rep := pack.Representative()
+		reason := importFailureReason(failRec)
 
 		if settings.DryRun {
-			log.Warn("[DRY-RUN] would remove failed import", "title", record.Title, "reason", reason, "download_id", record.DownloadID)
+			log.Warn("[DRY-RUN] would remove failed import", "title", rep.Title, "reason", reason, "download_id", rep.DownloadID, "pack_size", len(pack.Records))
 			continue
 		}
 
-		log.Warn("removing failed import", "title", record.Title, "reason", reason, "download_id", record.DownloadID)
+		log.Warn("removing failed import", "title", rep.Title, "reason", reason, "download_id", rep.DownloadID, "pack_size", len(pack.Records))
 
-		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), settings.FailedImportBlocklist); err != nil {
-			log.Error("failed to remove failed import", "error", err)
+		if !deletePackFromQueue(ctx, log, client, apiVersion, pack, effectiveRemoveFromClient(settings), settings.FailedImportBlocklist) {
 			continue
 		}
-		if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "failed_import: "+reason); err != nil {
-			log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+		if err := c.db.LogBlocklist(ctx, appType, inst.ID, rep.DownloadID, rep.Title, "failed_import: "+reason); err != nil {
+			log.Warn("failed to log blocklist", "title", rep.Title, "error", err)
 		}
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 		metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
-		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)
+		c.notifyRemoval(ctx, appType, inst.Name, rep.Title, "failed_import: "+reason)
 		if settings.SearchOnRemove {
 			if l := lurking.LurkerFor(appType); l != nil {
-				c.triggerReSearch(ctx, log, l, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+				c.triggerReSearch(ctx, log, l, client, rep, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
@@ -815,7 +886,7 @@ func (c *Cleaner) getDownloadClient(ctx context.Context, appType database.AppTyp
 
 // cleanSeeding checks completed torrent downloads against seeding rules and
 // removes items that have exceeded the configured ratio or seeding time.
-func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord) {
+func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, packs []Pack) {
 	torrentClient := c.getDownloadClient(ctx, appType)
 	if torrentClient == nil {
 		return
@@ -843,25 +914,26 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 		groups = nil // fall back to global settings only
 	}
 
-	for _, record := range records {
-		if record.Protocol != "torrent" {
+	for _, pack := range packs {
+		rep := pack.Representative()
+		if rep.Protocol != "torrent" {
 			continue
 		}
-		if record.DownloadID == "" {
+		if rep.DownloadID == "" {
 			continue
 		}
 		// Only look at completed downloads (imported or waiting for import).
-		if record.TrackedDownloadState != "imported" && record.TrackedDownloadState != "importPending" {
+		if !pack.AnyImportPendingOrImported() {
 			continue
 		}
 
-		item, ok := itemsByID[strings.ToLower(record.DownloadID)]
+		item, ok := itemsByID[strings.ToLower(rep.DownloadID)]
 		if !ok {
 			continue
 		}
 
 		// Skip private trackers if configured.
-		if settings.SeedingSkipPrivate && isPrivateTracker(record) {
+		if settings.SeedingSkipPrivate && isPrivateTracker(rep) {
 			continue
 		}
 
@@ -870,7 +942,7 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 
 		// If a group matches and has skip_removal, skip this item entirely.
 		if group != nil && group.SkipRemoval {
-			log.Debug("seeding group skip_removal", "title", record.Title, "group", group.Name)
+			log.Debug("seeding group skip_removal", "title", rep.Title, "group", group.Name)
 			continue
 		}
 
@@ -892,7 +964,7 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 
 		// Skip cross-seeded items: multiple torrents sharing the same content.
 		if settings.SkipCrossSeeds && isCrossSeeded(item, crossSeedCounts) {
-			log.Info("cross-seed detected, skipping removal", "title", record.Title, "path", item.SavePath)
+			log.Info("cross-seed detected, skipping removal", "title", rep.Title, "path", item.SavePath)
 			continue
 		}
 
@@ -900,16 +972,16 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			deleteFiles = false
 		}
 		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
-			log.Info("hardlinks detected, skipping file deletion", "title", record.Title, "path", item.SavePath)
+			log.Info("hardlinks detected, skipping file deletion", "title", rep.Title, "path", item.SavePath)
 			deleteFiles = false
 		}
 
 		// RecycleBin: move files to recycle folder instead of permanent deletion
 		if deleteFiles && settings.RecycleBinEnabled && settings.RecycleBinPath != "" && item.SavePath != "" {
 			if err := moveToRecycleBin(item.SavePath, settings.RecycleBinPath); err != nil {
-				log.Error("recycle bin move failed, falling back to deletion", "title", record.Title, "error", err)
+				log.Error("recycle bin move failed, falling back to deletion", "title", rep.Title, "error", err)
 			} else {
-				log.Info("moved to recycle bin", "title", record.Title, "source", item.SavePath, "dest", settings.RecycleBinPath)
+				log.Info("moved to recycle bin", "title", rep.Title, "source", item.SavePath, "dest", settings.RecycleBinPath)
 				deleteFiles = false
 			}
 		}
@@ -919,7 +991,7 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			groupName = group.Name
 		}
 		log.Info("seeding limit reached, removing",
-			"title", record.Title,
+			"title", rep.Title,
 			"ratio", item.Ratio,
 			"seeding_hours", float64(item.SeedingTime)/3600,
 			"max_ratio", maxRatio,
@@ -927,21 +999,22 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			"mode", seedingMode,
 			"group", groupName,
 			"delete_files", deleteFiles,
+			"pack_size", len(pack.Records),
 		)
 
 		if settings.DryRun {
-			log.Info("[DRY-RUN] would remove seeded torrent", "title", record.Title)
+			log.Info("[DRY-RUN] would remove seeded torrent", "title", rep.Title)
 			continue
 		}
 
-		// Remove from the torrent client directly.
+		// Remove from the torrent client directly (once per download, not per record).
 		if err := torrentClient.RemoveItem(ctx, item.ID, deleteFiles); err != nil {
-			log.Error("failed to remove seeded torrent", "title", record.Title, "error", err)
+			log.Error("failed to remove seeded torrent", "title", rep.Title, "error", err)
 			continue
 		}
 
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
-		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "seeding_limit_reached")
+		c.notifyRemoval(ctx, appType, inst.Name, rep.Title, "seeding_limit_reached")
 	}
 }
 
@@ -1067,37 +1140,30 @@ func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, i
 // cleanDeletedMedia removes queue items whose media file has been externally deleted.
 // Uses enriched queue data — the embedded media object's HasFile field tells us
 // whether the *arr instance still sees a file on disk for this media.
-func (c *Cleaner) cleanDeletedMedia(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, lurker lurking.ArrLurker, searchBudget *int) {
-	for _, record := range records {
-		// Only check items that have already been imported — these are the ones
-		// where the media file was present and may have been externally deleted.
-		if record.TrackedDownloadState != "imported" {
+func (c *Cleaner) cleanDeletedMedia(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, packs []Pack, lurker lurking.ArrLurker, searchBudget *int) {
+	for _, pack := range packs {
+		// For packs: only remove when ALL imported records have their file deleted.
+		// A single surviving episode means the download is still partially useful.
+		if !pack.AllFilesDeleted() {
 			continue
 		}
 
-		hasFile, ok := record.MediaHasFile()
-		if !ok {
-			continue // enriched data unavailable, skip
-		}
-		if hasFile {
-			continue // file still present, nothing to do
-		}
+		rep := pack.Representative()
 
 		if settings.DryRun {
-			log.Warn("[DRY-RUN] would remove (media file deleted)", "title", record.Title, "media_id", record.MediaID())
+			log.Warn("[DRY-RUN] would remove (media file deleted)", "title", rep.Title, "media_id", rep.MediaID(), "pack_size", len(pack.Records))
 			continue
 		}
 
 		log.Warn("media file deleted externally, removing queue item",
-			"title", record.Title, "media_id", record.MediaID())
-		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), false); err != nil {
-			log.Error("failed to remove deleted-media item", "title", record.Title, "error", err)
+			"title", rep.Title, "media_id", rep.MediaID(), "pack_size", len(pack.Records))
+		if !deletePackFromQueue(ctx, log, client, apiVersion, pack, effectiveRemoveFromClient(settings), false) {
 			continue
 		}
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
-		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "media_file_deleted")
+		c.notifyRemoval(ctx, appType, inst.Name, rep.Title, "media_file_deleted")
 		if settings.SearchOnRemove {
-			c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+			c.triggerReSearch(ctx, log, lurker, client, rep, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 		}
 	}
 }
@@ -1105,60 +1171,48 @@ func (c *Cleaner) cleanDeletedMedia(ctx context.Context, log *slog.Logger, appTy
 // cleanUnmonitored removes queue items for media that has been unmonitored.
 // Uses enriched queue data — the embedded media object's Monitored field tells us
 // whether the user still wants this media downloaded.
-func (c *Cleaner) cleanUnmonitored(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, lurker lurking.ArrLurker, searchBudget *int) {
-	for _, record := range records {
-		// Skip items that have already been imported — they completed successfully.
-		if record.TrackedDownloadState == "imported" {
+func (c *Cleaner) cleanUnmonitored(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, packs []Pack, lurker lurking.ArrLurker, searchBudget *int) {
+	for _, pack := range packs {
+		// For packs: only remove when ALL non-imported records are unmonitored.
+		// One monitored episode means the download is still wanted.
+		if !pack.AllUnmonitored() {
 			continue
 		}
 
-		monitored, ok := record.MediaMonitored()
-		if !ok {
-			continue // enriched data unavailable, skip
-		}
-		if monitored {
-			continue // still monitored, nothing to do
-		}
+		rep := pack.Representative()
 
 		if settings.DryRun {
-			log.Warn("[DRY-RUN] would remove (media unmonitored)", "title", record.Title, "media_id", record.MediaID())
+			log.Warn("[DRY-RUN] would remove (media unmonitored)", "title", rep.Title, "media_id", rep.MediaID(), "pack_size", len(pack.Records))
 			continue
 		}
 
 		log.Warn("media unmonitored, removing queue item",
-			"title", record.Title, "media_id", record.MediaID())
-		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), false); err != nil {
-			log.Error("failed to remove unmonitored item", "title", record.Title, "error", err)
+			"title", rep.Title, "media_id", rep.MediaID(), "pack_size", len(pack.Records))
+		if !deletePackFromQueue(ctx, log, client, apiVersion, pack, effectiveRemoveFromClient(settings), false) {
 			continue
 		}
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
-		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "media_unmonitored")
+		c.notifyRemoval(ctx, appType, inst.Name, rep.Title, "media_unmonitored")
 	}
 }
 
 // cleanMismatches detects and strikes queue items where the download doesn't
 // match the expected media (wrong series/movie/episode) based on *arr status messages.
 // Uses the strike system since mismatches can be transient during initial processing.
-func (c *Cleaner) cleanMismatches(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, lurker lurking.ArrLurker, searchBudget *int) {
-	for _, record := range records {
-		// Only check items in warning state with import pending/failed — that's where
-		// mismatch messages appear. Skip items that imported successfully.
-		if record.TrackedDownloadStatus != "warning" {
+func (c *Cleaner) cleanMismatches(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, packs []Pack, lurker lurking.ArrLurker, searchBudget *int) {
+	for _, pack := range packs {
+		if !pack.AnyMismatched() {
 			continue
 		}
-		if record.TrackedDownloadState != "importPending" && record.TrackedDownloadState != "importFailed" {
-			continue
-		}
-		if !isMismatchedRelease(record) {
-			continue
-		}
+
+		rep := pack.Representative()
 
 		if settings.DryRun {
-			log.Info("[DRY-RUN] would strike (metadata mismatch)", "title", record.Title, "download_id", record.DownloadID)
+			log.Info("[DRY-RUN] would strike (metadata mismatch)", "title", rep.Title, "download_id", rep.DownloadID, "pack_size", len(pack.Records))
 			continue
 		}
 
-		count, err := c.db.AddStrikeAndCount(ctx, appType, inst.ID, record.DownloadID, record.Title, "mismatch", settings.StrikeWindowHours)
+		count, err := c.db.AddStrikeAndCount(ctx, appType, inst.ID, rep.DownloadID, rep.Title, "mismatch", settings.StrikeWindowHours)
 		if err != nil {
 			log.Error("failed to add mismatch strike", "error", err)
 			continue
@@ -1166,22 +1220,21 @@ func (c *Cleaner) cleanMismatches(ctx context.Context, log *slog.Logger, appType
 		metrics.QueueCleanerStrikes.WithLabelValues(string(appType), inst.Name).Inc()
 
 		maxStrikes := effectiveMaxStrikes("mismatch", settings)
-		log.Info("mismatch strike added", "title", record.Title, "strikes", count, "max", maxStrikes)
+		log.Info("mismatch strike added", "title", rep.Title, "strikes", count, "max", maxStrikes)
 
 		if count >= maxStrikes {
-			log.Warn("metadata mismatch — max strikes reached, removing", "title", record.Title, "download_id", record.DownloadID)
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, effectiveRemoveFromClient(settings), shouldBlocklist("mismatch", settings)); err != nil {
-				log.Error("failed to remove mismatched item", "title", record.Title, "error", err)
+			log.Warn("metadata mismatch — max strikes reached, removing", "title", rep.Title, "download_id", rep.DownloadID, "pack_size", len(pack.Records))
+			if !deletePackFromQueue(ctx, log, client, apiVersion, pack, effectiveRemoveFromClient(settings), shouldBlocklist("mismatch", settings)) {
 				continue
 			}
-			if err := c.db.LogBlocklist(ctx, appType, inst.ID, record.DownloadID, record.Title, "mismatch"); err != nil {
-				log.Warn("failed to log blocklist", "title", record.Title, "error", err)
+			if err := c.db.LogBlocklist(ctx, appType, inst.ID, rep.DownloadID, rep.Title, "mismatch"); err != nil {
+				log.Warn("failed to log blocklist", "title", rep.Title, "error", err)
 			}
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
-			c.notifyRemoval(ctx, appType, inst.Name, record.Title, "mismatch")
+			c.notifyRemoval(ctx, appType, inst.Name, rep.Title, "mismatch")
 			if settings.SearchOnRemove {
-				c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+				c.triggerReSearch(ctx, log, lurker, client, rep, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
 			}
 		}
 	}
@@ -1641,6 +1694,27 @@ func shouldBlocklist(reason string, settings *database.QueueCleanerSettings) boo
 		return settings.BlocklistMismatch
 	}
 	return settings.BlocklistOnRemove
+}
+
+// deletePackFromQueue removes all queue records in a pack from the *arr queue.
+// The first record is deleted with the full removeFromClient/blocklist flags;
+// subsequent records are deleted with removeFromClient=false since the download
+// is already gone. Returns true if at least the first deletion succeeded.
+func deletePackFromQueue(ctx context.Context, log *slog.Logger, client *arrclient.Client, apiVersion string, pack Pack, removeFromClient, blocklist bool) bool {
+	for i, r := range pack.Records {
+		// Only the first deletion needs to remove the download from the client.
+		rfc := removeFromClient && i == 0
+		bl := blocklist
+		if err := client.DeleteQueueItem(ctx, apiVersion, r.ID, rfc, bl); err != nil {
+			if i == 0 {
+				log.Error("failed to remove queue item", "queue_id", r.ID, "error", err)
+				return false
+			}
+			// Subsequent failures are non-fatal — the download is already removed.
+			log.Debug("failed to remove pack member from queue", "queue_id", r.ID, "error", err)
+		}
+	}
+	return true
 }
 
 // effectiveRemoveFromClient returns false when KeepArchives is enabled,

@@ -479,7 +479,7 @@ func TestCleanDeletedMedia_RemovesImportedWithMissingFile(t *testing.T) {
 		},
 	}
 
-	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if !deleted {
 		t.Error("expected queue item to be deleted for media with missing file")
 	}
@@ -516,7 +516,7 @@ func TestCleanDeletedMedia_SkipsWhenFilePresent(t *testing.T) {
 		},
 	}
 
-	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if deleted {
 		t.Error("should not delete queue item when media file is present")
 	}
@@ -553,7 +553,7 @@ func TestCleanDeletedMedia_SkipsNonImported(t *testing.T) {
 		},
 	}
 
-	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if deleted {
 		t.Error("should not delete queue item that is still downloading")
 	}
@@ -592,7 +592,7 @@ func TestCleanDeletedMedia_DryRun(t *testing.T) {
 		},
 	}
 
-	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if deleted {
 		t.Error("dry-run should not actually delete")
 	}
@@ -630,7 +630,7 @@ func TestCleanUnmonitored_RemovesUnmonitoredDownload(t *testing.T) {
 		},
 	}
 
-	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if !deleted {
 		t.Error("expected queue item to be deleted for unmonitored media")
 	}
@@ -667,7 +667,7 @@ func TestCleanUnmonitored_SkipsMonitored(t *testing.T) {
 		},
 	}
 
-	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if deleted {
 		t.Error("should not delete queue item for monitored media")
 	}
@@ -704,7 +704,7 @@ func TestCleanUnmonitored_SkipsImported(t *testing.T) {
 		},
 	}
 
-	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if deleted {
 		t.Error("should not delete imported items even if media is unmonitored")
 	}
@@ -743,7 +743,7 @@ func TestCleanUnmonitored_DryRun(t *testing.T) {
 		},
 	}
 
-	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", GroupByDownloadID(records), nil, nil)
 	if deleted {
 		t.Error("dry-run should not actually delete")
 	}
