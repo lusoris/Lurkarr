@@ -151,16 +151,33 @@ func provideScheduler(lc fx.Lifecycle, db *database.DB, logger *logging.Logger, 
 	return s, nil
 }
 
-// provideServerConfig builds the server configuration from app config.
-func provideServerConfig(cfg *config.Config) server.Config {
+// provideServerConfig builds the server configuration from app config and
+// persisted CSRF key. If no CSRF_KEY env var is set, the key is loaded from
+// the database. If absent there too, a new key is generated and stored.
+func provideServerConfig(cfg *config.Config, db *database.DB) server.Config {
 	csrfKey := []byte(cfg.CSRFKey)
 	if len(csrfKey) < 32 {
-		csrfKey = make([]byte, 32)
-		if _, err := rand.Read(csrfKey); err != nil {
-			slog.Error("failed to generate CSRF key", "error", err)
-			os.Exit(1)
+		// Try loading persisted key from database.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		stored, err := db.GetCSRFKey(ctx)
+		if err == nil && len(stored) >= 32 {
+			csrfKey = []byte(stored)
+			slog.Info("loaded persisted CSRF key from database")
+		} else {
+			// Generate a new key and persist it.
+			csrfKey = make([]byte, 32)
+			if _, err := rand.Read(csrfKey); err != nil {
+				slog.Error("failed to generate CSRF key", "error", err)
+				os.Exit(1)
+			}
+			if err := db.SetCSRFKey(ctx, string(csrfKey)); err != nil {
+				slog.Warn("failed to persist CSRF key to database", "error", err)
+			} else {
+				slog.Info("generated and persisted new CSRF key to database")
+			}
 		}
-		slog.Warn("no CSRF_KEY set, generated random key (sessions will not survive restarts)")
 	}
 	return server.Config{
 		Addr:             cfg.ListenAddr,
@@ -193,7 +210,8 @@ func provideServerConfig(cfg *config.Config) server.Config {
 
 // startServer creates the HTTP server and manages its lifecycle.
 func startServer(lc fx.Lifecycle, shutdowner fx.Shutdowner, cfg server.Config, db *database.DB, sched *scheduler.Scheduler, notifMgr *notifications.Manager) {
-	srv := server.New(cfg, db, sched, notifMgr)
+	ctx, cancel := context.WithCancel(context.Background())
+	srv := server.New(ctx, cfg, db, sched, notifMgr)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {
@@ -205,6 +223,7 @@ func startServer(lc fx.Lifecycle, shutdowner fx.Shutdowner, cfg server.Config, d
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			cancel()
 			return srv.Shutdown(ctx)
 		},
 	})

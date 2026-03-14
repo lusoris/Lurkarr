@@ -816,3 +816,26 @@ func (db *DB) AutoResetExpiredStates(ctx context.Context, resetHours int) (int64
 	}
 	return ct.RowsAffected(), nil
 }
+
+// --- CSRF Key ---
+
+// GetCSRFKey returns the persisted CSRF key, or empty string if not set.
+func (db *DB) GetCSRFKey(ctx context.Context) (string, error) {
+	var key string
+	err := db.Pool.QueryRow(ctx,
+		`SELECT csrf_key FROM general_settings WHERE id = 1`,
+	).Scan(&key)
+	if err != nil {
+		return "", err
+	}
+	return key, nil
+}
+
+// SetCSRFKey persists a CSRF key in general_settings.
+func (db *DB) SetCSRFKey(ctx context.Context, key string) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE general_settings SET csrf_key = $1 WHERE id = 1`,
+		key,
+	)
+	return err
+}
