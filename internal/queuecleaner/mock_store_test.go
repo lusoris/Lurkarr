@@ -319,3 +319,18 @@ func (mr *MockStoreMockRecorder) IsSearchFailureLimitReached(ctx, appType, insta
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSearchFailureLimitReached", reflect.TypeOf((*MockStore)(nil).IsSearchFailureLimitReached), ctx, appType, instanceID, mediaID, maxFailures)
 }
+
+// ListSeedingRuleGroups mocks base method.
+func (m *MockStore) ListSeedingRuleGroups(ctx context.Context) ([]database.SeedingRuleGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSeedingRuleGroups", ctx)
+	ret0, _ := ret[0].([]database.SeedingRuleGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSeedingRuleGroups indicates an expected call of ListSeedingRuleGroups.
+func (mr *MockStoreMockRecorder) ListSeedingRuleGroups(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSeedingRuleGroups", reflect.TypeOf((*MockStore)(nil).ListSeedingRuleGroups), ctx)
+}

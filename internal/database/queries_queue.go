@@ -416,3 +416,63 @@ func (db *DB) UpdateDownloadClientSettings(ctx context.Context, s *DownloadClien
 	}
 	return nil
 }
+
+// --- Seeding Rule Groups ---
+
+func (db *DB) ListSeedingRuleGroups(ctx context.Context) ([]SeedingRuleGroup, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, name, priority, match_type, match_pattern, max_ratio, max_hours,
+		        seeding_mode, skip_removal, delete_files, created_at, updated_at
+		 FROM seeding_rule_groups ORDER BY priority DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list seeding rule groups: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []SeedingRuleGroup
+	for rows.Next() {
+		var g SeedingRuleGroup
+		if err := rows.Scan(&g.ID, &g.Name, &g.Priority, &g.MatchType, &g.MatchPattern,
+			&g.MaxRatio, &g.MaxHours, &g.SeedingMode, &g.SkipRemoval, &g.DeleteFiles,
+			&g.CreatedAt, &g.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan seeding rule group: %w", err)
+		}
+		groups = append(groups, g)
+	}
+	return groups, nil
+}
+
+func (db *DB) CreateSeedingRuleGroup(ctx context.Context, g *SeedingRuleGroup) (*SeedingRuleGroup, error) {
+	err := db.Pool.QueryRow(ctx,
+		`INSERT INTO seeding_rule_groups (name, priority, match_type, match_pattern, max_ratio, max_hours, seeding_mode, skip_removal, delete_files)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, created_at, updated_at`,
+		g.Name, g.Priority, g.MatchType, g.MatchPattern, g.MaxRatio, g.MaxHours, g.SeedingMode, g.SkipRemoval, g.DeleteFiles,
+	).Scan(&g.ID, &g.CreatedAt, &g.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("create seeding rule group: %w", err)
+	}
+	return g, nil
+}
+
+func (db *DB) UpdateSeedingRuleGroup(ctx context.Context, g *SeedingRuleGroup) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE seeding_rule_groups SET
+		        name = $2, priority = $3, match_type = $4, match_pattern = $5,
+		        max_ratio = $6, max_hours = $7, seeding_mode = $8, skip_removal = $9, delete_files = $10,
+		        updated_at = NOW()
+		 WHERE id = $1`,
+		g.ID, g.Name, g.Priority, g.MatchType, g.MatchPattern, g.MaxRatio, g.MaxHours, g.SeedingMode, g.SkipRemoval, g.DeleteFiles)
+	if err != nil {
+		return fmt.Errorf("update seeding rule group: %w", err)
+	}
+	return nil
+}
+
+func (db *DB) DeleteSeedingRuleGroup(ctx context.Context, id int) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM seeding_rule_groups WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete seeding rule group: %w", err)
+	}
+	return nil
+}

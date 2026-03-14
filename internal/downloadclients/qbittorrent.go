@@ -2,6 +2,7 @@ package downloadclient
 
 import (
 	"context"
+	"strings"
 
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
 )
@@ -23,6 +24,14 @@ func (a *QBittorrentAdapter) GetItems(ctx context.Context) ([]DownloadItem, erro
 	}
 	items := make([]DownloadItem, 0, len(torrents))
 	for _, t := range torrents {
+		var tags []string
+		if t.Tags != "" {
+			for _, tag := range strings.Split(t.Tags, ",") {
+				if s := strings.TrimSpace(tag); s != "" {
+					tags = append(tags, s)
+				}
+			}
+		}
 		items = append(items, DownloadItem{
 			ID:            t.Hash,
 			Name:          t.Name,
@@ -39,6 +48,8 @@ func (a *QBittorrentAdapter) GetItems(ctx context.Context) ([]DownloadItem, erro
 			SeedingTime:   t.TimeActive,
 			CompletedAt:   t.CompletionOn,
 			AddedAt:       t.AddedOn,
+			Tags:          tags,
+			TrackerURL:    t.Tracker,
 		})
 	}
 	return items, nil

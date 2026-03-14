@@ -385,6 +385,10 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
 	protected.HandleFunc("GET /api/queue/download-client/{app}", queueH.HandleGetDownloadClientSettings)
 	protected.HandleFunc("PUT /api/queue/download-client/{app}", queueH.HandleUpdateDownloadClientSettings)
+	protected.HandleFunc("GET /api/queue/seeding-groups", queueH.HandleListSeedingRuleGroups)
+	protected.HandleFunc("POST /api/queue/seeding-groups", queueH.HandleCreateSeedingRuleGroup)
+	protected.HandleFunc("PUT /api/queue/seeding-groups/{id}", queueH.HandleUpdateSeedingRuleGroup)
+	protected.HandleFunc("DELETE /api/queue/seeding-groups/{id}", queueH.HandleDeleteSeedingRuleGroup)
 
 	// Blocklist Sources & Rules
 	protected.HandleFunc("GET /api/blocklist/sources", blocklistH.HandleListSources)

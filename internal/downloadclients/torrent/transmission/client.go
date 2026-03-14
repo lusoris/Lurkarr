@@ -141,8 +141,12 @@ type Torrent struct {
 	DownloadDir   string  `json:"downloadDir"`
 	SizeWhenDone  int64   `json:"sizeWhenDone"`
 	LeftUntilDone int64   `json:"leftUntilDone"`
-	Error         int     `json:"error"`
-	ErrorString   string  `json:"errorString"`
+	Error         int      `json:"error"`
+	ErrorString   string   `json:"errorString"`
+	Labels        []string `json:"labels"`
+	Trackers      []struct {
+		Announce string `json:"announce"`
+	} `json:"trackers"`
 }
 
 // Transmission torrent status codes.
@@ -169,7 +173,7 @@ var defaultFields = []string{
 	"id", "name", "hashString", "status", "totalSize", "percentDone",
 	"rateDownload", "rateUpload", "uploadRatio", "eta", "addedDate",
 	"doneDate", "downloadDir", "sizeWhenDone", "leftUntilDone",
-	"error", "errorString",
+	"error", "errorString", "labels", "trackers",
 }
 
 // GetTorrents returns all torrents with default fields.

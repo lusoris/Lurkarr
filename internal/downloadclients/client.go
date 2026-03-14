@@ -6,21 +6,23 @@ import "context"
 
 // DownloadItem represents a generic download item across all client types.
 type DownloadItem struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Status        string  `json:"status"`
-	TotalSize     int64   `json:"total_size"`
-	RemainingSize int64   `json:"remaining_size"`
-	Progress      float64 `json:"progress"`       // 0.0 to 1.0
-	DownloadSpeed int64   `json:"download_speed"` // bytes/sec
-	UploadSpeed   int64   `json:"upload_speed"`   // bytes/sec (torrent only)
-	ETA           int64   `json:"eta"`            // seconds
-	Category      string  `json:"category"`
-	SavePath      string  `json:"save_path"`
-	Ratio         float64 `json:"ratio"`        // upload/download ratio (torrent only)
-	SeedingTime   int64   `json:"seeding_time"` // seconds spent seeding (torrent only)
-	CompletedAt   int64   `json:"completed_at"` // unix timestamp of completion
-	AddedAt       int64   `json:"added_at"`     // unix timestamp when added
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Status        string   `json:"status"`
+	TotalSize     int64    `json:"total_size"`
+	RemainingSize int64    `json:"remaining_size"`
+	Progress      float64  `json:"progress"`       // 0.0 to 1.0
+	DownloadSpeed int64    `json:"download_speed"` // bytes/sec
+	UploadSpeed   int64    `json:"upload_speed"`   // bytes/sec (torrent only)
+	ETA           int64    `json:"eta"`            // seconds
+	Category      string   `json:"category"`
+	SavePath      string   `json:"save_path"`
+	Ratio         float64  `json:"ratio"`        // upload/download ratio (torrent only)
+	SeedingTime   int64    `json:"seeding_time"` // seconds spent seeding (torrent only)
+	CompletedAt   int64    `json:"completed_at"` // unix timestamp of completion
+	AddedAt       int64    `json:"added_at"`     // unix timestamp when added
+	Tags          []string `json:"tags"`          // qBit: parsed from comma-sep; Transmission: labels
+	TrackerURL    string   `json:"tracker_url"`   // primary tracker URL/domain
 }
 
 // ClientStatus represents the overall status of a download client.

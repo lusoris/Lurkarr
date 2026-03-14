@@ -419,6 +419,23 @@ type ScoringProfile struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
+// SeedingRuleGroup defines a per-group seeding limit override.
+// Torrents matching the group's criteria use its limits instead of the global settings.
+type SeedingRuleGroup struct {
+	ID           int       `json:"id"`
+	Name         string    `json:"name"`
+	Priority     int       `json:"priority"`
+	MatchType    string    `json:"match_type"`    // "tracker", "category", "tag"
+	MatchPattern string    `json:"match_pattern"`
+	MaxRatio     float64   `json:"max_ratio"`
+	MaxHours     int       `json:"max_hours"`
+	SeedingMode  string    `json:"seeding_mode"` // "and" or "or"
+	SkipRemoval  bool      `json:"skip_removal"`
+	DeleteFiles  bool      `json:"delete_files"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 // BlocklistLog records blocklisted downloads.
 type BlocklistLog struct {
 	ID            int64     `json:"id"`

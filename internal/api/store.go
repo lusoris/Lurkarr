@@ -67,6 +67,12 @@ type Store interface {
 	GetStrikeLog(ctx context.Context, appType database.AppType, limit int) ([]database.QueueStrike, error)
 	GetAutoImportLog(ctx context.Context, appType database.AppType, limit int) ([]database.AutoImportLog, error)
 
+	// Seeding Rule Groups
+	ListSeedingRuleGroups(ctx context.Context) ([]database.SeedingRuleGroup, error)
+	CreateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) (*database.SeedingRuleGroup, error)
+	UpdateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) error
+	DeleteSeedingRuleGroup(ctx context.Context, id int) error
+
 	// Blocklist Sources & Rules
 	ListBlocklistSources(ctx context.Context) ([]database.BlocklistSource, error)
 	GetBlocklistSource(ctx context.Context, id uuid.UUID) (*database.BlocklistSource, error)

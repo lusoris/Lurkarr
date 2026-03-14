@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/lusoris/lurkarr/internal/database"
 )
@@ -210,4 +211,70 @@ func (h *QueueHandler) HandleUpdateDownloadClientSettings(w http.ResponseWriter,
 
 	s.Password = s.MaskedPassword()
 	writeJSON(w, http.StatusOK, s)
+}
+
+// HandleListSeedingRuleGroups handles GET /api/queue/seeding-groups.
+func (h *QueueHandler) HandleListSeedingRuleGroups(w http.ResponseWriter, r *http.Request) {
+	groups, err := h.DB.ListSeedingRuleGroups(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list seeding rule groups"))
+		return
+	}
+	if groups == nil {
+		groups = []database.SeedingRuleGroup{}
+	}
+	writeJSON(w, http.StatusOK, groups)
+}
+
+// HandleCreateSeedingRuleGroup handles POST /api/queue/seeding-groups.
+func (h *QueueHandler) HandleCreateSeedingRuleGroup(w http.ResponseWriter, r *http.Request) {
+	limitBody(w, r)
+	var g database.SeedingRuleGroup
+	if err := json.NewDecoder(r.Body).Decode(&g); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+		return
+	}
+	created, err := h.DB.CreateSeedingRuleGroup(r.Context(), &g)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create seeding rule group"))
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
+}
+
+// HandleUpdateSeedingRuleGroup handles PUT /api/queue/seeding-groups/{id}.
+func (h *QueueHandler) HandleUpdateSeedingRuleGroup(w http.ResponseWriter, r *http.Request) {
+	limitBody(w, r)
+	var g database.SeedingRuleGroup
+	if err := json.NewDecoder(r.Body).Decode(&g); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group id"))
+		return
+	}
+	g.ID = id
+	if err := h.DB.UpdateSeedingRuleGroup(r.Context(), &g); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to update seeding rule group"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// HandleDeleteSeedingRuleGroup handles DELETE /api/queue/seeding-groups/{id}.
+func (h *QueueHandler) HandleDeleteSeedingRuleGroup(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group id"))
+		return
+	}
+	if err := h.DB.DeleteSeedingRuleGroup(r.Context(), id); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to delete seeding rule group"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

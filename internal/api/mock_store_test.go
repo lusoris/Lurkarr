@@ -1449,3 +1449,61 @@ func (mr *MockStoreMockRecorder) UserCount(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserCount", reflect.TypeOf((*MockStore)(nil).UserCount), ctx)
 }
+
+// ListSeedingRuleGroups mocks base method.
+func (m *MockStore) ListSeedingRuleGroups(ctx context.Context) ([]database.SeedingRuleGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSeedingRuleGroups", ctx)
+	ret0, _ := ret[0].([]database.SeedingRuleGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSeedingRuleGroups indicates an expected call of ListSeedingRuleGroups.
+func (mr *MockStoreMockRecorder) ListSeedingRuleGroups(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSeedingRuleGroups", reflect.TypeOf((*MockStore)(nil).ListSeedingRuleGroups), ctx)
+}
+
+// CreateSeedingRuleGroup mocks base method.
+func (m *MockStore) CreateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) (*database.SeedingRuleGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSeedingRuleGroup", ctx, g)
+	ret0, _ := ret[0].(*database.SeedingRuleGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSeedingRuleGroup indicates an expected call of CreateSeedingRuleGroup.
+func (mr *MockStoreMockRecorder) CreateSeedingRuleGroup(ctx, g any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).CreateSeedingRuleGroup), ctx, g)
+}
+
+// UpdateSeedingRuleGroup mocks base method.
+func (m *MockStore) UpdateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSeedingRuleGroup", ctx, g)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateSeedingRuleGroup indicates an expected call of UpdateSeedingRuleGroup.
+func (mr *MockStoreMockRecorder) UpdateSeedingRuleGroup(ctx, g any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).UpdateSeedingRuleGroup), ctx, g)
+}
+
+// DeleteSeedingRuleGroup mocks base method.
+func (m *MockStore) DeleteSeedingRuleGroup(ctx context.Context, id int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSeedingRuleGroup", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSeedingRuleGroup indicates an expected call of DeleteSeedingRuleGroup.
+func (mr *MockStoreMockRecorder) DeleteSeedingRuleGroup(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).DeleteSeedingRuleGroup), ctx, id)
+}

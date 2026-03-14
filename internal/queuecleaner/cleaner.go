@@ -49,6 +49,7 @@ type Store interface {
 	RecordSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
 	ClearSearchFailure(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
 	IsSearchFailureLimitReached(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, maxFailures int) (bool, error)
+	ListSeedingRuleGroups(ctx context.Context) ([]database.SeedingRuleGroup, error)
 }
 
 // removal tracks a removed queue item with both its title and media key for
@@ -835,6 +836,13 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 	// Build cross-seed map if enabled: count items sharing the same save path & size.
 	crossSeedCounts := countCrossSeeds(items)
 
+	// Load seeding rule groups (priority-sorted, first match wins).
+	groups, err := c.db.ListSeedingRuleGroups(ctx)
+	if err != nil {
+		log.Error("failed to load seeding rule groups", "error", err)
+		groups = nil // fall back to global settings only
+	}
+
 	for _, record := range records {
 		if record.Protocol != "torrent" {
 			continue
@@ -857,7 +865,28 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			continue
 		}
 
-		if !c.seedingLimitReached(settings, item) {
+		// Find matching seeding rule group for this item.
+		group := matchSeedingGroup(item, groups)
+
+		// If a group matches and has skip_removal, skip this item entirely.
+		if group != nil && group.SkipRemoval {
+			log.Debug("seeding group skip_removal", "title", record.Title, "group", group.Name)
+			continue
+		}
+
+		// Determine limits: use group overrides or global settings.
+		maxRatio := settings.SeedingMaxRatio
+		maxHours := settings.SeedingMaxHours
+		seedingMode := settings.SeedingMode
+		deleteFiles := settings.SeedingDeleteFiles
+		if group != nil {
+			maxRatio = group.MaxRatio
+			maxHours = group.MaxHours
+			seedingMode = group.SeedingMode
+			deleteFiles = group.DeleteFiles
+		}
+
+		if !seedingLimitReachedEx(maxRatio, maxHours, seedingMode, item) {
 			continue
 		}
 
@@ -867,7 +896,6 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			continue
 		}
 
-		deleteFiles := settings.SeedingDeleteFiles
 		if deleteFiles && settings.KeepArchives {
 			deleteFiles = false
 		}
@@ -886,13 +914,18 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			}
 		}
 
+		groupName := "global"
+		if group != nil {
+			groupName = group.Name
+		}
 		log.Info("seeding limit reached, removing",
 			"title", record.Title,
 			"ratio", item.Ratio,
 			"seeding_hours", float64(item.SeedingTime)/3600,
-			"max_ratio", settings.SeedingMaxRatio,
-			"max_hours", settings.SeedingMaxHours,
-			"mode", settings.SeedingMode,
+			"max_ratio", maxRatio,
+			"max_hours", maxHours,
+			"mode", seedingMode,
+			"group", groupName,
 			"delete_files", deleteFiles,
 		)
 
@@ -910,6 +943,53 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "seeding_limit_reached")
 	}
+}
+
+// matchSeedingGroup finds the first matching seeding rule group for a download item.
+// Groups are pre-sorted by priority DESC so first match wins. Returns nil if no match.
+func matchSeedingGroup(item downloadclient.DownloadItem, groups []database.SeedingRuleGroup) *database.SeedingRuleGroup {
+	for i := range groups {
+		g := &groups[i]
+		switch g.MatchType {
+		case "tracker":
+			if g.MatchPattern != "" && item.TrackerURL != "" &&
+				strings.Contains(strings.ToLower(item.TrackerURL), strings.ToLower(g.MatchPattern)) {
+				return g
+			}
+		case "category":
+			if strings.EqualFold(item.Category, g.MatchPattern) {
+				return g
+			}
+		case "tag":
+			for _, tag := range item.Tags {
+				if strings.EqualFold(tag, g.MatchPattern) {
+					return g
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// seedingLimitReachedEx evaluates whether a torrent has exceeded the given
+// seeding limits. Extracted to support both global and per-group limits.
+func seedingLimitReachedEx(maxRatio float64, maxHours int, mode string, item downloadclient.DownloadItem) bool {
+	ratioMet := maxRatio > 0 && item.Ratio >= maxRatio
+	timeMet := maxHours > 0 && item.SeedingTime >= int64(maxHours)*3600
+
+	if maxRatio <= 0 && maxHours <= 0 {
+		return false
+	}
+	if maxRatio <= 0 {
+		return timeMet
+	}
+	if maxHours <= 0 {
+		return ratioMet
+	}
+	if mode == "and" {
+		return ratioMet && timeMet
+	}
+	return ratioMet || timeMet
 }
 
 // seedingLimitReached evaluates whether a torrent has exceeded the configured
@@ -981,26 +1061,7 @@ func isPausedStatus(status string) bool {
 }
 
 func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, item downloadclient.DownloadItem) bool {
-	ratioMet := settings.SeedingMaxRatio > 0 && item.Ratio >= settings.SeedingMaxRatio
-	timeMet := settings.SeedingMaxHours > 0 && item.SeedingTime >= int64(settings.SeedingMaxHours)*3600
-
-	// If neither limit is configured, nothing to enforce.
-	if settings.SeedingMaxRatio <= 0 && settings.SeedingMaxHours <= 0 {
-		return false
-	}
-
-	// If only one limit is configured, use that one.
-	if settings.SeedingMaxRatio <= 0 {
-		return timeMet
-	}
-	if settings.SeedingMaxHours <= 0 {
-		return ratioMet
-	}
-
-	if settings.SeedingMode == "and" {
-		return ratioMet && timeMet
-	}
-	return ratioMet || timeMet // "or" mode (default)
+	return seedingLimitReachedEx(settings.SeedingMaxRatio, settings.SeedingMaxHours, settings.SeedingMode, item)
 }
 
 // cleanDeletedMedia removes queue items whose media file has been externally deleted.

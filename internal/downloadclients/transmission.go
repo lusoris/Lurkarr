@@ -29,6 +29,10 @@ func (a *TransmissionAdapter) GetItems(ctx context.Context) ([]DownloadItem, err
 		if t.DoneDate > 0 {
 			seedingTime = time.Now().Unix() - t.DoneDate
 		}
+		var trackerURL string
+		if len(t.Trackers) > 0 {
+			trackerURL = t.Trackers[0].Announce
+		}
 		items = append(items, DownloadItem{
 			ID:            strconv.Itoa(t.ID),
 			Name:          t.Name,
@@ -44,6 +48,8 @@ func (a *TransmissionAdapter) GetItems(ctx context.Context) ([]DownloadItem, err
 			SeedingTime:   seedingTime,
 			CompletedAt:   t.DoneDate,
 			AddedAt:       t.AddedDate,
+			Tags:          t.Labels,
+			TrackerURL:    trackerURL,
 		})
 	}
 	return items, nil

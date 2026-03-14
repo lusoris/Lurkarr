@@ -38,6 +38,7 @@ func (a *DelugeAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) {
 			Ratio:         t.Ratio,
 			SeedingTime:   t.SeedingTime,
 			AddedAt:       int64(t.TimeAdded),
+			TrackerURL:    t.TrackerHost,
 		})
 	}
 	return items, nil

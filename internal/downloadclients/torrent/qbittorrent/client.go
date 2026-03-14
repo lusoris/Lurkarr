@@ -211,6 +211,7 @@ type Torrent struct {
 	Tracker       string  `json:"tracker"`
 	TotalSize     int64   `json:"total_size"`
 	ETA           int64   `json:"eta"`
+	Tags          string  `json:"tags"`
 }
 
 // TransferInfo represents global transfer information.

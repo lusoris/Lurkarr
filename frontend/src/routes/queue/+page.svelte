@@ -117,6 +117,19 @@
 		created_at: string;
 	}
 
+	interface SeedingRuleGroup {
+		id: number;
+		name: string;
+		priority: number;
+		match_type: string;
+		match_pattern: string;
+		max_ratio: number;
+		max_hours: number;
+		seeding_mode: string;
+		skip_removal: boolean;
+		delete_files: boolean;
+	}
+
 	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports';
 
 	let activeTab = $state<Tab>('cleaner');
@@ -242,7 +255,62 @@
 	$effect(() => {
 		if (!sourcesLoaded) loadSources();
 		if (!rulesLoaded) loadRules();
+		if (!seedingGroupsLoaded) loadSeedingGroups();
 	});
+
+	// --- Seeding Rule Groups ---
+	let seedingGroups = $state<SeedingRuleGroup[]>([]);
+	let seedingGroupsLoaded = $state(false);
+	let showAddGroup = $state(false);
+	let editingGroup = $state<SeedingRuleGroup | null>(null);
+	let savingGroup = $state(false);
+	let confirmDeleteGroup = $state<number | null>(null);
+	let newGroup = $state<Omit<SeedingRuleGroup, 'id'>>({
+		name: '', priority: 0, match_type: 'tracker', match_pattern: '',
+		max_ratio: 0, max_hours: 0, seeding_mode: 'or', skip_removal: false, delete_files: false
+	});
+
+	async function loadSeedingGroups() {
+		try {
+			seedingGroups = await api.get<SeedingRuleGroup[]>('/queue/seeding-groups');
+		} catch { seedingGroups = []; }
+		seedingGroupsLoaded = true;
+	}
+
+	async function createSeedingGroup() {
+		savingGroup = true;
+		try {
+			await api.post('/queue/seeding-groups', newGroup);
+			toasts.success('Seeding group created');
+			newGroup = { name: '', priority: 0, match_type: 'tracker', match_pattern: '', max_ratio: 0, max_hours: 0, seeding_mode: 'or', skip_removal: false, delete_files: false };
+			showAddGroup = false;
+			await loadSeedingGroups();
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to create group');
+		}
+		savingGroup = false;
+	}
+
+	async function updateSeedingGroup(g: SeedingRuleGroup) {
+		try {
+			await api.put(`/queue/seeding-groups/${g.id}`, g);
+			toasts.success('Seeding group updated');
+			editingGroup = null;
+			await loadSeedingGroups();
+		} catch {
+			toasts.error('Failed to update group');
+		}
+	}
+
+	async function deleteSeedingGroup(id: number) {
+		try {
+			await api.del(`/queue/seeding-groups/${id}`);
+			toasts.success('Seeding group deleted');
+			await loadSeedingGroups();
+		} catch {
+			toasts.error('Failed to delete group');
+		}
+	}
 
 	async function loadCleaner(app: string) {
 		try {
@@ -497,6 +565,112 @@
 						</div>
 					{/if}
 				</Card>
+
+				{#if settings.seeding_enabled}
+				<Card>
+					<div class="flex items-center justify-between mb-3">
+						<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Seeding Rule Groups</h3>
+						<Button size="sm" onclick={() => (showAddGroup = true)}>Add Group</Button>
+					</div>
+					<p class="text-xs text-muted-foreground mb-3">Override seeding limits per tracker, category, or tag. First match wins (highest priority). Items not matching any group use the global settings above.</p>
+
+					{#if showAddGroup}
+						<div class="border border-border rounded-lg p-3 space-y-2 mb-3">
+							<Input bind:value={newGroup.name} label="Name" />
+							<div class="grid grid-cols-2 gap-3">
+								<Select bind:value={newGroup.match_type} label="Match Type">
+									<option value="tracker">Tracker (domain contains)</option>
+									<option value="category">Category (exact)</option>
+									<option value="tag">Tag (exact)</option>
+								</Select>
+								<Input bind:value={newGroup.match_pattern} label="Pattern" />
+							</div>
+							<Input bind:value={newGroup.priority} type="number" label="Priority" hint="Higher = checked first" />
+							<div class="grid grid-cols-2 gap-3">
+								<Input bind:value={newGroup.max_ratio} type="number" label="Max Ratio" hint="0 = disabled" />
+								<Input bind:value={newGroup.max_hours} type="number" label="Max Hours" hint="0 = disabled" />
+							</div>
+							<Select bind:value={newGroup.seeding_mode} label="Mode">
+								<option value="or">Either (OR)</option>
+								<option value="and">Both (AND)</option>
+							</Select>
+							<div class="space-y-2">
+								<Toggle bind:checked={newGroup.skip_removal} label="Skip Removal" hint="Never remove torrents matching this group" />
+								<Toggle bind:checked={newGroup.delete_files} label="Delete Files" />
+							</div>
+							<div class="flex gap-2">
+								<Button size="sm" onclick={createSeedingGroup} disabled={savingGroup}>Create</Button>
+								<Button size="sm" variant="ghost" onclick={() => (showAddGroup = false)}>Cancel</Button>
+							</div>
+						</div>
+					{/if}
+
+					{#each seedingGroups as group (group.id)}
+						{#if editingGroup?.id === group.id}
+							<div class="border border-border rounded-lg p-3 space-y-2 mb-2">
+								<Input bind:value={editingGroup.name} label="Name" />
+								<div class="grid grid-cols-2 gap-3">
+									<Select bind:value={editingGroup.match_type} label="Match Type">
+										<option value="tracker">Tracker (domain contains)</option>
+										<option value="category">Category (exact)</option>
+										<option value="tag">Tag (exact)</option>
+									</Select>
+									<Input bind:value={editingGroup.match_pattern} label="Pattern" />
+								</div>
+								<Input bind:value={editingGroup.priority} type="number" label="Priority" />
+								<div class="grid grid-cols-2 gap-3">
+									<Input bind:value={editingGroup.max_ratio} type="number" label="Max Ratio" />
+									<Input bind:value={editingGroup.max_hours} type="number" label="Max Hours" />
+								</div>
+								<Select bind:value={editingGroup.seeding_mode} label="Mode">
+									<option value="or">Either (OR)</option>
+									<option value="and">Both (AND)</option>
+								</Select>
+								<div class="space-y-2">
+									<Toggle bind:checked={editingGroup.skip_removal} label="Skip Removal" />
+									<Toggle bind:checked={editingGroup.delete_files} label="Delete Files" />
+								</div>
+								<div class="flex gap-2">
+									<Button size="sm" onclick={() => updateSeedingGroup(editingGroup!)}>Save</Button>
+									<Button size="sm" variant="ghost" onclick={() => (editingGroup = null)}>Cancel</Button>
+								</div>
+							</div>
+						{:else}
+							<div class="flex items-center justify-between border border-border rounded-lg p-2 mb-2">
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2">
+										<span class="font-medium text-sm">{group.name}</span>
+										<Badge>{group.match_type}: {group.match_pattern}</Badge>
+										<Badge variant="outline">P{group.priority}</Badge>
+										{#if group.skip_removal}<Badge variant="secondary">skip</Badge>{/if}
+									</div>
+									<div class="text-xs text-muted-foreground mt-0.5">
+										{group.max_ratio > 0 ? `Ratio ≥${group.max_ratio}` : ''}
+										{group.max_ratio > 0 && group.max_hours > 0 ? ` ${group.seeding_mode.toUpperCase()} ` : ''}
+										{group.max_hours > 0 ? `${group.max_hours}h` : ''}
+										{group.max_ratio <= 0 && group.max_hours <= 0 && !group.skip_removal ? 'No limits set' : ''}
+									</div>
+								</div>
+								<div class="flex gap-1">
+									<button class="p-1 text-muted-foreground hover:text-foreground" onclick={() => (editingGroup = {...group})}>
+										<SquarePen class="w-3.5 h-3.5" />
+									</button>
+									{#if confirmDeleteGroup === group.id}
+										<Button size="sm" variant="destructive" onclick={() => { deleteSeedingGroup(group.id); confirmDeleteGroup = null; }}>Confirm</Button>
+										<Button size="sm" variant="ghost" onclick={() => (confirmDeleteGroup = null)}>Cancel</Button>
+									{:else}
+										<button class="p-1 text-muted-foreground hover:text-destructive" onclick={() => (confirmDeleteGroup = group.id)}>
+											<Trash2 class="w-3.5 h-3.5" />
+										</button>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					{:else}
+						<p class="text-xs text-muted-foreground italic">No seeding groups defined — all torrents use global settings.</p>
+					{/each}
+				</Card>
+				{/if}
 
 				<Card>
 					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Orphan Cleanup</h3>
