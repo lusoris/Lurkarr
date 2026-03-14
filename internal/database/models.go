@@ -110,12 +110,12 @@ type InstanceGroupMember struct {
 
 // CrossInstanceMedia represents a media item detected across multiple instances.
 type CrossInstanceMedia struct {
-	ID         uuid.UUID                `json:"id"`
-	GroupID    uuid.UUID                `json:"group_id"`
-	ExternalID string                   `json:"external_id"`
-	Title      string                   `json:"title"`
-	DetectedAt time.Time                `json:"detected_at"`
-	Presence   []CrossInstancePresence  `json:"presence,omitempty"`
+	ID         uuid.UUID               `json:"id"`
+	GroupID    uuid.UUID               `json:"group_id"`
+	ExternalID string                  `json:"external_id"`
+	Title      string                  `json:"title"`
+	DetectedAt time.Time               `json:"detected_at"`
+	Presence   []CrossInstancePresence `json:"presence,omitempty"`
 }
 
 // CrossInstancePresence records that a media item exists in a specific instance.
@@ -125,6 +125,20 @@ type CrossInstancePresence struct {
 	InstanceName string    `json:"instance_name,omitempty"`
 	Monitored    bool      `json:"monitored"`
 	HasFile      bool      `json:"has_file"`
+}
+
+// CrossInstanceAction records a routing or dedup action taken by Lurkarr.
+type CrossInstanceAction struct {
+	ID               uuid.UUID  `json:"id"`
+	GroupID          uuid.UUID  `json:"group_id"`
+	ExternalID       string     `json:"external_id"`
+	Title            string     `json:"title"`
+	Action           string     `json:"action"`
+	Reason           string     `json:"reason"`
+	SeerrRequestID   *int       `json:"seerr_request_id,omitempty"`
+	SourceInstanceID *uuid.UUID `json:"source_instance_id,omitempty"`
+	TargetInstanceID *uuid.UUID `json:"target_instance_id,omitempty"`
+	ExecutedAt       time.Time  `json:"executed_at"`
 }
 
 type AppSettings struct {

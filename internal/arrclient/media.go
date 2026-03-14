@@ -45,10 +45,10 @@ func (c *Client) RadarrGetAllMovies(ctx context.Context) ([]MediaItem, error) {
 // SonarrGetAllSeries fetches all series from a Sonarr instance.
 func (c *Client) SonarrGetAllSeries(ctx context.Context) ([]MediaItem, error) {
 	var series []struct {
-		ID        int    `json:"id"`
-		Title     string `json:"title"`
-		TvdbID    int    `json:"tvdbId"`
-		Monitored bool   `json:"monitored"`
+		ID         int    `json:"id"`
+		Title      string `json:"title"`
+		TvdbID     int    `json:"tvdbId"`
+		Monitored  bool   `json:"monitored"`
 		Statistics struct {
 			EpisodeFileCount int `json:"episodeFileCount"`
 		} `json:"statistics"`
@@ -103,10 +103,10 @@ func (c *Client) ErosGetAllMovies(ctx context.Context) ([]MediaItem, error) {
 // WhisparrGetAllSeries fetches all series from a Whisparr v2 instance.
 func (c *Client) WhisparrGetAllSeries(ctx context.Context) ([]MediaItem, error) {
 	var series []struct {
-		ID        int    `json:"id"`
-		Title     string `json:"title"`
-		TvdbID    int    `json:"tvdbId"`
-		Monitored bool   `json:"monitored"`
+		ID         int    `json:"id"`
+		Title      string `json:"title"`
+		TvdbID     int    `json:"tvdbId"`
+		Monitored  bool   `json:"monitored"`
 		Statistics struct {
 			EpisodeFileCount int `json:"episodeFileCount"`
 		} `json:"statistics"`

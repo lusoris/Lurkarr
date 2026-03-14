@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
@@ -197,4 +198,23 @@ func (h *InstanceGroupsHandler) HandleListOverlaps(w http.ResponseWriter, r *htt
 		media = []database.CrossInstanceMedia{}
 	}
 	writeJSON(w, http.StatusOK, media)
+}
+
+// HandleListActions returns the recent cross-instance routing actions.
+func (h *InstanceGroupsHandler) HandleListActions(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
+			limit = n
+		}
+	}
+	actions, err := h.DB.ListCrossInstanceActions(r.Context(), limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list actions"))
+		return
+	}
+	if actions == nil {
+		actions = []database.CrossInstanceAction{}
+	}
+	writeJSON(w, http.StatusOK, actions)
 }

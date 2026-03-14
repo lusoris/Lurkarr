@@ -744,6 +744,21 @@ func (mr *MockStoreMockRecorder) ListBlocklistSources(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlocklistSources", reflect.TypeOf((*MockStore)(nil).ListBlocklistSources), ctx)
 }
 
+// ListCrossInstanceActions mocks base method.
+func (m *MockStore) ListCrossInstanceActions(ctx context.Context, limit int) ([]database.CrossInstanceAction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCrossInstanceActions", ctx, limit)
+	ret0, _ := ret[0].([]database.CrossInstanceAction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCrossInstanceActions indicates an expected call of ListCrossInstanceActions.
+func (mr *MockStoreMockRecorder) ListCrossInstanceActions(ctx, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCrossInstanceActions", reflect.TypeOf((*MockStore)(nil).ListCrossInstanceActions), ctx, limit)
+}
+
 // ListCrossInstanceMedia mocks base method.
 func (m *MockStore) ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]database.CrossInstanceMedia, error) {
 	m.ctrl.T.Helper()

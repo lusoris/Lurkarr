@@ -25,13 +25,14 @@ type Settings struct {
 // request status and optionally auto-approves pending requests.
 type SyncEngine struct {
 	settings SettingsProvider
+	router   *RequestRouter
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
 }
 
 // NewSyncEngine creates a new Seerr sync engine.
-func NewSyncEngine(settings SettingsProvider) *SyncEngine {
-	return &SyncEngine{settings: settings}
+func NewSyncEngine(settings SettingsProvider, router *RequestRouter) *SyncEngine {
+	return &SyncEngine{settings: settings, router: router}
 }
 
 // Start launches the background sync loop.
@@ -117,6 +118,21 @@ func (e *SyncEngine) sync(ctx context.Context, settings *Settings) {
 
 			// Auto-approve if configured.
 			if settings.AutoApprove {
+				// Check cross-instance routing rules before approving.
+				if e.router != nil {
+					decision := e.router.Evaluate(ctx, req)
+					if decision.Action == "decline" {
+						slog.Info("seerr: declining request (cross-instance routing)",
+							"request_id", req.ID, "reason", decision.Reason)
+						if err := client.DeclineRequest(ctx, req.ID); err != nil {
+							slog.Error("seerr: failed to decline request",
+								"request_id", req.ID, "error", err)
+						}
+						e.router.LogAction(ctx, req, decision)
+						continue
+					}
+				}
+
 				if err := client.ApproveRequest(ctx, req.ID); err != nil {
 					slog.Error("seerr: failed to auto-approve request",
 						"request_id", req.ID, "error", err)

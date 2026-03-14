@@ -1219,3 +1219,126 @@ func (db *DB) DeleteCrossInstanceMediaByGroup(ctx context.Context, groupID uuid.
 	}
 	return nil
 }
+
+// --- Cross-Instance Routing ---
+
+// MediaPresenceResult contains a matched media item with its group context.
+type MediaPresenceResult struct {
+	GroupID    uuid.UUID
+	GroupMode  string
+	ExternalID string
+	Title      string
+	Instances  []PresenceInstance
+}
+
+// PresenceInstance contains instance-level presence details with quality rank.
+type PresenceInstance struct {
+	InstanceID  uuid.UUID
+	Name        string
+	QualityRank int
+	Monitored   bool
+	HasFile     bool
+}
+
+// FindMediaPresenceByExternalID looks up cross-instance media presence by external ID,
+// including group mode and member quality ranks for routing decisions.
+func (db *DB) FindMediaPresenceByExternalID(ctx context.Context, externalID string) ([]MediaPresenceResult, error) {
+	rows, err := db.Pool.Query(ctx, `
+		SELECT
+			cim.group_id, ig.mode, cim.external_id, cim.title,
+			cip.instance_id, COALESCE(ai.name, ''), COALESCE(igm.quality_rank, 0),
+			cip.monitored, cip.has_file
+		FROM cross_instance_media cim
+		JOIN instance_groups ig ON ig.id = cim.group_id
+		JOIN cross_instance_presence cip ON cip.media_id = cim.id
+		LEFT JOIN app_instances ai ON ai.id = cip.instance_id
+		LEFT JOIN instance_group_members igm ON igm.group_id = cim.group_id AND igm.instance_id = cip.instance_id
+		WHERE cim.external_id = $1
+		ORDER BY cim.group_id, COALESCE(igm.quality_rank, 999)
+	`, externalID)
+	if err != nil {
+		return nil, fmt.Errorf("find media presence: %w", err)
+	}
+	defer rows.Close()
+
+	groupMap := make(map[uuid.UUID]*MediaPresenceResult)
+	var order []uuid.UUID
+
+	for rows.Next() {
+		var groupID uuid.UUID
+		var mode, extID, title, instName string
+		var instID uuid.UUID
+		var rank int
+		var monitored, hasFile bool
+
+		if err := rows.Scan(&groupID, &mode, &extID, &title, &instID, &instName, &rank, &monitored, &hasFile); err != nil {
+			return nil, fmt.Errorf("scan media presence: %w", err)
+		}
+
+		result, ok := groupMap[groupID]
+		if !ok {
+			result = &MediaPresenceResult{
+				GroupID:    groupID,
+				GroupMode:  mode,
+				ExternalID: extID,
+				Title:      title,
+			}
+			groupMap[groupID] = result
+			order = append(order, groupID)
+		}
+		result.Instances = append(result.Instances, PresenceInstance{
+			InstanceID:  instID,
+			Name:        instName,
+			QualityRank: rank,
+			Monitored:   monitored,
+			HasFile:     hasFile,
+		})
+	}
+
+	results := make([]MediaPresenceResult, 0, len(order))
+	for _, id := range order {
+		results = append(results, *groupMap[id])
+	}
+	return results, nil
+}
+
+// CreateCrossInstanceAction logs a routing or dedup action.
+func (db *DB) CreateCrossInstanceAction(ctx context.Context, action CrossInstanceAction) error {
+	_, err := db.Pool.Exec(ctx, `
+		INSERT INTO cross_instance_actions (group_id, external_id, title, action, reason, seerr_request_id, source_instance_id, target_instance_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		action.GroupID, action.ExternalID, action.Title, action.Action, action.Reason,
+		action.SeerrRequestID, action.SourceInstanceID, action.TargetInstanceID,
+	)
+	if err != nil {
+		return fmt.Errorf("create cross instance action: %w", err)
+	}
+	return nil
+}
+
+// ListCrossInstanceActions returns recent routing actions, newest first.
+func (db *DB) ListCrossInstanceActions(ctx context.Context, limit int) ([]CrossInstanceAction, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := db.Pool.Query(ctx, `
+		SELECT id, group_id, external_id, title, action, reason, seerr_request_id, source_instance_id, target_instance_id, executed_at
+		FROM cross_instance_actions
+		ORDER BY executed_at DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list cross instance actions: %w", err)
+	}
+	defer rows.Close()
+
+	var actions []CrossInstanceAction
+	for rows.Next() {
+		var a CrossInstanceAction
+		if err := rows.Scan(&a.ID, &a.GroupID, &a.ExternalID, &a.Title, &a.Action, &a.Reason,
+			&a.SeerrRequestID, &a.SourceInstanceID, &a.TargetInstanceID, &a.ExecutedAt); err != nil {
+			return nil, fmt.Errorf("scan cross instance action: %w", err)
+		}
+		actions = append(actions, a)
+	}
+	return actions, nil
+}

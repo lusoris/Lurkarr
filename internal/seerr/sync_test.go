@@ -23,7 +23,7 @@ func TestSyncEngine_StartStop(t *testing.T) {
 		},
 	}
 
-	engine := NewSyncEngine(provider)
+	engine := NewSyncEngine(provider, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	engine.Start(ctx)
@@ -40,7 +40,7 @@ func TestSyncEngine_SyncDisabled(t *testing.T) {
 		},
 	}
 
-	engine := NewSyncEngine(provider)
+	engine := NewSyncEngine(provider, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

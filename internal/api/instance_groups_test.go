@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -382,5 +383,47 @@ func TestHandleListOverlaps_Nil(t *testing.T) {
 	}
 	if out == nil || len(out) != 0 {
 		t.Fatalf("expected empty slice, got %v", out)
+	}
+}
+
+// --- Actions ---
+
+func TestHandleListActions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListCrossInstanceActions(gomock.Any(), 50).
+		Return([]database.CrossInstanceAction{{Action: "decline", Reason: "higher quality"}}, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/instance-groups/actions", http.NoBody)
+	h.HandleListActions(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListActions_CustomLimit(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListCrossInstanceActions(gomock.Any(), 10).Return(nil, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/instance-groups/actions?limit=10", http.NoBody)
+	h.HandleListActions(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListActions_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListCrossInstanceActions(gomock.Any(), 50).Return(nil, errors.New("fail"))
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/instance-groups/actions", http.NoBody)
+	h.HandleListActions(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
 	}
 }

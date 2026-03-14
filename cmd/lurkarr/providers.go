@@ -279,13 +279,14 @@ func startAutoImporter(lc fx.Lifecycle, db *database.DB, logger *logging.Logger,
 
 // startSeerrSync creates the Seerr sync engine and manages its lifecycle.
 func startSeerrSync(lc fx.Lifecycle, db *database.DB) {
+	router := &seerr.RequestRouter{DB: db}
 	se := seerr.NewSyncEngine(seerr.DBSettingsFunc(func(ctx context.Context) (string, string, bool, int, bool, error) {
 		s, err := db.GetSeerrSettings(ctx)
 		if err != nil {
 			return "", "", false, 0, false, err
 		}
 		return s.URL, s.APIKey, s.Enabled, s.SyncIntervalMinutes, s.AutoApprove, nil
-	}))
+	}), router)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			se.Start(context.Background()) //nolint:gosec // G118: sync engine manages its own lifecycle via Stop()

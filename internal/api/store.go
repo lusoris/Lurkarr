@@ -130,6 +130,7 @@ type Store interface {
 
 	// Cross-Instance Media
 	ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]database.CrossInstanceMedia, error)
+	ListCrossInstanceActions(ctx context.Context, limit int) ([]database.CrossInstanceAction, error)
 
 	// WebAuthn Credentials
 	CreateWebAuthnCredential(ctx context.Context, c *database.WebAuthnCredential) error

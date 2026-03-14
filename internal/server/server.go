@@ -427,6 +427,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("DELETE /api/instance-groups/by-id/{id}", groupsH.HandleDeleteGroup)
 	protected.HandleFunc("PUT /api/instance-groups/by-id/{id}/members", groupsH.HandleSetMembers)
 	protected.HandleFunc("GET /api/instance-groups/by-id/{id}/overlaps", groupsH.HandleListOverlaps)
+	protected.HandleFunc("GET /api/instance-groups/actions", groupsH.HandleListActions)
 
 	// Mount protected routes with auth + CSRF + token injection.
 	// csrfPlaintextHTTP must wrap the CSRF middleware so gorilla/csrf knows when
