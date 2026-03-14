@@ -22,6 +22,11 @@ type MatchResult struct {
 	Rule    database.BlocklistRule
 }
 
+// MaxRegexPatternLength is the maximum allowed length for a regex pattern.
+// Go's regexp uses RE2 (linear-time), but very long patterns can still
+// consume excessive memory during compilation.
+const MaxRegexPatternLength = 1024
+
 // Matcher checks queue records against a set of blocklist rules.
 type Matcher struct {
 	rules    []database.BlocklistRule
@@ -30,7 +35,7 @@ type Matcher struct {
 }
 
 // NewMatcher creates a Matcher from a set of enabled rules.
-// Invalid regex patterns are silently skipped.
+// Invalid or overly long regex patterns are silently skipped.
 // The parse function extracts release group info from titles.
 func NewMatcher(rules []database.BlocklistRule, parse ReleaseParser) *Matcher {
 	m := &Matcher{
@@ -39,7 +44,7 @@ func NewMatcher(rules []database.BlocklistRule, parse ReleaseParser) *Matcher {
 		parse:    parse,
 	}
 	for _, r := range rules {
-		if r.PatternType == "title_regex" {
+		if r.PatternType == "title_regex" && len(r.Pattern) <= MaxRegexPatternLength {
 			re, err := regexp.Compile(r.Pattern)
 			if err == nil {
 				m.compiled[r.ID.String()] = re

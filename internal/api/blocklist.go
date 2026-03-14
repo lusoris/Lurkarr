@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/google/uuid"
+	"github.com/lusoris/lurkarr/internal/blocklist"
 	"github.com/lusoris/lurkarr/internal/database"
 )
 
@@ -159,6 +160,10 @@ func (h *BlocklistHandler) HandleCreateRule(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if rule.PatternType == "title_regex" {
+		if len(rule.Pattern) > blocklist.MaxRegexPatternLength {
+			writeJSON(w, http.StatusBadRequest, errorResponse("regex pattern too long (max 1024 characters)"))
+			return
+		}
 		if _, err := regexp.Compile(rule.Pattern); err != nil {
 			writeJSON(w, http.StatusBadRequest, errorResponse("invalid regex pattern"))
 			return

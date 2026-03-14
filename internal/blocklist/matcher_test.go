@@ -2,6 +2,7 @@ package blocklist
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -98,6 +99,25 @@ func TestMatcherInvalidRegex(t *testing.T) {
 	result := m.Check(arrclient.QueueRecord{Title: "anything"})
 	if result.Matched {
 		t.Error("invalid regex should not match")
+	}
+}
+
+func TestMatcherRegexTooLong(t *testing.T) {
+	longPattern := strings.Repeat("a", MaxRegexPatternLength+1)
+	m := NewMatcher([]database.BlocklistRule{rule("title_regex", longPattern)}, testParser)
+	result := m.Check(arrclient.QueueRecord{Title: strings.Repeat("a", MaxRegexPatternLength+1)})
+	if result.Matched {
+		t.Error("regex exceeding MaxRegexPatternLength should not be compiled or match")
+	}
+}
+
+func TestMatcherRegexAtMaxLength(t *testing.T) {
+	// A valid regex at exactly the limit should still work.
+	pattern := strings.Repeat("a", MaxRegexPatternLength)
+	m := NewMatcher([]database.BlocklistRule{rule("title_regex", pattern)}, testParser)
+	result := m.Check(arrclient.QueueRecord{Title: strings.Repeat("a", MaxRegexPatternLength)})
+	if !result.Matched {
+		t.Error("regex at exactly MaxRegexPatternLength should compile and match")
 	}
 }
 
