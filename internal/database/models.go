@@ -89,18 +89,18 @@ func (a *AppInstance) MaskedAPIKey() string {
 }
 
 type AppSettings struct {
-	AppType          AppType `json:"app_type"`
-	LurkMissingCount int     `json:"lurk_missing_count"`
-	LurkUpgradeCount int     `json:"lurk_upgrade_count"`
-	LurkMissingMode  string  `json:"lurk_missing_mode"`
-	UpgradeMode      string  `json:"upgrade_mode"`
-	SleepDuration    int     `json:"sleep_duration"`
-	MonitoredOnly    bool    `json:"monitored_only"`
-	SkipFuture       bool    `json:"skip_future"`
-	HourlyCap        int     `json:"hourly_cap"`
-	SelectionMode      string  `json:"selection_mode"`
-	MaxSearchFailures  int     `json:"max_search_failures"`
-	DebugMode          bool    `json:"debug_mode"`
+	AppType           AppType `json:"app_type"`
+	LurkMissingCount  int     `json:"lurk_missing_count"`
+	LurkUpgradeCount  int     `json:"lurk_upgrade_count"`
+	LurkMissingMode   string  `json:"lurk_missing_mode"`
+	UpgradeMode       string  `json:"upgrade_mode"`
+	SleepDuration     int     `json:"sleep_duration"`
+	MonitoredOnly     bool    `json:"monitored_only"`
+	SkipFuture        bool    `json:"skip_future"`
+	HourlyCap         int     `json:"hourly_cap"`
+	SelectionMode     string  `json:"selection_mode"`
+	MaxSearchFailures int     `json:"max_search_failures"`
+	DebugMode         bool    `json:"debug_mode"`
 }
 
 type GeneralSettings struct {
@@ -273,12 +273,16 @@ type QueueCleanerSettings struct {
 	// Failed import message patterns
 	FailedImportPatterns string `json:"failed_import_patterns"` // Comma-separated substrings; only remove failed imports matching these (empty = all failures)
 	// Queued item strikes
-	StrikeQueued    bool `json:"strike_queued"`     // Strike items stuck in queued state (not downloading)
+	StrikeQueued     bool `json:"strike_queued"`      // Strike items stuck in queued state (not downloading)
 	MaxStrikesQueued int  `json:"max_strikes_queued"` // Override max_strikes for queued items (0 = use global)
 	// Search cooldown
 	SearchCooldownHours int `json:"search_cooldown_hours"` // Minimum hours between re-searches for the same media (0 = no cooldown)
 	MaxSearchesPerRun   int `json:"max_searches_per_run"`  // Max re-searches per cleanup run per instance (0 = unlimited)
 	MaxSearchFailures   int `json:"max_search_failures"`   // Max consecutive search failures before deprioritizing media (0 = no limit)
+	// Deletion detection
+	DeletionDetectionEnabled bool `json:"deletion_detection_enabled"` // Remove queue items for externally deleted media files
+	// Unmonitored cleanup
+	UnmonitoredCleanupEnabled bool `json:"unmonitored_cleanup_enabled"` // Remove queue items for unmonitored media
 }
 
 // QueueStrike represents a strike against a problematic download.

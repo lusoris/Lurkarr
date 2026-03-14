@@ -30,7 +30,9 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        failed_import_patterns,
 		        strike_queued, max_strikes_queued,
 		        search_cooldown_hours, max_searches_per_run,
-		        max_search_failures
+		        max_search_failures,
+		        deletion_detection_enabled,
+		        unmonitored_cleanup_enabled
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -49,7 +51,9 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.FailedImportPatterns,
 		&s.StrikeQueued, &s.MaxStrikesQueued,
 		&s.SearchCooldownHours, &s.MaxSearchesPerRun,
-		&s.MaxSearchFailures)
+		&s.MaxSearchFailures,
+		&s.DeletionDetectionEnabled,
+		&s.UnmonitoredCleanupEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -78,7 +82,9 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        failed_import_patterns = $41,
 		        strike_queued = $42, max_strikes_queued = $43,
 		        search_cooldown_hours = $44, max_searches_per_run = $45,
-		        max_search_failures = $46
+		        max_search_failures = $46,
+		        deletion_detection_enabled = $47,
+		        unmonitored_cleanup_enabled = $48
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -97,7 +103,9 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.FailedImportPatterns,
 		s.StrikeQueued, s.MaxStrikesQueued,
 		s.SearchCooldownHours, s.MaxSearchesPerRun,
-		s.MaxSearchFailures)
+		s.MaxSearchFailures,
+		s.DeletionDetectionEnabled,
+		s.UnmonitoredCleanupEnabled)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

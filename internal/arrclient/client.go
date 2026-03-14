@@ -232,23 +232,28 @@ type QueueRecord struct {
 
 // QueueMovie holds enriched movie data from Radarr/Eros queue responses.
 type QueueMovie struct {
-	TmdbID int    `json:"tmdbId"`
-	ImdbID string `json:"imdbId"`
-	Title  string `json:"title"`
-	Tags   []int  `json:"tags"`
+	TmdbID    int    `json:"tmdbId"`
+	ImdbID    string `json:"imdbId"`
+	Title     string `json:"title"`
+	Tags      []int  `json:"tags"`
+	HasFile   bool   `json:"hasFile"`
+	Monitored bool   `json:"monitored"`
 }
 
 // QueueSeries holds enriched series data from Sonarr/Whisparr queue responses.
 type QueueSeries struct {
-	TvdbID int    `json:"tvdbId"`
-	Title  string `json:"title"`
-	Tags   []int  `json:"tags"`
+	TvdbID    int    `json:"tvdbId"`
+	Title     string `json:"title"`
+	Tags      []int  `json:"tags"`
+	Monitored bool   `json:"monitored"`
 }
 
 // QueueEpisode holds enriched episode data from Sonarr/Whisparr queue responses.
 type QueueEpisode struct {
-	SeasonNumber  int `json:"seasonNumber"`
-	EpisodeNumber int `json:"episodeNumber"`
+	SeasonNumber  int  `json:"seasonNumber"`
+	EpisodeNumber int  `json:"episodeNumber"`
+	HasFile       bool `json:"hasFile"`
+	Monitored     bool `json:"monitored"`
 }
 
 // QueueAlbum holds enriched album data from Lidarr queue responses.
@@ -256,6 +261,10 @@ type QueueAlbum struct {
 	ForeignAlbumID string `json:"foreignAlbumId"`
 	Title          string `json:"title"`
 	Tags           []int  `json:"tags"`
+	Monitored      bool   `json:"monitored"`
+	Statistics     struct {
+		TrackFileCount int `json:"trackFileCount"`
+	} `json:"statistics"`
 }
 
 // QueueBook holds enriched book data from Readarr queue responses.
@@ -263,6 +272,10 @@ type QueueBook struct {
 	ForeignBookID string `json:"foreignBookId"`
 	Title         string `json:"title"`
 	Tags          []int  `json:"tags"`
+	Monitored     bool   `json:"monitored"`
+	Statistics    struct {
+		BookFileCount int `json:"bookFileCount"`
+	} `json:"statistics"`
 }
 
 // StatusMessage from arr queue items for detecting import issues.
@@ -364,6 +377,47 @@ func (q *QueueRecord) MediaTags() []int {
 	return nil
 }
 
+// MediaHasFile returns whether the media item has a file on disk, using enriched
+// queue data. The second return value is false when enriched data is unavailable.
+func (q *QueueRecord) MediaHasFile() (hasFile, ok bool) {
+	if q.Movie != nil {
+		return q.Movie.HasFile, true
+	}
+	if q.Episode != nil {
+		return q.Episode.HasFile, true
+	}
+	if q.Album != nil {
+		return q.Album.Statistics.TrackFileCount > 0, true
+	}
+	if q.Book != nil {
+		return q.Book.Statistics.BookFileCount > 0, true
+	}
+	return false, false
+}
+
+// MediaMonitored returns whether the media item is monitored, using enriched
+// queue data. For episode-based apps, checks both episode and series monitored
+// status. The second return value is false when enriched data is unavailable.
+func (q *QueueRecord) MediaMonitored() (monitored, ok bool) {
+	if q.Movie != nil {
+		return q.Movie.Monitored, true
+	}
+	if q.Episode != nil {
+		epMon := q.Episode.Monitored
+		if q.Series != nil {
+			epMon = epMon && q.Series.Monitored
+		}
+		return epMon, true
+	}
+	if q.Album != nil {
+		return q.Album.Monitored, true
+	}
+	if q.Book != nil {
+		return q.Book.Monitored, true
+	}
+	return false, false
+}
+
 // Tag represents a tag from an *arr instance.
 type Tag struct {
 	ID    int    `json:"id"`
@@ -411,8 +465,8 @@ func (c *Client) TagMedia(ctx context.Context, apiVersion, appType string, media
 		return fmt.Errorf("unsupported app type for tagging: %s", appType)
 	}
 	body, _ := json.Marshal(map[string]any{
-		idsKey:     []int{mediaID},
-		"tags":     []int{tagID},
+		idsKey:      []int{mediaID},
+		"tags":      []int{tagID},
 		"applyTags": "add",
 	})
 	return c.put(ctx, path, bytes.NewReader(body))

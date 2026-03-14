@@ -446,3 +446,305 @@ func TestGetSABnzbdStatuses_Error(t *testing.T) {
 		t.Errorf("expected empty statuses on error, got %d", len(statuses))
 	}
 }
+
+func TestCleanDeletedMedia_RemovesImportedWithMissingFile(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+	settings.DeletionDetectionEnabled = true
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Missing.File.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "imported",
+			Movie:                &arrclient.QueueMovie{HasFile: false, Monitored: true},
+		},
+	}
+
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if !deleted {
+		t.Error("expected queue item to be deleted for media with missing file")
+	}
+}
+
+func TestCleanDeletedMedia_SkipsWhenFilePresent(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Has.File.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "imported",
+			Movie:                &arrclient.QueueMovie{HasFile: true, Monitored: true},
+		},
+	}
+
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if deleted {
+		t.Error("should not delete queue item when media file is present")
+	}
+}
+
+func TestCleanDeletedMedia_SkipsNonImported(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Downloading.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "downloading",
+			Movie:                &arrclient.QueueMovie{HasFile: false, Monitored: true},
+		},
+	}
+
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if deleted {
+		t.Error("should not delete queue item that is still downloading")
+	}
+}
+
+func TestCleanDeletedMedia_DryRun(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+	settings.DeletionDetectionEnabled = true
+	settings.DryRun = true
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Missing.File.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "imported",
+			Movie:                &arrclient.QueueMovie{HasFile: false},
+		},
+	}
+
+	c.cleanDeletedMedia(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if deleted {
+		t.Error("dry-run should not actually delete")
+	}
+}
+
+func TestCleanUnmonitored_RemovesUnmonitoredDownload(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+	settings.UnmonitoredCleanupEnabled = true
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Unmonitored.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "downloading",
+			Movie:                &arrclient.QueueMovie{Monitored: false},
+		},
+	}
+
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if !deleted {
+		t.Error("expected queue item to be deleted for unmonitored media")
+	}
+}
+
+func TestCleanUnmonitored_SkipsMonitored(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Monitored.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "downloading",
+			Movie:                &arrclient.QueueMovie{Monitored: true},
+		},
+	}
+
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if deleted {
+		t.Error("should not delete queue item for monitored media")
+	}
+}
+
+func TestCleanUnmonitored_SkipsImported(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Already.Imported.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "imported",
+			Movie:                &arrclient.QueueMovie{Monitored: false},
+		},
+	}
+
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if deleted {
+		t.Error("should not delete imported items even if media is unmonitored")
+	}
+}
+
+func TestCleanUnmonitored_DryRun(t *testing.T) {
+	var deleted bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = true
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	logger := newTestLogger()
+	defer logger.Close()
+	log := logger.ForApp("radarr")
+
+	client := arrclient.NewClient(srv.URL, "k", 5*time.Second, true)
+	inst := database.AppInstance{ID: uuid.New(), Name: "test"}
+	settings := defaultQCSettings()
+	settings.UnmonitoredCleanupEnabled = true
+	settings.DryRun = true
+
+	c := New(nil, logger)
+	records := []arrclient.QueueRecord{
+		{
+			ID:                   1,
+			Title:                "Unmonitored.Movie",
+			MovieID:              42,
+			TrackedDownloadState: "downloading",
+			Movie:                &arrclient.QueueMovie{Monitored: false},
+		},
+	}
+
+	c.cleanUnmonitored(context.Background(), log, database.AppRadarr, settings, inst, client, "v3", records, nil, nil)
+	if deleted {
+		t.Error("dry-run should not actually delete")
+	}
+}

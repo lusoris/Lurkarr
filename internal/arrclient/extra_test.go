@@ -313,3 +313,74 @@ func TestClientGetServerError(t *testing.T) {
 		t.Fatal("expected error for 500 response")
 	}
 }
+
+func TestQueueRecordMediaHasFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		record  QueueRecord
+		want    bool
+		wantOK  bool
+	}{
+		{"movie has file", QueueRecord{Movie: &QueueMovie{HasFile: true}}, true, true},
+		{"movie no file", QueueRecord{Movie: &QueueMovie{HasFile: false}}, false, true},
+		{"episode has file", QueueRecord{Episode: &QueueEpisode{HasFile: true}}, true, true},
+		{"episode no file", QueueRecord{Episode: &QueueEpisode{HasFile: false}}, false, true},
+		{"album has tracks", QueueRecord{Album: &QueueAlbum{Statistics: struct {
+			TrackFileCount int `json:"trackFileCount"`
+		}{TrackFileCount: 3}}}, true, true},
+		{"album no tracks", QueueRecord{Album: &QueueAlbum{}}, false, true},
+		{"book has files", QueueRecord{Book: &QueueBook{Statistics: struct {
+			BookFileCount int `json:"bookFileCount"`
+		}{BookFileCount: 1}}}, true, true},
+		{"book no files", QueueRecord{Book: &QueueBook{}}, false, true},
+		{"no enriched data", QueueRecord{}, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.record.MediaHasFile()
+			if ok != tt.wantOK {
+				t.Errorf("MediaHasFile() ok = %v, want %v", ok, tt.wantOK)
+			}
+			if got != tt.want {
+				t.Errorf("MediaHasFile() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueueRecordMediaMonitored(t *testing.T) {
+	tests := []struct {
+		name    string
+		record  QueueRecord
+		want    bool
+		wantOK  bool
+	}{
+		{"movie monitored", QueueRecord{Movie: &QueueMovie{Monitored: true}}, true, true},
+		{"movie unmonitored", QueueRecord{Movie: &QueueMovie{Monitored: false}}, false, true},
+		{"episode monitored, series monitored", QueueRecord{
+			Episode: &QueueEpisode{Monitored: true},
+			Series:  &QueueSeries{Monitored: true},
+		}, true, true},
+		{"episode monitored, series unmonitored", QueueRecord{
+			Episode: &QueueEpisode{Monitored: true},
+			Series:  &QueueSeries{Monitored: false},
+		}, false, true},
+		{"episode unmonitored", QueueRecord{Episode: &QueueEpisode{Monitored: false}}, false, true},
+		{"album monitored", QueueRecord{Album: &QueueAlbum{Monitored: true}}, true, true},
+		{"album unmonitored", QueueRecord{Album: &QueueAlbum{Monitored: false}}, false, true},
+		{"book monitored", QueueRecord{Book: &QueueBook{Monitored: true}}, true, true},
+		{"book unmonitored", QueueRecord{Book: &QueueBook{Monitored: false}}, false, true},
+		{"no enriched data", QueueRecord{}, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.record.MediaMonitored()
+			if ok != tt.wantOK {
+				t.Errorf("MediaMonitored() ok = %v, want %v", ok, tt.wantOK)
+			}
+			if got != tt.want {
+				t.Errorf("MediaMonitored() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

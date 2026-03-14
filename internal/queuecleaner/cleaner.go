@@ -182,9 +182,11 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		genSettings.SSLVerify,
 	)
 
-	// Use enriched queue when cross-arr sync or protected tags are enabled so we
-	// get external IDs and media tags from the enriched response.
-	needEnriched := settings.CrossArrSync || settings.ProtectedTags != ""
+	// Use enriched queue when cross-arr sync, protected tags, deletion detection,
+	// or unmonitored cleanup is enabled so we get external IDs and media status
+	// from the enriched response.
+	needEnriched := settings.CrossArrSync || settings.ProtectedTags != "" ||
+		settings.DeletionDetectionEnabled || settings.UnmonitoredCleanupEnabled
 	var queue *arrclient.QueueResponse
 	if needEnriched {
 		queue, err = getEnrichedQueue(ctx, client, appType)
@@ -390,6 +392,16 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	// 4. Seeding enforcement — remove completed torrents exceeding ratio/time limits
 	if settings.SeedingEnabled {
 		c.cleanSeeding(ctx, log, appType, settings, inst, client, apiVersion, queue.Records)
+	}
+
+	// 4.5. Deletion detection — remove queue items whose media file was deleted externally
+	if settings.DeletionDetectionEnabled {
+		c.cleanDeletedMedia(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
+	}
+
+	// 4.6. Unmonitored cleanup — remove queue items for unmonitored media
+	if settings.UnmonitoredCleanupEnabled {
+		c.cleanUnmonitored(ctx, log, appType, settings, inst, client, apiVersion, queue.Records, lurker, searchBudget)
 	}
 
 	return removed
@@ -781,6 +793,78 @@ func (c *Cleaner) seedingLimitReached(settings *database.QueueCleanerSettings, i
 		return ratioMet && timeMet
 	}
 	return ratioMet || timeMet // "or" mode (default)
+}
+
+// cleanDeletedMedia removes queue items whose media file has been externally deleted.
+// Uses enriched queue data — the embedded media object's HasFile field tells us
+// whether the *arr instance still sees a file on disk for this media.
+func (c *Cleaner) cleanDeletedMedia(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, lurker lurking.ArrLurker, searchBudget *int) {
+	for _, record := range records {
+		// Only check items that have already been imported — these are the ones
+		// where the media file was present and may have been externally deleted.
+		if record.TrackedDownloadState != "imported" {
+			continue
+		}
+
+		hasFile, ok := record.MediaHasFile()
+		if !ok {
+			continue // enriched data unavailable, skip
+		}
+		if hasFile {
+			continue // file still present, nothing to do
+		}
+
+		if settings.DryRun {
+			log.Warn("[DRY-RUN] would remove (media file deleted)", "title", record.Title, "media_id", record.MediaID())
+			continue
+		}
+
+		log.Warn("media file deleted externally, removing queue item",
+			"title", record.Title, "media_id", record.MediaID())
+		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, false); err != nil {
+			log.Error("failed to remove deleted-media item", "title", record.Title, "error", err)
+			continue
+		}
+		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "media_file_deleted")
+		if settings.SearchOnRemove {
+			c.triggerReSearch(ctx, log, lurker, client, record, appType, inst.ID, settings.SearchCooldownHours, searchBudget, settings.MaxSearchFailures)
+		}
+	}
+}
+
+// cleanUnmonitored removes queue items for media that has been unmonitored.
+// Uses enriched queue data — the embedded media object's Monitored field tells us
+// whether the user still wants this media downloaded.
+func (c *Cleaner) cleanUnmonitored(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance, client *arrclient.Client, apiVersion string, records []arrclient.QueueRecord, lurker lurking.ArrLurker, searchBudget *int) {
+	for _, record := range records {
+		// Skip items that have already been imported — they completed successfully.
+		if record.TrackedDownloadState == "imported" {
+			continue
+		}
+
+		monitored, ok := record.MediaMonitored()
+		if !ok {
+			continue // enriched data unavailable, skip
+		}
+		if monitored {
+			continue // still monitored, nothing to do
+		}
+
+		if settings.DryRun {
+			log.Warn("[DRY-RUN] would remove (media unmonitored)", "title", record.Title, "media_id", record.MediaID())
+			continue
+		}
+
+		log.Warn("media unmonitored, removing queue item",
+			"title", record.Title, "media_id", record.MediaID())
+		if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, false); err != nil {
+			log.Error("failed to remove unmonitored item", "title", record.Title, "error", err)
+			continue
+		}
+		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
+		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "media_unmonitored")
+	}
 }
 
 // syncBlocklistAcross propagates removals to sibling instances of the same app type.
