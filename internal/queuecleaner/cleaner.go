@@ -244,6 +244,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason)
+			if settings.SearchOnRemove {
+				triggerReSearch(ctx, log, lurker, client, record)
+			}
 		}
 	}
 
@@ -340,6 +343,9 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 			metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 			c.notifyRemoval(ctx, appType, inst.Name, record.Title, reason+"_max_strikes")
+			if settings.SearchOnRemove {
+				triggerReSearch(ctx, log, lurker, client, record)
+			}
 		}
 	}
 
@@ -470,6 +476,11 @@ func (c *Cleaner) cleanFailedImports(ctx context.Context, log *slog.Logger, appT
 		metrics.QueueCleanerItemsRemoved.WithLabelValues(string(appType), inst.Name).Inc()
 		metrics.QueueCleanerBlocklistAdditions.WithLabelValues(string(appType), inst.Name).Inc()
 		c.notifyRemoval(ctx, appType, inst.Name, record.Title, "failed_import: "+reason)
+		if settings.SearchOnRemove {
+			if l := lurking.LurkerFor(appType); l != nil {
+				triggerReSearch(ctx, log, l, client, record)
+			}
+		}
 	}
 }
 
@@ -1094,6 +1105,21 @@ func filterProtectedTags(ctx context.Context, log *slog.Logger, client *arrclien
 		}
 	}
 	return filtered
+}
+
+// triggerReSearch asks the arr instance to search for a replacement after a
+// queue item is removed. It is a best-effort operation — failures are logged
+// but do not interrupt the cleanup loop.
+func triggerReSearch(ctx context.Context, log *slog.Logger, lurker lurking.ArrLurker, client *arrclient.Client, record arrclient.QueueRecord) {
+	mediaID := record.MediaID()
+	if mediaID <= 0 {
+		return
+	}
+	if err := lurker.Search(ctx, client, mediaID); err != nil {
+		log.Warn("re-search failed", "title", record.Title, "media_id", mediaID, "error", err)
+	} else {
+		log.Info("re-search triggered", "title", record.Title, "media_id", mediaID)
+	}
 }
 
 func apiVersionFor(appType database.AppType) string {

@@ -47,6 +47,7 @@
 		cross_arr_sync: boolean;
 		dry_run: boolean;
 		protected_tags: string;
+		search_on_remove: boolean;
 	}
 
 	interface ScoringProfile {
@@ -367,6 +368,7 @@
 						<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" />
 						<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
 						<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" />
+						<Toggle bind:checked={settings.search_on_remove} label="Re-search on Remove" hint="Trigger a new search when an item is removed (blocklist, stalled, failed import)" />
 					</div>
 				</Card>
 
