@@ -31,6 +31,7 @@ func TestActivityFeed_MergesAndSorts(t *testing.T) {
 	// Blocklist + auto-import: return empty for all app types.
 	store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
 
@@ -74,6 +75,7 @@ func TestActivityFeed_DefaultLimit(t *testing.T) {
 	store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	h := &ActivityHandler{DB: store}
@@ -115,6 +117,7 @@ func TestActivityFeed_LimitTruncation(t *testing.T) {
 	store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return(nil, nil)
 	store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	h := &ActivityHandler{DB: store}

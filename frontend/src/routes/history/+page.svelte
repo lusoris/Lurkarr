@@ -18,7 +18,7 @@
 	const toasts = getToasts();
 	const PAGE_SIZE = 50;
 
-	type ActiveTab = 'lurking' | 'cleaner' | 'imports';
+	type ActiveTab = 'lurking' | 'cleaner' | 'imports' | 'strikes';
 	let activeTab = $state<ActiveTab>('lurking');
 
 	// --- Lurk History ---
@@ -70,6 +70,21 @@
 	let importItems = $state<ImportEntry[]>([]);
 	let importApp = $state('');
 	let importLoading = $state(false);
+
+	// --- Strike Log ---
+	interface StrikeEntry {
+		id: number;
+		app_type: string;
+		instance_id: string;
+		download_id: string;
+		title: string;
+		reason: string;
+		struck_at: string;
+	}
+
+	let strikeItems = $state<StrikeEntry[]>([]);
+	let strikeApp = $state('');
+	let strikeLoading = $state(false);
 
 	// --- Lurk History ---
 	async function load() {
@@ -126,6 +141,18 @@
 		importLoading = false;
 	}
 
+	// --- Strike Log ---
+	async function loadStrikes() {
+		if (!strikeApp) { strikeItems = []; return; }
+		strikeLoading = true;
+		try {
+			strikeItems = await api.get<StrikeEntry[]>(`/queue/strikes/${strikeApp}`);
+		} catch {
+			strikeItems = [];
+		}
+		strikeLoading = false;
+	}
+
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let mounted = false;
 
@@ -169,6 +196,7 @@
 		activeTab = tab as ActiveTab;
 		if (tab === 'cleaner' && blocklistItems.length === 0 && blocklistApp) loadBlocklist();
 		if (tab === 'imports' && importItems.length === 0 && importApp) loadImports();
+		if (tab === 'strikes' && strikeItems.length === 0 && strikeApp) loadStrikes();
 	}
 
 	// Unique app types present in current results
@@ -188,6 +216,13 @@
 		if (reason.includes('max_strikes')) return 'error';
 		if (reason.includes('duplicate')) return 'warning';
 		if (reason.includes('blocklist')) return 'info';
+		return 'default';
+	}
+
+	function strikeReasonVariant(reason: string): 'default' | 'warning' | 'info' | 'error' {
+		if (reason === 'unregistered') return 'error';
+		if (reason === 'stalled') return 'warning';
+		if (reason === 'slow') return 'info';
 		return 'default';
 	}
 
@@ -212,6 +247,12 @@
 		{ key: 'reason', header: 'Reason' },
 		{ key: 'created_at', header: 'Date', sortable: true }
 	];
+
+	const strikeColumns: Column<StrikeEntry>[] = [
+		{ key: 'title', header: 'Title', sortable: true },
+		{ key: 'reason', header: 'Reason', sortable: true },
+		{ key: 'struck_at', header: 'Date', sortable: true }
+	];
 </script>
 
 <svelte:head><title>History - Lurkarr</title></svelte:head>
@@ -223,7 +264,8 @@
 		tabs={[
 			{ value: 'lurking', label: 'Lurking' },
 			{ value: 'cleaner', label: 'Queue Cleaner' },
-			{ value: 'imports', label: 'Auto-Import' }
+			{ value: 'imports', label: 'Auto-Import' },
+			{ value: 'strikes', label: 'Strikes' }
 		]}
 		bind:value={activeTab}
 		onchange={onTabChange}
@@ -344,6 +386,35 @@
 						<T.Cell><Badge>{entry.action}</Badge></T.Cell>
 						<T.Cell class="text-muted-foreground">{entry.reason}</T.Cell>
 						<T.Cell class="text-muted-foreground text-xs">{new Date(entry.created_at).toLocaleString()}</T.Cell>
+					</T.Row>
+				{/snippet}
+			</DataTable>
+		{/if}
+
+	<!-- ==================== Strike Log Tab ==================== -->
+	{:else if activeTab === 'strikes'}
+		<div class="flex flex-col sm:flex-row gap-3">
+			<Select bind:value={strikeApp} onchange={loadStrikes} class="sm:w-48">
+				<option value="">Select App</option>
+				{#each visibleAppTypes as app}
+					<option value={app}>{appDisplayName(app)}</option>
+				{/each}
+			</Select>
+		</div>
+
+		{#if strikeLoading}
+			<Skeleton rows={5} height="h-14" />
+		{:else if !strikeApp}
+			<EmptyState icon={History} title="Select an app" description="Choose an app type above to view its strike log." />
+		{:else if strikeItems.length === 0}
+			<EmptyState icon={History} title="No strikes recorded" description="Strikes for {appDisplayName(strikeApp)} will appear here when the queue cleaner issues them." />
+		{:else}
+			<DataTable data={strikeItems} columns={strikeColumns} searchable pageSize={50} noun="strikes">
+				{#snippet row(entry)}
+					<T.Row>
+						<T.Cell class="text-foreground max-w-xs truncate" title={entry.title}>{entry.title}</T.Cell>
+						<T.Cell><Badge variant={strikeReasonVariant(entry.reason)}>{reasonLabel(entry.reason)}</Badge></T.Cell>
+						<T.Cell class="text-muted-foreground text-xs">{new Date(entry.struck_at).toLocaleString()}</T.Cell>
 					</T.Row>
 				{/snippet}
 			</DataTable>

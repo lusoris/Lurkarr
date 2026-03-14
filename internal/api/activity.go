@@ -123,6 +123,23 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// 6. Strike log (all app types).
+	for _, app := range database.AllAppTypes() {
+		if items, err := h.DB.GetStrikeLog(r.Context(), app, perSource); err == nil {
+			for _, it := range items {
+				events = append(events, ActivityEvent{
+					ID:        fmt.Sprintf("strike-%d", it.ID),
+					Source:    "strike",
+					AppType:   string(it.AppType),
+					Title:     it.Title,
+					Action:    "strike",
+					Detail:    it.Reason,
+					Timestamp: it.StruckAt,
+				})
+			}
+		}
+	}
+
 	// Sort all events by timestamp descending, then truncate.
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].Timestamp.After(events[j].Timestamp)

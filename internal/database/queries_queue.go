@@ -189,6 +189,26 @@ func (db *DB) ResetStrikes(ctx context.Context, appType AppType, instanceID uuid
 	return nil
 }
 
+func (db *DB) GetStrikeLog(ctx context.Context, appType AppType, limit int) ([]QueueStrike, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, app_type, instance_id, download_id, title, reason, struck_at
+		 FROM queue_strikes WHERE app_type = $1 ORDER BY struck_at DESC LIMIT $2`, appType, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get strike log: %w", err)
+	}
+	defer rows.Close()
+
+	var strikes []QueueStrike
+	for rows.Next() {
+		var s QueueStrike
+		if err := rows.Scan(&s.ID, &s.AppType, &s.InstanceID, &s.DownloadID, &s.Title, &s.Reason, &s.StruckAt); err != nil {
+			return nil, fmt.Errorf("scan strike log: %w", err)
+		}
+		strikes = append(strikes, s)
+	}
+	return strikes, rows.Err()
+}
+
 // --- Auto Import Log ---
 
 func (db *DB) LogAutoImport(ctx context.Context, appType AppType, instanceID uuid.UUID, mediaID int, mediaTitle string, queueItemID int, action, reason string) error {

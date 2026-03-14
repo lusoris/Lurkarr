@@ -381,6 +381,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("GET /api/queue/scoring/{app}", queueH.HandleGetScoringProfile)
 	protected.HandleFunc("PUT /api/queue/scoring/{app}", queueH.HandleUpdateScoringProfile)
 	protected.HandleFunc("GET /api/queue/blocklist/{app}", queueH.HandleGetBlocklistLog)
+	protected.HandleFunc("GET /api/queue/strikes/{app}", queueH.HandleGetStrikeLog)
 	protected.HandleFunc("GET /api/queue/imports/{app}", queueH.HandleGetAutoImportLog)
 	protected.HandleFunc("GET /api/queue/download-client/{app}", queueH.HandleGetDownloadClientSettings)
 	protected.HandleFunc("PUT /api/queue/download-client/{app}", queueH.HandleUpdateDownloadClientSettings)

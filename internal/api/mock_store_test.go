@@ -473,6 +473,21 @@ func (mr *MockStoreMockRecorder) GetBlocklistLog(ctx, appType, limit any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlocklistLog", reflect.TypeOf((*MockStore)(nil).GetBlocklistLog), ctx, appType, limit)
 }
 
+// GetStrikeLog mocks base method.
+func (m *MockStore) GetStrikeLog(ctx context.Context, appType database.AppType, limit int) ([]database.QueueStrike, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStrikeLog", ctx, appType, limit)
+	ret0, _ := ret[0].([]database.QueueStrike)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStrikeLog indicates an expected call of GetStrikeLog.
+func (mr *MockStoreMockRecorder) GetStrikeLog(ctx, appType, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStrikeLog", reflect.TypeOf((*MockStore)(nil).GetStrikeLog), ctx, appType, limit)
+}
+
 // GetBlocklistSource mocks base method.
 func (m *MockStore) GetBlocklistSource(ctx context.Context, id uuid.UUID) (*database.BlocklistSource, error) {
 	m.ctrl.T.Helper()

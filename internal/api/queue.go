@@ -121,6 +121,26 @@ func (h *QueueHandler) HandleGetBlocklistLog(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, logs)
 }
 
+// HandleGetStrikeLog handles GET /api/queue/strikes/{app}.
+func (h *QueueHandler) HandleGetStrikeLog(w http.ResponseWriter, r *http.Request) {
+	appType := r.PathValue("app")
+	if !database.ValidAppType(appType) {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+		return
+	}
+
+	strikes, err := h.DB.GetStrikeLog(r.Context(), database.AppType(appType), 200)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get strike log"))
+		return
+	}
+
+	if strikes == nil {
+		strikes = []database.QueueStrike{}
+	}
+	writeJSON(w, http.StatusOK, strikes)
+}
+
 // HandleGetAutoImportLog handles GET /api/queue/imports/{app}.
 func (h *QueueHandler) HandleGetAutoImportLog(w http.ResponseWriter, r *http.Request) {
 	appType := r.PathValue("app")

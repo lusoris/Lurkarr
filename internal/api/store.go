@@ -64,6 +64,7 @@ type Store interface {
 	GetScoringProfile(ctx context.Context, appType database.AppType) (*database.ScoringProfile, error)
 	UpdateScoringProfile(ctx context.Context, p *database.ScoringProfile) error
 	GetBlocklistLog(ctx context.Context, appType database.AppType, limit int) ([]database.BlocklistLog, error)
+	GetStrikeLog(ctx context.Context, appType database.AppType, limit int) ([]database.QueueStrike, error)
 	GetAutoImportLog(ctx context.Context, appType database.AppType, limit int) ([]database.AutoImportLog, error)
 
 	// Blocklist Sources & Rules
