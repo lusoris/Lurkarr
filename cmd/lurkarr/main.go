@@ -23,6 +23,7 @@ func main() {
 			serverModule,
 			servicesModule,
 			maintenanceModule,
+			metricsModule,
 		)
 	}
 

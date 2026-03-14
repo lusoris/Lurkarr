@@ -534,6 +534,14 @@ type OIDCSettings struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// PersistentCounter stores a cumulative metric value across restarts.
+type PersistentCounter struct {
+	MetricName string    `json:"metric_name"`
+	LabelKey   string    `json:"label_key"`
+	Value      int64     `json:"value"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 // MaskedClientSecret returns the OIDC client secret masked for display.
 func (o *OIDCSettings) MaskedClientSecret() string {
 	if len(o.ClientSecret) <= 4 {

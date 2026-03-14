@@ -16,6 +16,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/healthpoller"
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/lurking"
+	"github.com/lusoris/lurkarr/internal/metrics"
 	"github.com/lusoris/lurkarr/internal/notifications"
 	"github.com/lusoris/lurkarr/internal/openapi"
 	"github.com/lusoris/lurkarr/internal/queuecleaner"
@@ -63,6 +64,10 @@ var servicesModule = fx.Module("services",
 
 var maintenanceModule = fx.Module("maintenance",
 	fx.Invoke(startMaintenance),
+)
+
+var metricsModule = fx.Module("metrics",
+	fx.Invoke(startMetricsPersistence),
 )
 
 var runOnceModule = fx.Module("run-once",
@@ -398,6 +403,34 @@ func executeRunOnce(lc fx.Lifecycle, shutdowner fx.Shutdowner, db *database.DB, 
 				slog.Info("run-once mode: all passes complete, shutting down")
 				_ = shutdowner.Shutdown()
 			}()
+			return nil
+		},
+	})
+}
+
+// startMetricsPersistence creates the metrics persister, restores saved
+// counters, and runs a periodic flush loop.
+func startMetricsPersistence(lc fx.Lifecycle, db *database.DB) {
+	p := metrics.NewPersister(db)
+	var cancel context.CancelFunc
+	lc.Append(fx.Hook{
+		OnStart: func(_ context.Context) error {
+			ctx := context.Background()
+			if err := p.Restore(ctx); err != nil {
+				slog.Warn("failed to restore persisted metrics", "error", err)
+			}
+			var flushCtx context.Context
+			flushCtx, cancel = context.WithCancel(ctx) //nolint:gosec // G118: cancel is called in OnStop
+			go p.FlushLoop(flushCtx, 30*time.Second)
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			if err := p.FlushNow(ctx); err != nil {
+				slog.Warn("final metrics flush failed", "error", err)
+			}
 			return nil
 		},
 	})
