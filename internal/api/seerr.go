@@ -37,6 +37,8 @@ func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 		Enabled             bool   `json:"enabled"`
 		SyncIntervalMinutes int    `json:"sync_interval_minutes"`
 		AutoApprove         bool   `json:"auto_approve"`
+		CleanupEnabled      bool   `json:"cleanup_enabled"`
+		CleanupAfterDays    int    `json:"cleanup_after_days"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
@@ -53,6 +55,8 @@ func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 	settings.Enabled = req.Enabled
 	settings.SyncIntervalMinutes = req.SyncIntervalMinutes
 	settings.AutoApprove = req.AutoApprove
+	settings.CleanupEnabled = req.CleanupEnabled
+	settings.CleanupAfterDays = req.CleanupAfterDays
 
 	if req.URL != "" {
 		if err := validateAPIURL(req.URL); err != nil {

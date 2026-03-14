@@ -11,8 +11,8 @@ import (
 )
 
 func TestDBSettingsFunc_Success(t *testing.T) {
-	fn := DBSettingsFunc(func(ctx context.Context) (string, string, bool, int, bool, error) {
-		return "http://seerr:5055", "apikey123", true, 15, false, nil
+	fn := DBSettingsFunc(func(ctx context.Context) (string, string, bool, int, bool, bool, int, error) {
+		return "http://seerr:5055", "apikey123", true, 15, false, false, 0, nil
 	})
 
 	s, err := fn.GetSeerrSettings(context.Background())
@@ -37,8 +37,8 @@ func TestDBSettingsFunc_Success(t *testing.T) {
 }
 
 func TestDBSettingsFunc_Error(t *testing.T) {
-	fn := DBSettingsFunc(func(ctx context.Context) (string, string, bool, int, bool, error) {
-		return "", "", false, 0, false, errors.New("db error")
+	fn := DBSettingsFunc(func(ctx context.Context) (string, string, bool, int, bool, bool, int, error) {
+		return "", "", false, 0, false, false, 0, errors.New("db error")
 	})
 
 	_, err := fn.GetSeerrSettings(context.Background())

@@ -19,6 +19,8 @@ type Settings struct {
 	Enabled             bool
 	SyncIntervalMinutes int
 	AutoApprove         bool
+	CleanupEnabled      bool
+	CleanupAfterDays    int
 }
 
 // SyncEngine periodically polls Seerr for pending requests. It monitors
@@ -141,5 +143,55 @@ func (e *SyncEngine) sync(ctx context.Context, settings *Settings) {
 				}
 			}
 		}
+	}
+
+	// Cleanup fulfilled requests if enabled.
+	if settings.CleanupEnabled && settings.CleanupAfterDays > 0 {
+		e.cleanupFulfilledRequests(ctx, client, settings.CleanupAfterDays)
+	}
+}
+
+// cleanupFulfilledRequests deletes requests whose media is available and
+// whose last update is older than the configured grace period.
+func (e *SyncEngine) cleanupFulfilledRequests(ctx context.Context, client *Client, afterDays int) {
+	cutoff := time.Now().AddDate(0, 0, -afterDays)
+	cleaned := 0
+
+	// Paginate through available requests.
+	for skip := 0; ; skip += 50 {
+		resp, err := client.ListRequests(ctx, "available", 50, skip)
+		if err != nil {
+			slog.Error("seerr: failed to list available requests for cleanup", "error", err)
+			return
+		}
+
+		for _, req := range resp.Results {
+			if req.Media.Status != MediaAvailable {
+				continue
+			}
+			if req.UpdatedAt.After(cutoff) {
+				continue
+			}
+			if err := client.DeleteRequest(ctx, req.ID); err != nil {
+				slog.Error("seerr: failed to delete fulfilled request",
+					"request_id", req.ID, "error", err)
+			} else {
+				cleaned++
+				slog.Info("seerr: cleaned up fulfilled request",
+					"request_id", req.ID,
+					"type", req.Type,
+					"tmdb_id", req.Media.TmdbID,
+					"fulfilled_at", req.UpdatedAt,
+				)
+			}
+		}
+
+		if len(resp.Results) < 50 {
+			break
+		}
+	}
+
+	if cleaned > 0 {
+		slog.Info("seerr: cleanup complete", "deleted", cleaned)
 	}
 }

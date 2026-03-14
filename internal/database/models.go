@@ -448,6 +448,8 @@ type SeerrSettings struct {
 	Enabled             bool      `json:"enabled"`
 	SyncIntervalMinutes int       `json:"sync_interval_minutes"`
 	AutoApprove         bool      `json:"auto_approve"`
+	CleanupEnabled      bool      `json:"cleanup_enabled"`
+	CleanupAfterDays    int       `json:"cleanup_after_days"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
