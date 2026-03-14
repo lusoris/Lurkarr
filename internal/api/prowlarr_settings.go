@@ -35,6 +35,12 @@ func (h *ProwlarrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Re
 		}
 		update.APIKey = existing.APIKey
 	}
+	if update.URL != "" {
+		if err := validateAPIURL(update.URL); err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+			return
+		}
+	}
 	if err := h.DB.UpdateProwlarrSettings(r.Context(), &update); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse(err.Error()))
 		return

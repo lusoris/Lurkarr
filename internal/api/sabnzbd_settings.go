@@ -35,6 +35,12 @@ func (h *SABnzbdHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Req
 		}
 		update.APIKey = existing.APIKey
 	}
+	if update.URL != "" {
+		if err := validateAPIURL(update.URL); err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+			return
+		}
+	}
 	if err := h.DB.UpdateSABnzbdSettings(r.Context(), &update); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse(err.Error()))
 		return

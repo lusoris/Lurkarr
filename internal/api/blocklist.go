@@ -61,6 +61,11 @@ func (h *BlocklistHandler) HandleCreateSource(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if err := validateAPIURL(s.URL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+		return
+	}
+
 	if err := h.DB.CreateBlocklistSource(r.Context(), &s); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create source"))
 		return
@@ -87,6 +92,11 @@ func (h *BlocklistHandler) HandleUpdateSource(w http.ResponseWriter, r *http.Req
 
 	if s.Name == "" || s.URL == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("name and url are required"))
+		return
+	}
+
+	if err := validateAPIURL(s.URL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 

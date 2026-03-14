@@ -2,8 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 )
 
 const maxRequestBodySize = 1 << 20 // 1 MB
@@ -23,4 +25,24 @@ func errorResponse(msg string) map[string]string {
 // limitBody wraps the request body with MaxBytesReader.
 func limitBody(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+}
+
+// validateAPIURL checks that a URL is safe to use as an API endpoint.
+// It ensures the scheme is http or https, the host is non-empty, and
+// no embedded credentials (userinfo) are present.
+func validateAPIURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be http or https, got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL must have a host")
+	}
+	if u.User != nil {
+		return fmt.Errorf("URL must not contain embedded credentials")
+	}
+	return nil
 }

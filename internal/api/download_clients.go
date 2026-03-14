@@ -35,6 +35,9 @@ func (h *DownloadClientHandler) HandleList(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list download clients"))
 		return
 	}
+	if instances == nil {
+		instances = []database.DownloadClientInstance{}
+	}
 	for i := range instances {
 		instances[i].APIKey = instances[i].MaskedAPIKey()
 		instances[i].Password = instances[i].MaskedPassword()
@@ -61,6 +64,10 @@ func (h *DownloadClientHandler) HandleCreate(w http.ResponseWriter, r *http.Requ
 	}
 	if req.Name == "" || req.URL == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("name and url are required"))
+		return
+	}
+	if err := validateAPIURL(req.URL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 	if !validClientTypes[req.ClientType] {
@@ -116,6 +123,11 @@ func (h *DownloadClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if !validClientTypes[req.ClientType] {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid client_type"))
+		return
+	}
+
 	existing, err := h.DB.GetDownloadClientInstance(r.Context(), id)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errorResponse("download client not found"))
@@ -130,6 +142,11 @@ func (h *DownloadClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Requ
 	password := req.Password
 	if password == "" || password == "****" {
 		password = existing.Password
+	}
+
+	if err := validateAPIURL(req.URL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+		return
 	}
 
 	if err := h.DB.UpdateDownloadClientInstance(r.Context(), &database.DownloadClientInstance{
@@ -166,9 +183,12 @@ func (h *DownloadClientHandler) HandleDelete(w http.ResponseWriter, r *http.Requ
 }
 
 // HandleTestDownloadClient handles POST /api/download-clients/test.
+// When editing an existing client, the frontend sends the client ID so the
+// backend can fall back to stored credentials for empty/masked fields.
 func (h *DownloadClientHandler) HandleTest(w http.ResponseWriter, r *http.Request) {
 	limitBody(w, r)
 	var req struct {
+		ID         string `json:"id"`
 		ClientType string `json:"client_type"`
 		URL        string `json:"url"`
 		APIKey     string `json:"api_key"`
@@ -179,8 +199,37 @@ func (h *DownloadClientHandler) HandleTest(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
 		return
 	}
+
+	// If editing an existing client, resolve empty/masked credentials from stored record.
+	if req.ID != "" {
+		id, err := uuid.Parse(req.ID)
+		if err == nil {
+			if existing, err := h.DB.GetDownloadClientInstance(r.Context(), id); err == nil {
+				if req.APIKey == "" || req.APIKey == "keep" || (len(req.APIKey) >= 4 && req.APIKey[:4] == "****") {
+					req.APIKey = existing.APIKey
+				}
+				if req.Password == "" || req.Password == "keep" || req.Password == "****" {
+					req.Password = existing.Password
+				}
+				if req.URL == "" {
+					req.URL = existing.URL
+				}
+				if req.ClientType == "" {
+					req.ClientType = existing.ClientType
+				}
+				if req.Username == "" {
+					req.Username = existing.Username
+				}
+			}
+		}
+	}
+
 	if req.URL == "" || !validClientTypes[req.ClientType] {
 		writeJSON(w, http.StatusBadRequest, errorResponse("url and valid client_type required"))
+		return
+	}
+	if err := validateAPIURL(req.URL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 
@@ -229,6 +278,72 @@ func (h *DownloadClientHandler) HandleHealthCheck(w http.ResponseWriter, r *http
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "client_type": inst.ClientType, "version": version})
+}
+
+// HandleStatus handles GET /api/download-clients/{id}/status.
+func (h *DownloadClientHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+		return
+	}
+
+	inst, err := h.DB.GetDownloadClientInstance(r.Context(), id)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("download client not found"))
+		return
+	}
+
+	timeout := time.Duration(inst.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	client := buildClient(inst.ClientType, inst.URL, inst.APIKey, inst.Username, inst.Password, timeout)
+	if client == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "offline"})
+		return
+	}
+
+	status, err := client.GetStatus(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "offline", "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+// HandleItems handles GET /api/download-clients/{id}/items.
+func (h *DownloadClientHandler) HandleItems(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+		return
+	}
+
+	inst, err := h.DB.GetDownloadClientInstance(r.Context(), id)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("download client not found"))
+		return
+	}
+
+	timeout := time.Duration(inst.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	client := buildClient(inst.ClientType, inst.URL, inst.APIKey, inst.Username, inst.Password, timeout)
+	if client == nil {
+		writeJSON(w, http.StatusOK, []any{})
+		return
+	}
+
+	items, err := client.GetItems(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, errorResponse(err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
 }
 
 // buildClient constructs the appropriate download client based on type.

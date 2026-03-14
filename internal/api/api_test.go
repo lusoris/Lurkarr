@@ -964,6 +964,7 @@ func TestProwlarrTestConnection_BadBody(t *testing.T) {
 func TestProwlarrTestConnection_MissingFields(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().GetProwlarrSettings(gomock.Any()).Return(nil, errors.New("not found"))
 	h := &ProwlarrHandler{DB: store}
 	body, _ := json.Marshal(map[string]string{"url": "http://example.com"})
 	w := httptest.NewRecorder()
@@ -976,12 +977,13 @@ func TestProwlarrTestConnection_MissingFields(t *testing.T) {
 func TestProwlarrTestConnection_InvalidURL(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{SSLVerify: true}, nil)
 	h := &ProwlarrHandler{DB: store}
 	body, _ := json.Marshal(map[string]string{"url": "://bad", "api_key": "key123"})
 	w := httptest.NewRecorder()
 	h.HandleTestConnection(w, httptest.NewRequest("POST", "/api/prowlarr/test", bytes.NewReader(body)))
-	if w.Code != 400 {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != 502 {
+		t.Fatalf("expected 502, got %d", w.Code)
 	}
 }
 
@@ -1151,6 +1153,7 @@ func TestSABnzbdTestConnection_BadBody(t *testing.T) {
 func TestSABnzbdTestConnection_MissingFields(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
+	store.EXPECT().GetSABnzbdSettings(gomock.Any()).Return(nil, errors.New("not configured"))
 	h := &SABnzbdHandler{DB: store}
 	body, _ := json.Marshal(map[string]string{"url": "http://example.com"})
 	w := httptest.NewRecorder()
@@ -1167,8 +1170,8 @@ func TestSABnzbdTestConnection_InvalidURL(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"url": "://bad", "api_key": "key123"})
 	w := httptest.NewRecorder()
 	h.HandleTestConnection(w, httptest.NewRequest("POST", "/api/sabnzbd/test", bytes.NewReader(body)))
-	if w.Code != 400 {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != 502 {
+		t.Fatalf("expected 502, got %d", w.Code)
 	}
 }
 
@@ -1378,14 +1381,12 @@ func TestAppsTestConnection_InvalidAppType(t *testing.T) {
 }
 
 func TestAppsTestConnection_InvalidURL(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
-	h := &AppsHandler{DB: store}
+	h := &AppsHandler{}
 	body, _ := json.Marshal(map[string]string{"api_url": "://bad", "api_key": "key123", "app_type": "sonarr"})
 	w := httptest.NewRecorder()
 	h.HandleTestConnection(w, httptest.NewRequest("POST", "/api/instances/test", bytes.NewReader(body)))
 	if w.Code != 400 {
-		t.Fatalf("expected 400, got %d", w.Code)
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

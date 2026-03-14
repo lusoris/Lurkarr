@@ -86,3 +86,31 @@ func TestWriteJSONUnmarshalableLogsError(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
+
+func TestValidateAPIURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"valid http", "http://sonarr.local:8989", false},
+		{"valid https", "https://radarr.example.com", false},
+		{"valid with path", "http://192.168.1.100:7878/radarr", false},
+		{"empty", "", true},
+		{"no scheme", "sonarr.local:8989", true},
+		{"file scheme", "file:///etc/passwd", true},
+		{"ftp scheme", "ftp://example.com", true},
+		{"gopher scheme", "gopher://evil.com", true},
+		{"no host", "http://", true},
+		{"embedded credentials", "http://user:pass@sonarr.local:8989", true},
+		{"embedded user only", "http://admin@sonarr.local:8989", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateAPIURL(tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateAPIURL(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
+			}
+		})
+	}
+}

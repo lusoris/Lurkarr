@@ -28,6 +28,9 @@ func (h *AppsHandler) HandleListInstances(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list instances"))
 		return
 	}
+	if instances == nil {
+		instances = []database.AppInstance{}
+	}
 
 	// Mask API keys in response
 	for i := range instances {
@@ -53,6 +56,11 @@ func (h *AppsHandler) HandleCreateInstance(w http.ResponseWriter, r *http.Reques
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.APIURL == "" || req.APIKey == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("name, api_url, and api_key required"))
+		return
+	}
+
+	if err := validateAPIURL(req.APIURL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 
@@ -94,6 +102,11 @@ func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		req.APIKey = existing.APIKey
+	}
+
+	if err := validateAPIURL(req.APIURL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+		return
 	}
 
 	if err := h.DB.UpdateInstance(r.Context(), id, req.Name, req.APIURL, req.APIKey, req.Enabled); err != nil {
@@ -166,15 +179,44 @@ func (h *AppsHandler) HandleHealthCheckInstance(w http.ResponseWriter, r *http.R
 }
 
 // HandleTestConnection handles POST /api/instances/test.
+// When editing an existing instance, the frontend sends the instance ID so the
+// backend can fall back to stored credentials for empty/masked API keys.
 func (h *AppsHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
 	limitBody(w, r)
 	var req struct {
+		ID      string `json:"id"`
 		APIURL  string `json:"api_url"`
 		APIKey  string `json:"api_key"`
 		AppType string `json:"app_type"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.APIURL == "" || req.APIKey == "" || req.AppType == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+		return
+	}
+
+	// If API key is empty or masked, resolve from stored instance.
+	if req.ID != "" && (req.APIKey == "" || (len(req.APIKey) >= 4 && req.APIKey[:4] == "****")) {
+		id, err := uuid.Parse(req.ID)
+		if err == nil {
+			if existing, err := h.DB.GetInstance(r.Context(), id); err == nil {
+				req.APIKey = existing.APIKey
+				if req.APIURL == "" {
+					req.APIURL = existing.APIURL
+				}
+				if req.AppType == "" {
+					req.AppType = string(existing.AppType)
+				}
+			}
+		}
+	}
+
+	if req.APIURL == "" || req.APIKey == "" || req.AppType == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("api_url, api_key, and app_type required"))
+		return
+	}
+
+	if err := validateAPIURL(req.APIURL); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 
@@ -183,25 +225,14 @@ func (h *AppsHandler) HandleTestConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// SSRF protection
-	isPrivate, err := arrclient.IsPrivateIP(req.APIURL)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid URL"))
-		return
-	}
-	if isPrivate {
-		writeJSON(w, http.StatusForbidden, errorResponse("private/internal URLs are not allowed"))
-		return
+	genSettings, _ := h.DB.GetGeneralSettings(r.Context())
+	sslVerify := true
+	if genSettings != nil {
+		sslVerify = genSettings.SSLVerify
 	}
 
-	client := arrclient.NewClient(req.APIURL, req.APIKey, 15_000_000_000, true)
-
-	apiVersion := "v3"
-	if req.AppType == "lidarr" || req.AppType == "readarr" {
-		apiVersion = "v1"
-	}
-
-	status, err := client.TestConnection(r.Context(), apiVersion)
+	client := arrclient.NewClient(req.APIURL, req.APIKey, 15*time.Second, sslVerify)
+	status, err := client.TestConnection(r.Context(), arrclient.APIVersionFor(req.AppType))
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, errorResponse("connection failed: "+err.Error()))
 		return

@@ -193,7 +193,7 @@ func TestBlocklistUpdateSource_DBError(t *testing.T) {
 	id := uuid.New()
 	store.EXPECT().UpdateBlocklistSource(gomock.Any(), gomock.Any()).Return(errors.New("fail"))
 	h := &BlocklistHandler{DB: store}
-	body, _ := json.Marshal(map[string]string{"name": "x", "url": "y"})
+	body, _ := json.Marshal(map[string]string{"name": "x", "url": "http://example.com"})
 	w := httptest.NewRecorder()
 	r := reqWithPathValue("PUT", "/api/blocklist/sources/"+id.String(), body, "id", id.String())
 	h.HandleUpdateSource(w, r)

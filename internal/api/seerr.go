@@ -51,8 +51,15 @@ func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 	settings.SyncIntervalMinutes = req.SyncIntervalMinutes
 	settings.AutoApprove = req.AutoApprove
 
+	if req.URL != "" {
+		if err := validateAPIURL(req.URL); err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+			return
+		}
+	}
+
 	// Only update API key if a non-masked value is provided.
-	if req.APIKey != "" && req.APIKey != settings.MaskedSeerrAPIKey() {
+	if req.APIKey != "" && !(len(req.APIKey) >= 4 && req.APIKey[:4] == "****") {
 		settings.APIKey = req.APIKey
 	}
 
@@ -66,19 +73,42 @@ func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 }
 
 // HandleTestConnection handles POST /api/seerr/test.
+// Accepts optional url/api_key in body; falls back to stored settings.
 func (h *SeerrHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
+	limitBody(w, r)
+	var body struct {
+		URL    string `json:"url"`
+		APIKey string `json:"api_key"`
+	}
+	// Ignore decode errors — body is optional, we fall back to stored settings.
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
 	settings, err := h.DB.GetSeerrSettings(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load seerr settings"))
 		return
 	}
 
-	if settings.URL == "" || settings.APIKey == "" {
+	url := body.URL
+	if url == "" {
+		url = settings.URL
+	}
+	apiKey := body.APIKey
+	if apiKey == "" || (len(apiKey) >= 4 && apiKey[:4] == "****") {
+		apiKey = settings.APIKey
+	}
+
+	if url == "" || apiKey == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("seerr URL and API key are required"))
 		return
 	}
 
-	client := seerr.NewClient(settings.URL, settings.APIKey, 10*time.Second)
+	if err := validateAPIURL(url); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
+		return
+	}
+
+	client := seerr.NewClient(url, apiKey, 10*time.Second)
 	info, err := client.GetAbout(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{
