@@ -345,7 +345,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 			log.Info("removing duplicate",
 				"remove", d.RemoveTitle, "remove_score", d.RemoveScore,
 				"keep", d.KeepTitle, "keep_score", d.KeepScore)
-			if err := client.DeleteQueueItem(ctx, apiVersion, d.RemoveQueueID, settings.RemoveFromClient, settings.BlocklistOnRemove); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, d.RemoveQueueID, settings.RemoveFromClient, shouldBlocklist("duplicate", settings)); err != nil {
 				log.Error("failed to remove duplicate", "error", err)
 				continue
 			}
@@ -408,7 +408,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 					}
 				}
 			}
-			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, settings.BlocklistOnRemove); err != nil {
+			if err := client.DeleteQueueItem(ctx, apiVersion, record.ID, settings.RemoveFromClient, shouldBlocklist(reason, settings)); err != nil {
 				log.Error("failed to remove struck item", "error", err)
 				continue
 			}
@@ -1458,6 +1458,24 @@ func effectiveMaxStrikes(reason string, settings *database.QueueCleanerSettings)
 		}
 	}
 	return settings.MaxStrikes
+}
+
+// shouldBlocklist returns the per-reason blocklist flag if available, falling
+// back to the global BlocklistOnRemove setting.
+func shouldBlocklist(reason string, settings *database.QueueCleanerSettings) bool {
+	switch reason {
+	case "stalled":
+		return settings.BlocklistStalled
+	case "slow":
+		return settings.BlocklistSlow
+	case "metadata_stuck":
+		return settings.BlocklistMetadata
+	case "duplicate":
+		return settings.BlocklistDuplicate
+	case "unregistered":
+		return settings.BlocklistUnregistered
+	}
+	return settings.BlocklistOnRemove
 }
 
 // resolveTagID finds or creates a tag with the given label, returning its ID.

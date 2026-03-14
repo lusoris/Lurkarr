@@ -67,6 +67,11 @@
 		search_cooldown_hours: number;
 		max_searches_per_run: number;
 		max_search_failures: number;
+		blocklist_stalled: boolean;
+		blocklist_slow: boolean;
+		blocklist_metadata: boolean;
+		blocklist_duplicate: boolean;
+		blocklist_unregistered: boolean;
 	}
 
 	interface ScoringProfile {
@@ -418,7 +423,17 @@
 					<div class="space-y-2">
 						<Input bind:value={settings.check_interval_seconds} type="number" label="Check Interval (seconds)" />
 						<Toggle bind:checked={settings.remove_from_client} label="Remove from Download Client" />
-						<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove" />
+						<Toggle bind:checked={settings.blocklist_on_remove} label="Blocklist on Remove (global default)" hint="Fallback for reasons without a specific toggle below" />
+						<details class="mt-1 pl-1 border-l-2 border-border">
+							<summary class="text-xs text-muted-foreground cursor-pointer select-none py-1">Per-reason blocklist overrides</summary>
+							<div class="space-y-2 pt-2 pl-2">
+								<Toggle bind:checked={settings.blocklist_stalled} label="Blocklist Stalled" />
+								<Toggle bind:checked={settings.blocklist_slow} label="Blocklist Slow" />
+								<Toggle bind:checked={settings.blocklist_metadata} label="Blocklist Metadata Stuck" />
+								<Toggle bind:checked={settings.blocklist_duplicate} label="Blocklist Duplicates" />
+								<Toggle bind:checked={settings.blocklist_unregistered} label="Blocklist Unregistered" />
+							</div>
+						</details>
 						<Toggle bind:checked={settings.search_on_remove} label="Re-search on Remove" hint="Trigger a new search when an item is removed (blocklist, stalled, failed import)" />
 						{#if settings.search_on_remove}
 							<Input bind:value={settings.search_cooldown_hours} type="number" label="Search Cooldown (hours)" hint="Min hours between re-searches for the same media (0 = no cooldown)" />

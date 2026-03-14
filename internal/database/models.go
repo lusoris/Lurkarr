@@ -359,6 +359,12 @@ type QueueCleanerSettings struct {
 	// RecycleBin
 	RecycleBinEnabled bool   `json:"recycle_bin_enabled"` // Move files to recycle folder instead of permanent deletion
 	RecycleBinPath    string `json:"recycle_bin_path"`    // Absolute path to recycle bin folder
+	// Per-reason blocklist toggles (override the global blocklist_on_remove)
+	BlocklistStalled      bool `json:"blocklist_stalled"`      // Blocklist when removing stalled items
+	BlocklistSlow         bool `json:"blocklist_slow"`         // Blocklist when removing slow items
+	BlocklistMetadata     bool `json:"blocklist_metadata"`     // Blocklist when removing metadata-stuck items
+	BlocklistDuplicate    bool `json:"blocklist_duplicate"`    // Blocklist when removing lower-quality duplicates
+	BlocklistUnregistered bool `json:"blocklist_unregistered"` // Blocklist when removing unregistered torrents
 }
 
 // QueueStrike represents a strike against a problematic download.

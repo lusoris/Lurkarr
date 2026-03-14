@@ -35,7 +35,9 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        unmonitored_cleanup_enabled,
 		        unregistered_enabled, max_strikes_unregistered,
 		        recheck_paused_enabled,
-		        recycle_bin_enabled, recycle_bin_path
+		        recycle_bin_enabled, recycle_bin_path,
+		        blocklist_stalled, blocklist_slow, blocklist_metadata,
+		        blocklist_duplicate, blocklist_unregistered
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -59,7 +61,9 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.UnmonitoredCleanupEnabled,
 		&s.UnregisteredEnabled, &s.MaxStrikesUnregistered,
 		&s.RecheckPausedEnabled,
-		&s.RecycleBinEnabled, &s.RecycleBinPath)
+		&s.RecycleBinEnabled, &s.RecycleBinPath,
+		&s.BlocklistStalled, &s.BlocklistSlow, &s.BlocklistMetadata,
+		&s.BlocklistDuplicate, &s.BlocklistUnregistered)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -93,7 +97,9 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        unmonitored_cleanup_enabled = $48,
 		        unregistered_enabled = $49, max_strikes_unregistered = $50,
 		        recheck_paused_enabled = $51,
-		        recycle_bin_enabled = $52, recycle_bin_path = $53
+		        recycle_bin_enabled = $52, recycle_bin_path = $53,
+		        blocklist_stalled = $54, blocklist_slow = $55, blocklist_metadata = $56,
+		        blocklist_duplicate = $57, blocklist_unregistered = $58
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -117,7 +123,9 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.UnmonitoredCleanupEnabled,
 		s.UnregisteredEnabled, s.MaxStrikesUnregistered,
 		s.RecheckPausedEnabled,
-		s.RecycleBinEnabled, s.RecycleBinPath)
+		s.RecycleBinEnabled, s.RecycleBinPath,
+		s.BlocklistStalled, s.BlocklistSlow, s.BlocklistMetadata,
+		s.BlocklistDuplicate, s.BlocklistUnregistered)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}
