@@ -351,6 +351,9 @@ type QueueCleanerSettings struct {
 	DeletionDetectionEnabled bool `json:"deletion_detection_enabled"` // Remove queue items for externally deleted media files
 	// Unmonitored cleanup
 	UnmonitoredCleanupEnabled bool `json:"unmonitored_cleanup_enabled"` // Remove queue items for unmonitored media
+	// Unregistered torrent detection
+	UnregisteredEnabled      bool `json:"unregistered_enabled"`       // Detect and strike torrents removed from tracker
+	MaxStrikesUnregistered   int  `json:"max_strikes_unregistered"`   // Override max_strikes for unregistered items (0 = use global)
 }
 
 // QueueStrike represents a strike against a problematic download.

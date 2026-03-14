@@ -478,6 +478,11 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 
 	// Check for stalled torrents — with per-privacy type rules
 	if record.Status == "warning" && record.TrackedDownloadStatus == "warning" {
+		// Check for unregistered torrents first (subset of stalled/warning)
+		if record.Protocol == "torrent" && settings.UnregisteredEnabled && isUnregisteredTorrent(record) {
+			return "unregistered"
+		}
+
 		if record.Protocol == "torrent" {
 			isPrivate := isPrivateTracker(record)
 			if isPrivate && !settings.StrikePrivate {
@@ -543,6 +548,40 @@ func isPrivateTracker(record arrclient.QueueRecord) bool {
 
 	// Has an indexer name but not recognized as public → treat as private.
 	return true
+}
+
+// unregisteredKeywords are substrings in arr status messages that indicate a
+// torrent has been removed from its tracker. Matched case-insensitively.
+var unregisteredKeywords = []string{
+	"unregistered",
+	"not registered",
+	"torrent not found",
+	"torrent is not found",
+	"info hash",
+	"infohash",
+	"not found on tracker",
+	"removed from tracker",
+	"tracker returned: not found",
+	"pack has been removed",
+	"pack has been nuked",
+	"trump",
+	"trumped",
+}
+
+// isUnregisteredTorrent checks whether a queue record's status messages indicate
+// that the torrent has been removed or unregistered from its tracker.
+func isUnregisteredTorrent(record arrclient.QueueRecord) bool {
+	for _, sm := range record.StatusMessages {
+		for _, msg := range sm.Messages {
+			lower := strings.ToLower(msg)
+			for _, kw := range unregisteredKeywords {
+				if strings.Contains(lower, kw) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
@@ -1317,6 +1356,10 @@ func effectiveMaxStrikes(reason string, settings *database.QueueCleanerSettings)
 	case "queued":
 		if settings.MaxStrikesQueued > 0 {
 			return settings.MaxStrikesQueued
+		}
+	case "unregistered":
+		if settings.MaxStrikesUnregistered > 0 {
+			return settings.MaxStrikesUnregistered
 		}
 	}
 	return settings.MaxStrikes

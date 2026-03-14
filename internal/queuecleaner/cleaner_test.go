@@ -719,3 +719,114 @@ func TestSyncBlocklistAcrossSkipsOwnRemovals(t *testing.T) {
 		t.Errorf("delete count = %d, want 0 (own removal should be skipped)", got)
 	}
 }
+
+func TestDetectProblemUnregistered(t *testing.T) {
+	c := &Cleaner{}
+	record := arrclient.QueueRecord{
+		Status:                "warning",
+		TrackedDownloadStatus: "warning",
+		Protocol:              "torrent",
+		StatusMessages: []arrclient.StatusMessage{
+			{Title: "test", Messages: []string{"Torrent is not registered with this tracker"}},
+		},
+	}
+	settings := &database.QueueCleanerSettings{
+		StrikePublic:        true,
+		StrikePrivate:       true,
+		UnregisteredEnabled: true,
+	}
+
+	reason := c.detectProblem(record, settings, nil, false)
+	if reason != "unregistered" {
+		t.Errorf("detectProblem() = %q, want unregistered", reason)
+	}
+}
+
+func TestDetectProblemUnregisteredDisabled(t *testing.T) {
+	c := &Cleaner{}
+	record := arrclient.QueueRecord{
+		Status:                "warning",
+		TrackedDownloadStatus: "warning",
+		Protocol:              "torrent",
+		StatusMessages: []arrclient.StatusMessage{
+			{Title: "test", Messages: []string{"Torrent is not registered with this tracker"}},
+		},
+	}
+	settings := &database.QueueCleanerSettings{
+		StrikePublic:        true,
+		StrikePrivate:       true,
+		UnregisteredEnabled: false,
+	}
+
+	// When disabled, should fall through to "stalled"
+	reason := c.detectProblem(record, settings, nil, false)
+	if reason != "stalled" {
+		t.Errorf("detectProblem() = %q, want stalled (detection disabled)", reason)
+	}
+}
+
+func TestDetectProblemUnregisteredUsenet(t *testing.T) {
+	c := &Cleaner{}
+	// Usenet items should not trigger unregistered detection
+	record := arrclient.QueueRecord{
+		Status:                "warning",
+		TrackedDownloadStatus: "warning",
+		Protocol:              "usenet",
+		StatusMessages: []arrclient.StatusMessage{
+			{Title: "test", Messages: []string{"not registered"}},
+		},
+	}
+	settings := &database.QueueCleanerSettings{
+		StrikePublic:        true,
+		StrikePrivate:       true,
+		UnregisteredEnabled: true,
+	}
+
+	reason := c.detectProblem(record, settings, nil, false)
+	if reason != "stalled" {
+		t.Errorf("detectProblem() = %q, want stalled (usenet can't be unregistered)", reason)
+	}
+}
+
+func TestIsUnregisteredTorrent(t *testing.T) {
+	tests := []struct {
+		name     string
+		messages []string
+		want     bool
+	}{
+		{"unregistered keyword", []string{"The download is not registered"}, true},
+		{"not found", []string{"Torrent not found on tracker"}, true},
+		{"info hash", []string{"Could not find info hash"}, true},
+		{"trumped", []string{"Release has been trumped"}, true},
+		{"normal stall", []string{"The download is stalled with no connections"}, false},
+		{"empty messages", []string{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record := arrclient.QueueRecord{
+				StatusMessages: []arrclient.StatusMessage{
+					{Title: "test", Messages: tt.messages},
+				},
+			}
+			if got := isUnregisteredTorrent(record); got != tt.want {
+				t.Errorf("isUnregisteredTorrent() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEffectiveMaxStrikesUnregistered(t *testing.T) {
+	settings := &database.QueueCleanerSettings{
+		MaxStrikes:             5,
+		MaxStrikesUnregistered: 2,
+	}
+	if got := effectiveMaxStrikes("unregistered", settings); got != 2 {
+		t.Errorf("effectiveMaxStrikes(unregistered) = %d, want 2", got)
+	}
+
+	// Fallback to global when override is 0
+	settings.MaxStrikesUnregistered = 0
+	if got := effectiveMaxStrikes("unregistered", settings); got != 5 {
+		t.Errorf("effectiveMaxStrikes(unregistered) = %d, want 5 (global fallback)", got)
+	}
+}
