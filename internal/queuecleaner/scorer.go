@@ -1,26 +1,42 @@
 package queuecleaner
 
 import (
+	"regexp"
+	"strings"
+
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 )
 
 // ScoreQueueItem computes a weighted score for a queue record based on the scoring profile.
-// Higher score = better quality download.
+// Higher score = better quality download. Scoring priority:
+//  1. Custom format score (authoritative, from the *arr quality profile)
+//  2. Resolution rank (2160p > 1080p > 720p > 480p)
+//  3. Source rank (Remux > BluRay > WEB-DL > WEBRip > HDTV > DVD)
+//  4. Revision bonus (PROPER/REPACK)
+//  5. Size tiebreaker
+//  6. Progress tiebreaker (more complete = prefer keeping)
 func ScoreQueueItem(item *arrclient.QueueRecord, profile *database.ScoringProfile) int {
 	score := 0
 
-	// Custom format score (from the arr itself)
+	// 1. Custom format score (from the arr itself)
 	score += item.CustomFormatScore * profile.CustomFormatWeight
 
-	// Quality tier score (higher quality ID = generally better)
-	if profile.PreferHigherQuality && item.Quality != nil {
-		score += item.Quality.Quality.ID * 100
+	// 2. Resolution rank — extract from quality name first, fall back to title
+	resolution := extractResolution(item)
+	score += resolutionRank(resolution) * profile.ResolutionWeight
+
+	// 3. Source rank — parsed from release title
+	info := ParseRelease(item.Title)
+	score += sourceRank(info.Source) * profile.SourceWeight
+
+	// 4. Revision bonus (PROPER/REPACK get a flat bonus)
+	if item.Quality != nil && item.Quality.Revision.Version > 1 {
+		score += profile.RevisionBonus
 	}
 
-	// Size score (larger = more data = potentially better quality)
+	// 5. Size tiebreaker
 	if profile.PreferLargerSize && item.Size > 0 {
-		// Normalise to GB, cap at 100
 		sizeGB := int(item.Size / (1024 * 1024 * 1024))
 		if sizeGB > 100 {
 			sizeGB = 100
@@ -28,13 +44,64 @@ func ScoreQueueItem(item *arrclient.QueueRecord, profile *database.ScoringProfil
 		score += sizeGB * profile.SizeWeight
 	}
 
-	// Download progress as tiebreaker (more complete = prefer keeping)
+	// 6. Download progress as tiebreaker (more complete = prefer keeping)
 	if item.Size > 0 {
 		progress := int(((item.Size - item.Sizeleft) * 100) / item.Size)
 		score += progress // 0-100 points
 	}
 
 	return score
+}
+
+// resolutionRank maps resolution strings to numeric rank values.
+func resolutionRank(res string) int {
+	switch strings.ToLower(res) {
+	case "4320p":
+		return 5
+	case "2160p":
+		return 4
+	case "1080p":
+		return 3
+	case "720p":
+		return 2
+	case "576p", "480p":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// sourceRank maps source type strings to numeric rank values.
+func sourceRank(src string) int {
+	switch src {
+	case "Remux":
+		return 5
+	case "BluRay":
+		return 4
+	case "WEB-DL":
+		return 3
+	case "WEBRip", "WEB":
+		return 2
+	case "HDTV":
+		return 1
+	case "DVD", "DVDRip":
+		return 0
+	default:
+		return -1 // CAM, TS, unknown
+	}
+}
+
+var reResolutionFromName = regexp.MustCompile(`(?i)(4320p|2160p|1080p|720p|576p|480p)`)
+
+// extractResolution gets the resolution from the quality name first (e.g. "Bluray-1080p")
+// and falls back to parsing the release title.
+func extractResolution(item *arrclient.QueueRecord) string {
+	if item.Quality != nil {
+		if m := reResolutionFromName.FindString(item.Quality.Quality.Name); m != "" {
+			return strings.ToLower(m)
+		}
+	}
+	return ParseRelease(item.Title).Resolution
 }
 
 // FindDuplicates groups queue records by media ID and identifies lower-scored duplicates.

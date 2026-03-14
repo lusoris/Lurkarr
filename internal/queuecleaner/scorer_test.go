@@ -10,6 +10,7 @@ import (
 func TestScoreQueueItemBasic(t *testing.T) {
 	item := &arrclient.QueueRecord{
 		CustomFormatScore: 10,
+		Title:             "Movie.2024.1080p.BluRay.x264-GROUP",
 		Size:              10 * 1024 * 1024 * 1024, // 10 GB
 		Sizeleft:          5 * 1024 * 1024 * 1024,  // 5 GB left (50% done)
 		Quality: &arrclient.QualityInfo{
@@ -20,16 +21,18 @@ func TestScoreQueueItemBasic(t *testing.T) {
 		},
 	}
 	profile := &database.ScoringProfile{
-		CustomFormatWeight:  2,
-		PreferHigherQuality: true,
-		PreferLargerSize:    true,
-		SizeWeight:          5,
+		CustomFormatWeight: 2,
+		ResolutionWeight:   50,
+		SourceWeight:       30,
+		RevisionBonus:      50,
+		PreferLargerSize:   true,
+		SizeWeight:         5,
 	}
 
 	score := ScoreQueueItem(item, profile)
 
-	// Expected: 10*2 (custom format) + 7*100 (quality) + 10*5 (size GB) + 50 (progress)
-	expected := 20 + 700 + 50 + 50
+	// Expected: 10*2 (CF) + 3*50 (1080p=rank3) + 4*30 (BluRay=rank4) + 0 (no revision) + 10*5 (size) + 50 (progress)
+	expected := 20 + 150 + 120 + 50 + 50
 	if score != expected {
 		t.Errorf("ScoreQueueItem() = %d, want %d", score, expected)
 	}
@@ -38,18 +41,19 @@ func TestScoreQueueItemBasic(t *testing.T) {
 func TestScoreQueueItemNoQuality(t *testing.T) {
 	item := &arrclient.QueueRecord{
 		CustomFormatScore: 5,
+		Title:             "movie.file",
 		Size:              1024 * 1024 * 1024,
 		Sizeleft:          0, // 100% done
 	}
 	profile := &database.ScoringProfile{
-		CustomFormatWeight:  1,
-		PreferHigherQuality: true,
-		PreferLargerSize:    false,
+		CustomFormatWeight: 1,
+		ResolutionWeight:   50,
+		SourceWeight:       30,
 	}
 
 	score := ScoreQueueItem(item, profile)
-	// 5*1 (custom format) + 0 (no quality) + 0 (not prefer larger) + 100 (progress)
-	expected := 5 + 100
+	// 5*1 (CF) + 0*50 (no resolution) + (-1)*30 (unknown source) + 100 (progress)
+	expected := 5 + 0 - 30 + 100
 	if score != expected {
 		t.Errorf("ScoreQueueItem() = %d, want %d", score, expected)
 	}
@@ -66,6 +70,7 @@ func TestScoreQueueItemZero(t *testing.T) {
 
 func TestScoreQueueItemSizeCap(t *testing.T) {
 	item := &arrclient.QueueRecord{
+		Title:    "movie.file",
 		Size:     200 * 1024 * 1024 * 1024, // 200 GB
 		Sizeleft: 0,
 	}
@@ -75,18 +80,97 @@ func TestScoreQueueItemSizeCap(t *testing.T) {
 	}
 
 	score := ScoreQueueItem(item, profile)
-	// Size capped at 100 GB: 100*10 + 100 (progress)
+	// Size capped at 100 GB: 100*10 + 0*0 (no resolution) + (-1)*0 (no source, weight=0) + 100 (progress)
 	expected := 1000 + 100
 	if score != expected {
 		t.Errorf("ScoreQueueItem() = %d, want %d", score, expected)
 	}
 }
 
+func TestScoreQueueItemRevisionBonus(t *testing.T) {
+	item := &arrclient.QueueRecord{
+		Title: "Movie.2024.1080p.WEB-DL.PROPER.x264-GROUP",
+		Quality: &arrclient.QualityInfo{
+			Quality: struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			}{ID: 3, Name: "WEB-DL 1080p"},
+			Revision: struct {
+				Version int `json:"version"`
+			}{Version: 2}, // PROPER
+		},
+	}
+	profile := &database.ScoringProfile{
+		ResolutionWeight: 50,
+		SourceWeight:     30,
+		RevisionBonus:    50,
+	}
+
+	score := ScoreQueueItem(item, profile)
+	// 0 (CF) + 3*50 (1080p) + 3*30 (WEB-DL=rank3) + 50 (revision bonus) + 0 (size/progress)
+	expected := 150 + 90 + 50
+	if score != expected {
+		t.Errorf("ScoreQueueItem() = %d, want %d", score, expected)
+	}
+}
+
+func TestScoreQueueItemResolutionFromTitle(t *testing.T) {
+	// Quality name doesn't contain resolution, must parse from title
+	item := &arrclient.QueueRecord{
+		Title: "Movie.2024.2160p.Remux.HEVC.Atmos-GROUP",
+		Quality: &arrclient.QualityInfo{
+			Quality: struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			}{ID: 31, Name: "Remux"},
+		},
+	}
+	profile := &database.ScoringProfile{
+		ResolutionWeight: 50,
+		SourceWeight:     30,
+	}
+
+	score := ScoreQueueItem(item, profile)
+	// 0 (CF) + 4*50 (2160p from title) + 5*30 (Remux=rank5 from title) + 0 (no revision/size/progress)
+	expected := 200 + 150
+	if score != expected {
+		t.Errorf("ScoreQueueItem() = %d, want %d", score, expected)
+	}
+}
+
+func TestResolutionRank(t *testing.T) {
+	cases := []struct {
+		res  string
+		want int
+	}{
+		{"2160p", 4}, {"1080p", 3}, {"720p", 2}, {"480p", 1}, {"4320p", 5}, {"", 0},
+	}
+	for _, c := range cases {
+		if got := resolutionRank(c.res); got != c.want {
+			t.Errorf("resolutionRank(%q) = %d, want %d", c.res, got, c.want)
+		}
+	}
+}
+
+func TestSourceRank(t *testing.T) {
+	cases := []struct {
+		src  string
+		want int
+	}{
+		{"Remux", 5}, {"BluRay", 4}, {"WEB-DL", 3}, {"WEBRip", 2}, {"HDTV", 1}, {"DVD", 0}, {"CAM", -1}, {"", -1},
+	}
+	for _, c := range cases {
+		if got := sourceRank(c.src); got != c.want {
+			t.Errorf("sourceRank(%q) = %d, want %d", c.src, got, c.want)
+		}
+	}
+}
+
 func TestFindDuplicatesHighest(t *testing.T) {
 	records := []arrclient.QueueRecord{
-		{ID: 1, MovieID: 100, Title: "Movie A Low", CustomFormatScore: 5, Size: 1024 * 1024 * 1024, Sizeleft: 0},
-		{ID: 2, MovieID: 100, Title: "Movie A High", CustomFormatScore: 20, Size: 2 * 1024 * 1024 * 1024, Sizeleft: 0},
-		{ID: 3, MovieID: 200, Title: "Movie B Only", CustomFormatScore: 10, Size: 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 1, MovieID: 100, Title: "Movie.A.720p.HDTV.x264", CustomFormatScore: 5, Size: 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 2, MovieID: 100, Title: "Movie.A.1080p.BluRay.x264", CustomFormatScore: 20, Size: 2 * 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 3, MovieID: 200, Title: "Movie.B.1080p.WEB-DL.x264", CustomFormatScore: 10, Size: 1024 * 1024 * 1024, Sizeleft: 0},
 	}
 	profile := &database.ScoringProfile{
 		Strategy:           "highest",
@@ -110,9 +194,9 @@ func TestFindDuplicatesHighest(t *testing.T) {
 
 func TestFindDuplicatesAdequate(t *testing.T) {
 	records := []arrclient.QueueRecord{
-		{ID: 1, MovieID: 100, Title: "Below Threshold", CustomFormatScore: 2, Size: 1024 * 1024 * 1024, Sizeleft: 1024 * 1024 * 1024},
-		{ID: 2, MovieID: 100, Title: "Above Threshold", CustomFormatScore: 500, Size: 2 * 1024 * 1024 * 1024, Sizeleft: 0},
-		{ID: 3, MovieID: 100, Title: "Even Higher", CustomFormatScore: 1000, Size: 3 * 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 1, MovieID: 100, Title: "Movie.480p.CAM", CustomFormatScore: 2, Size: 1024 * 1024 * 1024, Sizeleft: 1024 * 1024 * 1024},
+		{ID: 2, MovieID: 100, Title: "Movie.1080p.BluRay.x264", CustomFormatScore: 500, Size: 2 * 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 3, MovieID: 100, Title: "Movie.2160p.Remux.x265", CustomFormatScore: 1000, Size: 3 * 1024 * 1024 * 1024, Sizeleft: 0},
 	}
 	profile := &database.ScoringProfile{
 		Strategy:           "adequate",
@@ -121,10 +205,7 @@ func TestFindDuplicatesAdequate(t *testing.T) {
 	}
 
 	dupes := FindDuplicates(records, profile)
-	// Item 1 score: 2*1 + 0 (no progress since sizeleft=size) = 2 (below 400)
-	// Item 2 score: 500*1 + 100 (progress) = 600 (above 400) — first to meet threshold
-	// Item 3 score: 1000*1 + 100 (progress) = 1100
-	// So item 2 is kept, items 1 and 3 are removed
+	// Item 2 is first to meet threshold (CF 500 alone > 400). Items 1 and 3 removed.
 	if len(dupes) != 2 {
 		t.Fatalf("got %d duplicates, want 2", len(dupes))
 	}
@@ -164,8 +245,8 @@ func TestFindDuplicatesSkipZeroMediaID(t *testing.T) {
 
 func TestFindDuplicatesMultipleMediaTypes(t *testing.T) {
 	records := []arrclient.QueueRecord{
-		{ID: 1, EpisodeID: 50, Title: "Ep A", CustomFormatScore: 5, Size: 1024 * 1024 * 1024, Sizeleft: 0},
-		{ID: 2, EpisodeID: 50, Title: "Ep A Better", CustomFormatScore: 20, Size: 2 * 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 1, EpisodeID: 50, Title: "Ep.S01E01.720p.HDTV", CustomFormatScore: 5, Size: 1024 * 1024 * 1024, Sizeleft: 0},
+		{ID: 2, EpisodeID: 50, Title: "Ep.S01E01.1080p.BluRay", CustomFormatScore: 20, Size: 2 * 1024 * 1024 * 1024, Sizeleft: 0},
 		{ID: 3, AlbumID: 70, Title: "Album Solo"},
 	}
 	profile := &database.ScoringProfile{Strategy: "highest", CustomFormatWeight: 1}

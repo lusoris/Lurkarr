@@ -413,6 +413,9 @@ type ScoringProfile struct {
 	SizeWeight          int       `json:"size_weight"`
 	AgeWeight           int       `json:"age_weight"`
 	SeedersWeight       int       `json:"seeders_weight"`
+	ResolutionWeight    int       `json:"resolution_weight"`
+	SourceWeight        int       `json:"source_weight"`
+	RevisionBonus       int       `json:"revision_bonus"`
 	CreatedAt           time.Time `json:"created_at"`
 }
 

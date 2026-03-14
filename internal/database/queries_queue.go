@@ -277,10 +277,10 @@ func (db *DB) GetScoringProfile(ctx context.Context, appType AppType) (*ScoringP
 	var p ScoringProfile
 	err := db.Pool.QueryRow(ctx,
 		`SELECT id, app_type, name, strategy, adequate_threshold, prefer_higher_quality, prefer_larger_size, prefer_indexer_flags,
-		        custom_format_weight, size_weight, age_weight, seeders_weight, created_at
+		        custom_format_weight, size_weight, age_weight, seeders_weight, resolution_weight, source_weight, revision_bonus, created_at
 		 FROM scoring_profiles WHERE app_type = $1`, appType,
 	).Scan(&p.ID, &p.AppType, &p.Name, &p.Strategy, &p.AdequateThreshold, &p.PreferHigherQuality, &p.PreferLargerSize, &p.PreferIndexerFlags,
-		&p.CustomFormatWeight, &p.SizeWeight, &p.AgeWeight, &p.SeedersWeight, &p.CreatedAt)
+		&p.CustomFormatWeight, &p.SizeWeight, &p.AgeWeight, &p.SeedersWeight, &p.ResolutionWeight, &p.SourceWeight, &p.RevisionBonus, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get scoring profile: %w", err)
 	}
@@ -292,11 +292,13 @@ func (db *DB) UpdateScoringProfile(ctx context.Context, p *ScoringProfile) error
 		`UPDATE scoring_profiles SET
 		        name = $2, strategy = $3, adequate_threshold = $4,
 		        prefer_higher_quality = $5, prefer_larger_size = $6, prefer_indexer_flags = $7,
-		        custom_format_weight = $8, size_weight = $9, age_weight = $10, seeders_weight = $11
+		        custom_format_weight = $8, size_weight = $9, age_weight = $10, seeders_weight = $11,
+		        resolution_weight = $12, source_weight = $13, revision_bonus = $14
 		 WHERE id = $1`,
 		p.ID, p.Name, p.Strategy, p.AdequateThreshold,
 		p.PreferHigherQuality, p.PreferLargerSize, p.PreferIndexerFlags,
-		p.CustomFormatWeight, p.SizeWeight, p.AgeWeight, p.SeedersWeight)
+		p.CustomFormatWeight, p.SizeWeight, p.AgeWeight, p.SeedersWeight,
+		p.ResolutionWeight, p.SourceWeight, p.RevisionBonus)
 	if err != nil {
 		return fmt.Errorf("update scoring profile: %w", err)
 	}

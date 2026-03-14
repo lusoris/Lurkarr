@@ -92,6 +92,9 @@
 		size_weight: number;
 		age_weight: number;
 		seeders_weight: number;
+		resolution_weight: number;
+		source_weight: number;
+		revision_bonus: number;
 	}
 
 	interface BlocklistLog {
@@ -556,7 +559,10 @@
 				<Card>
 					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Weights</h3>
 					<div class="grid grid-cols-2 gap-3">
-						<Input bind:value={profile.custom_format_weight} type="number" label="Custom Format" />
+						<Input bind:value={profile.custom_format_weight} type="number" label="Custom Format" hint="Authoritative — reflects your *arr quality profile" />
+						<Input bind:value={profile.resolution_weight} type="number" label="Resolution" hint="2160p=4, 1080p=3, 720p=2, 480p=1" />
+						<Input bind:value={profile.source_weight} type="number" label="Source" hint="Remux=5, BluRay=4, WEB-DL=3, WEBRip=2, HDTV=1" />
+						<Input bind:value={profile.revision_bonus} type="number" label="Revision Bonus" hint="Flat bonus for PROPER/REPACK releases" />
 						<Input bind:value={profile.size_weight} type="number" label="Size" />
 						<Input bind:value={profile.age_weight} type="number" label="Age" />
 						<Input bind:value={profile.seeders_weight} type="number" label="Seeders" />
