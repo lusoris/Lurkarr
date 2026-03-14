@@ -34,7 +34,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        deletion_detection_enabled,
 		        unmonitored_cleanup_enabled,
 		        unregistered_enabled, max_strikes_unregistered,
-		        recheck_paused_enabled
+		        recheck_paused_enabled,
+		        recycle_bin_enabled, recycle_bin_path
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -57,7 +58,8 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.DeletionDetectionEnabled,
 		&s.UnmonitoredCleanupEnabled,
 		&s.UnregisteredEnabled, &s.MaxStrikesUnregistered,
-		&s.RecheckPausedEnabled)
+		&s.RecheckPausedEnabled,
+		&s.RecycleBinEnabled, &s.RecycleBinPath)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -90,7 +92,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        deletion_detection_enabled = $47,
 		        unmonitored_cleanup_enabled = $48,
 		        unregistered_enabled = $49, max_strikes_unregistered = $50,
-		        recheck_paused_enabled = $51
+		        recheck_paused_enabled = $51,
+		        recycle_bin_enabled = $52, recycle_bin_path = $53
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -113,7 +116,8 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.DeletionDetectionEnabled,
 		s.UnmonitoredCleanupEnabled,
 		s.UnregisteredEnabled, s.MaxStrikesUnregistered,
-		s.RecheckPausedEnabled)
+		s.RecheckPausedEnabled,
+		s.RecycleBinEnabled, s.RecycleBinPath)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}

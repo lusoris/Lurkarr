@@ -171,15 +171,15 @@ type AppSettings struct {
 }
 
 type GeneralSettings struct {
-	SecretKey                  string `json:"secret_key"`
-	ProxyAuthBypass            bool   `json:"proxy_auth_bypass"`
-	SSLVerify                  bool   `json:"ssl_verify"`
-	APITimeout                 int    `json:"api_timeout"`
-	StatefulResetHours         int    `json:"stateful_reset_hours"`
-	CommandWaitDelay           int    `json:"command_wait_delay"`
-	CommandWaitAttempts        int    `json:"command_wait_attempts"`
-	MinDownloadQueueSize       int    `json:"min_download_queue_size"`
-	AutoImportIntervalMinutes  int    `json:"auto_import_interval_minutes"`
+	SecretKey                 string `json:"secret_key"`
+	ProxyAuthBypass           bool   `json:"proxy_auth_bypass"`
+	SSLVerify                 bool   `json:"ssl_verify"`
+	APITimeout                int    `json:"api_timeout"`
+	StatefulResetHours        int    `json:"stateful_reset_hours"`
+	CommandWaitDelay          int    `json:"command_wait_delay"`
+	CommandWaitAttempts       int    `json:"command_wait_attempts"`
+	MinDownloadQueueSize      int    `json:"min_download_queue_size"`
+	AutoImportIntervalMinutes int    `json:"auto_import_interval_minutes"`
 }
 
 type ProcessedItem struct {
@@ -352,10 +352,13 @@ type QueueCleanerSettings struct {
 	// Unmonitored cleanup
 	UnmonitoredCleanupEnabled bool `json:"unmonitored_cleanup_enabled"` // Remove queue items for unmonitored media
 	// Unregistered torrent detection
-	UnregisteredEnabled      bool `json:"unregistered_enabled"`       // Detect and strike torrents removed from tracker
-	MaxStrikesUnregistered   int  `json:"max_strikes_unregistered"`   // Override max_strikes for unregistered items (0 = use global)
+	UnregisteredEnabled    bool `json:"unregistered_enabled"`     // Detect and strike torrents removed from tracker
+	MaxStrikesUnregistered int  `json:"max_strikes_unregistered"` // Override max_strikes for unregistered items (0 = use global)
 	// Recheck paused torrents
 	RecheckPausedEnabled bool `json:"recheck_paused_enabled"` // Recheck paused torrents and auto-resume if complete
+	// RecycleBin
+	RecycleBinEnabled bool   `json:"recycle_bin_enabled"` // Move files to recycle folder instead of permanent deletion
+	RecycleBinPath    string `json:"recycle_bin_path"`    // Absolute path to recycle bin folder
 }
 
 // QueueStrike represents a strike against a problematic download.

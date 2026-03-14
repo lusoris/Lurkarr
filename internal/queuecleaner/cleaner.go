@@ -828,6 +828,16 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 			deleteFiles = false
 		}
 
+		// RecycleBin: move files to recycle folder instead of permanent deletion
+		if deleteFiles && settings.RecycleBinEnabled && settings.RecycleBinPath != "" && item.SavePath != "" {
+			if err := moveToRecycleBin(item.SavePath, settings.RecycleBinPath); err != nil {
+				log.Error("recycle bin move failed, falling back to deletion", "title", record.Title, "error", err)
+			} else {
+				log.Info("moved to recycle bin", "title", record.Title, "source", item.SavePath, "dest", settings.RecycleBinPath)
+				deleteFiles = false
+			}
+		}
+
 		log.Info("seeding limit reached, removing",
 			"title", record.Title,
 			"ratio", item.Ratio,
@@ -1219,6 +1229,16 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 		if deleteFiles && settings.HardlinkProtection && item.SavePath != "" && hasHardlinks(item.SavePath) {
 			log.Info("hardlinks detected, skipping file deletion for orphan", "name", item.Name, "path", item.SavePath)
 			deleteFiles = false
+		}
+
+		// RecycleBin: move files to recycle folder instead of permanent deletion
+		if deleteFiles && settings.RecycleBinEnabled && settings.RecycleBinPath != "" && item.SavePath != "" {
+			if err := moveToRecycleBin(item.SavePath, settings.RecycleBinPath); err != nil {
+				log.Error("recycle bin move failed, falling back to deletion", "name", item.Name, "error", err)
+			} else {
+				log.Info("moved to recycle bin", "name", item.Name, "source", item.SavePath, "dest", settings.RecycleBinPath)
+				deleteFiles = false
+			}
 		}
 
 		log.Info("removing orphan download",
