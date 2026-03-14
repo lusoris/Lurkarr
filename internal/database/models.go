@@ -93,6 +93,7 @@ type InstanceGroup struct {
 	ID        uuid.UUID             `json:"id"`
 	AppType   AppType               `json:"app_type"`
 	Name      string                `json:"name"`
+	Mode      string                `json:"mode"`
 	CreatedAt time.Time             `json:"created_at"`
 	Members   []InstanceGroupMember `json:"members,omitempty"`
 }
@@ -100,10 +101,30 @@ type InstanceGroup struct {
 // InstanceGroupMember links an instance to a group with a quality rank.
 // Lower rank means higher quality (e.g., 1 = 4K, 2 = 1080p, 3 = 720p).
 type InstanceGroupMember struct {
-	GroupID      uuid.UUID `json:"group_id"`
+	GroupID       uuid.UUID `json:"group_id"`
+	InstanceID    uuid.UUID `json:"instance_id"`
+	InstanceName  string    `json:"instance_name,omitempty"`
+	QualityRank   int       `json:"quality_rank"`
+	IsIndependent bool      `json:"is_independent"`
+}
+
+// CrossInstanceMedia represents a media item detected across multiple instances.
+type CrossInstanceMedia struct {
+	ID         uuid.UUID                `json:"id"`
+	GroupID    uuid.UUID                `json:"group_id"`
+	ExternalID string                   `json:"external_id"`
+	Title      string                   `json:"title"`
+	DetectedAt time.Time                `json:"detected_at"`
+	Presence   []CrossInstancePresence  `json:"presence,omitempty"`
+}
+
+// CrossInstancePresence records that a media item exists in a specific instance.
+type CrossInstancePresence struct {
+	MediaID      uuid.UUID `json:"media_id"`
 	InstanceID   uuid.UUID `json:"instance_id"`
 	InstanceName string    `json:"instance_name,omitempty"`
-	QualityRank  int       `json:"quality_rank"`
+	Monitored    bool      `json:"monitored"`
+	HasFile      bool      `json:"has_file"`
 }
 
 type AppSettings struct {

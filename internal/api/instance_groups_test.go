@@ -171,14 +171,15 @@ func TestHandleUpdateGroup(t *testing.T) {
 	}
 }
 
-func TestHandleUpdateGroup_EmptyName(t *testing.T) {
+func TestHandleUpdateGroup_EmptyBody(t *testing.T) {
 	h := &InstanceGroupsHandler{}
 	w := httptest.NewRecorder()
 	id := uuid.New()
-	body, _ := json.Marshal(map[string]string{"name": ""})
+	body, _ := json.Marshal(map[string]string{})
 	h.HandleUpdateGroup(w, reqWithPathValue("PUT", "/api/instance-groups/by-id/"+id.String(), body, "id", id.String()))
-	if w.Code != 400 {
-		t.Fatalf("expected 400, got %d", w.Code)
+	// No name and no mode → no-op, returns 200
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }
 
@@ -278,5 +279,108 @@ func TestHandleSetMembers_Error(t *testing.T) {
 	h.HandleSetMembers(w, reqWithPathValue("PUT", "/api/instance-groups/by-id/"+groupID.String()+"/members", body, "id", groupID.String()))
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// --- UpdateGroup with mode ---
+
+func TestHandleUpdateGroup_WithMode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	id := uuid.New()
+	store.EXPECT().UpdateInstanceGroup(gomock.Any(), id, "renamed").Return(nil)
+	store.EXPECT().UpdateInstanceGroupMode(gomock.Any(), id, "overlap_detect").Return(nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	body, _ := json.Marshal(map[string]any{"name": "renamed", "mode": "overlap_detect"})
+	h.HandleUpdateGroup(w, reqWithPathValue("PUT", "/api/instance-groups/by-id/"+id.String(), body, "id", id.String()))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateGroup_InvalidMode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	id := uuid.New()
+	// No name update expected since mode validation happens after name
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	body, _ := json.Marshal(map[string]any{"mode": "bad_mode"})
+	h.HandleUpdateGroup(w, reqWithPathValue("PUT", "/api/instance-groups/by-id/"+id.String(), body, "id", id.String()))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleUpdateGroup_ModeOnly(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	id := uuid.New()
+	store.EXPECT().UpdateInstanceGroupMode(gomock.Any(), id, "quality_hierarchy").Return(nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	body, _ := json.Marshal(map[string]any{"mode": "quality_hierarchy"})
+	h.HandleUpdateGroup(w, reqWithPathValue("PUT", "/api/instance-groups/by-id/"+id.String(), body, "id", id.String()))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// --- Overlaps ---
+
+func TestHandleListOverlaps(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	groupID := uuid.New()
+	store.EXPECT().ListCrossInstanceMedia(gomock.Any(), groupID).
+		Return([]database.CrossInstanceMedia{{Title: "Movie A"}}, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListOverlaps(w, reqWithPathValue("GET", "/api/instance-groups/by-id/"+groupID.String()+"/overlaps", nil, "id", groupID.String()))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListOverlaps_BadID(t *testing.T) {
+	h := &InstanceGroupsHandler{}
+	w := httptest.NewRecorder()
+	h.HandleListOverlaps(w, reqWithPathValue("GET", "/api/instance-groups/by-id/bad/overlaps", nil, "id", "bad"))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleListOverlaps_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	groupID := uuid.New()
+	store.EXPECT().ListCrossInstanceMedia(gomock.Any(), groupID).Return(nil, errors.New("fail"))
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListOverlaps(w, reqWithPathValue("GET", "/api/instance-groups/by-id/"+groupID.String()+"/overlaps", nil, "id", groupID.String()))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestHandleListOverlaps_Nil(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	groupID := uuid.New()
+	store.EXPECT().ListCrossInstanceMedia(gomock.Any(), groupID).Return(nil, nil)
+	h := &InstanceGroupsHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListOverlaps(w, reqWithPathValue("GET", "/api/instance-groups/by-id/"+groupID.String()+"/overlaps", nil, "id", groupID.String()))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var out []database.CrossInstanceMedia
+	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out == nil || len(out) != 0 {
+		t.Fatalf("expected empty slice, got %v", out)
 	}
 }

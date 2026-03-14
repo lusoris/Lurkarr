@@ -744,6 +744,21 @@ func (mr *MockStoreMockRecorder) ListBlocklistSources(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlocklistSources", reflect.TypeOf((*MockStore)(nil).ListBlocklistSources), ctx)
 }
 
+// ListCrossInstanceMedia mocks base method.
+func (m *MockStore) ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]database.CrossInstanceMedia, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCrossInstanceMedia", ctx, groupID)
+	ret0, _ := ret[0].([]database.CrossInstanceMedia)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCrossInstanceMedia indicates an expected call of ListCrossInstanceMedia.
+func (mr *MockStoreMockRecorder) ListCrossInstanceMedia(ctx, groupID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCrossInstanceMedia", reflect.TypeOf((*MockStore)(nil).ListCrossInstanceMedia), ctx, groupID)
+}
+
 // ListDownloadClientInstances mocks base method.
 func (m *MockStore) ListDownloadClientInstances(ctx context.Context) ([]database.DownloadClientInstance, error) {
 	m.ctrl.T.Helper()
@@ -1091,6 +1106,20 @@ func (m *MockStore) UpdateInstanceGroup(ctx context.Context, id uuid.UUID, name 
 func (mr *MockStoreMockRecorder) UpdateInstanceGroup(ctx, id, name any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstanceGroup", reflect.TypeOf((*MockStore)(nil).UpdateInstanceGroup), ctx, id, name)
+}
+
+// UpdateInstanceGroupMode mocks base method.
+func (m *MockStore) UpdateInstanceGroupMode(ctx context.Context, id uuid.UUID, mode string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateInstanceGroupMode", ctx, id, mode)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateInstanceGroupMode indicates an expected call of UpdateInstanceGroupMode.
+func (mr *MockStoreMockRecorder) UpdateInstanceGroupMode(ctx, id, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstanceGroupMode", reflect.TypeOf((*MockStore)(nil).UpdateInstanceGroupMode), ctx, id, mode)
 }
 
 // UpdateNotificationProvider mocks base method.

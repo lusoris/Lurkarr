@@ -73,7 +73,7 @@ func (h *InstanceGroupsHandler) HandleGetGroup(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, group)
 }
 
-// HandleUpdateGroup renames an instance group.
+// HandleUpdateGroup updates an instance group's name and/or mode.
 func (h *InstanceGroupsHandler) HandleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -84,16 +84,31 @@ func (h *InstanceGroupsHandler) HandleUpdateGroup(w http.ResponseWriter, r *http
 	limitBody(w, r)
 	var req struct {
 		Name string `json:"name"`
+		Mode string `json:"mode"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		writeJSON(w, http.StatusBadRequest, errorResponse("name is required"))
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
 		return
 	}
 
-	if err := h.DB.UpdateInstanceGroup(r.Context(), id, req.Name); err != nil {
-		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to update instance group"))
-		return
+	if req.Name != "" {
+		if err := h.DB.UpdateInstanceGroup(r.Context(), id, req.Name); err != nil {
+			writeJSON(w, http.StatusInternalServerError, errorResponse("failed to update instance group"))
+			return
+		}
 	}
+	if req.Mode != "" {
+		validModes := map[string]bool{"quality_hierarchy": true, "overlap_detect": true}
+		if !validModes[req.Mode] {
+			writeJSON(w, http.StatusBadRequest, errorResponse("mode must be quality_hierarchy or overlap_detect"))
+			return
+		}
+		if err := h.DB.UpdateInstanceGroupMode(r.Context(), id, req.Mode); err != nil {
+			writeJSON(w, http.StatusInternalServerError, errorResponse("failed to update group mode"))
+			return
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -123,8 +138,9 @@ func (h *InstanceGroupsHandler) HandleSetMembers(w http.ResponseWriter, r *http.
 	limitBody(w, r)
 	var req struct {
 		Members []struct {
-			InstanceID  uuid.UUID `json:"instance_id"`
-			QualityRank int       `json:"quality_rank"`
+			InstanceID    uuid.UUID `json:"instance_id"`
+			QualityRank   int       `json:"quality_rank"`
+			IsIndependent bool      `json:"is_independent"`
 		} `json:"members"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -143,9 +159,10 @@ func (h *InstanceGroupsHandler) HandleSetMembers(w http.ResponseWriter, r *http.
 			return
 		}
 		members[i] = database.InstanceGroupMember{
-			GroupID:     id,
-			InstanceID:  m.InstanceID,
-			QualityRank: m.QualityRank,
+			GroupID:       id,
+			InstanceID:    m.InstanceID,
+			QualityRank:   m.QualityRank,
+			IsIndependent: m.IsIndependent,
 		}
 	}
 
@@ -161,4 +178,23 @@ func (h *InstanceGroupsHandler) HandleSetMembers(w http.ResponseWriter, r *http.
 		return
 	}
 	writeJSON(w, http.StatusOK, group)
+}
+
+// HandleListOverlaps returns all detected media overlaps for a group.
+func (h *InstanceGroupsHandler) HandleListOverlaps(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+		return
+	}
+
+	media, err := h.DB.ListCrossInstanceMedia(r.Context(), id)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list overlaps"))
+		return
+	}
+	if media == nil {
+		media = []database.CrossInstanceMedia{}
+	}
+	writeJSON(w, http.StatusOK, media)
 }

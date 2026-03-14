@@ -948,9 +948,9 @@ func (db *DB) CreateInstanceGroup(ctx context.Context, appType AppType, name str
 	var g InstanceGroup
 	err := db.Pool.QueryRow(ctx,
 		`INSERT INTO instance_groups (app_type, name) VALUES ($1, $2)
-		 RETURNING id, app_type, name, created_at`,
+		 RETURNING id, app_type, name, mode, created_at`,
 		appType, name,
-	).Scan(&g.ID, &g.AppType, &g.Name, &g.CreatedAt)
+	).Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create instance group: %w", err)
 	}
@@ -961,15 +961,15 @@ func (db *DB) CreateInstanceGroup(ctx context.Context, appType AppType, name str
 func (db *DB) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*InstanceGroup, error) {
 	var g InstanceGroup
 	err := db.Pool.QueryRow(ctx,
-		`SELECT id, app_type, name, created_at FROM instance_groups WHERE id = $1`,
+		`SELECT id, app_type, name, mode, created_at FROM instance_groups WHERE id = $1`,
 		id,
-	).Scan(&g.ID, &g.AppType, &g.Name, &g.CreatedAt)
+	).Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get instance group: %w", err)
 	}
 
 	rows, err := db.Pool.Query(ctx,
-		`SELECT m.group_id, m.instance_id, i.name, m.quality_rank
+		`SELECT m.group_id, m.instance_id, i.name, m.quality_rank, m.is_independent
 		 FROM instance_group_members m
 		 JOIN app_instances i ON i.id = m.instance_id
 		 WHERE m.group_id = $1
@@ -981,7 +981,7 @@ func (db *DB) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*InstanceGrou
 
 	for rows.Next() {
 		var m InstanceGroupMember
-		if err := rows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank); err != nil {
+		if err := rows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank, &m.IsIndependent); err != nil {
 			return nil, fmt.Errorf("scan instance group member: %w", err)
 		}
 		g.Members = append(g.Members, m)
@@ -992,7 +992,7 @@ func (db *DB) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*InstanceGrou
 // ListInstanceGroups returns all groups for a given app type with members.
 func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]InstanceGroup, error) {
 	rows, err := db.Pool.Query(ctx,
-		`SELECT id, app_type, name, created_at FROM instance_groups
+		`SELECT id, app_type, name, mode, created_at FROM instance_groups
 		 WHERE app_type = $1 ORDER BY name`, appType)
 	if err != nil {
 		return nil, fmt.Errorf("list instance groups: %w", err)
@@ -1002,7 +1002,7 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 	var groups []InstanceGroup
 	for rows.Next() {
 		var g InstanceGroup
-		if err := rows.Scan(&g.ID, &g.AppType, &g.Name, &g.CreatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan instance group: %w", err)
 		}
 		groups = append(groups, g)
@@ -1018,7 +1018,7 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 		}
 
 		mRows, err := db.Pool.Query(ctx,
-			`SELECT m.group_id, m.instance_id, i.name, m.quality_rank
+			`SELECT m.group_id, m.instance_id, i.name, m.quality_rank, m.is_independent
 			 FROM instance_group_members m
 			 JOIN app_instances i ON i.id = m.instance_id
 			 WHERE m.group_id = ANY($1)
@@ -1030,7 +1030,7 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 
 		for mRows.Next() {
 			var m InstanceGroupMember
-			if err := mRows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank); err != nil {
+			if err := mRows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank, &m.IsIndependent); err != nil {
 				return nil, fmt.Errorf("scan instance group member: %w", err)
 			}
 			if g, ok := groupMap[m.GroupID]; ok {
@@ -1078,9 +1078,9 @@ func (db *DB) SetGroupMembers(ctx context.Context, groupID uuid.UUID, members []
 
 	for _, m := range members {
 		_, err = tx.Exec(ctx,
-			`INSERT INTO instance_group_members (group_id, instance_id, quality_rank)
-			 VALUES ($1, $2, $3)`,
-			groupID, m.InstanceID, m.QualityRank)
+			`INSERT INTO instance_group_members (group_id, instance_id, quality_rank, is_independent)
+			 VALUES ($1, $2, $3, $4)`,
+			groupID, m.InstanceID, m.QualityRank, m.IsIndependent)
 		if err != nil {
 			return fmt.Errorf("insert group member: %w", err)
 		}
@@ -1103,4 +1103,119 @@ func (db *DB) GetInstanceGroupForInstance(ctx context.Context, instanceID uuid.U
 		return nil, fmt.Errorf("get group for instance: %w", err)
 	}
 	return db.GetInstanceGroup(ctx, groupID)
+}
+
+// UpdateInstanceGroupMode updates the mode of an instance group.
+func (db *DB) UpdateInstanceGroupMode(ctx context.Context, id uuid.UUID, mode string) error {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE instance_groups SET mode = $1 WHERE id = $2`, mode, id)
+	if err != nil {
+		return fmt.Errorf("update instance group mode: %w", err)
+	}
+	return nil
+}
+
+// --- Cross-Instance Media ---
+
+// UpsertCrossInstanceMedia stores a detected media overlap, returning the record.
+func (db *DB) UpsertCrossInstanceMedia(ctx context.Context, groupID uuid.UUID, externalID, title string) (*CrossInstanceMedia, error) {
+	var m CrossInstanceMedia
+	err := db.Pool.QueryRow(ctx,
+		`INSERT INTO cross_instance_media (group_id, external_id, title, detected_at)
+		 VALUES ($1, $2, $3, now())
+		 ON CONFLICT (group_id, external_id)
+		 DO UPDATE SET title = EXCLUDED.title, detected_at = now()
+		 RETURNING id, group_id, external_id, title, detected_at`,
+		groupID, externalID, title,
+	).Scan(&m.ID, &m.GroupID, &m.ExternalID, &m.Title, &m.DetectedAt)
+	if err != nil {
+		return nil, fmt.Errorf("upsert cross instance media: %w", err)
+	}
+	return &m, nil
+}
+
+// SetCrossInstancePresence replaces presence records for a media item.
+func (db *DB) SetCrossInstancePresence(ctx context.Context, mediaID uuid.UUID, presence []CrossInstancePresence) error {
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	_, err = tx.Exec(ctx, `DELETE FROM cross_instance_presence WHERE media_id = $1`, mediaID)
+	if err != nil {
+		return fmt.Errorf("clear presence: %w", err)
+	}
+
+	for _, p := range presence {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO cross_instance_presence (media_id, instance_id, monitored, has_file)
+			 VALUES ($1, $2, $3, $4)`,
+			mediaID, p.InstanceID, p.Monitored, p.HasFile)
+		if err != nil {
+			return fmt.Errorf("insert presence: %w", err)
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// ListCrossInstanceMedia returns all detected overlaps for a group.
+func (db *DB) ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]CrossInstanceMedia, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, group_id, external_id, title, detected_at
+		 FROM cross_instance_media WHERE group_id = $1
+		 ORDER BY detected_at DESC`, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("list cross instance media: %w", err)
+	}
+	defer rows.Close()
+
+	var items []CrossInstanceMedia
+	for rows.Next() {
+		var m CrossInstanceMedia
+		if err := rows.Scan(&m.ID, &m.GroupID, &m.ExternalID, &m.Title, &m.DetectedAt); err != nil {
+			return nil, fmt.Errorf("scan cross instance media: %w", err)
+		}
+		items = append(items, m)
+	}
+
+	// Load presence for all items
+	if len(items) > 0 {
+		mediaIDs := make([]uuid.UUID, len(items))
+		mediaMap := make(map[uuid.UUID]*CrossInstanceMedia, len(items))
+		for i := range items {
+			mediaIDs[i] = items[i].ID
+			mediaMap[items[i].ID] = &items[i]
+		}
+
+		pRows, err := db.Pool.Query(ctx,
+			`SELECT p.media_id, p.instance_id, i.name, p.monitored, p.has_file
+			 FROM cross_instance_presence p
+			 JOIN app_instances i ON i.id = p.instance_id
+			 WHERE p.media_id = ANY($1)`, mediaIDs)
+		if err != nil {
+			return nil, fmt.Errorf("list cross instance presence: %w", err)
+		}
+		defer pRows.Close()
+
+		for pRows.Next() {
+			var p CrossInstancePresence
+			if err := pRows.Scan(&p.MediaID, &p.InstanceID, &p.InstanceName, &p.Monitored, &p.HasFile); err != nil {
+				return nil, fmt.Errorf("scan presence: %w", err)
+			}
+			if m, ok := mediaMap[p.MediaID]; ok {
+				m.Presence = append(m.Presence, p)
+			}
+		}
+	}
+	return items, nil
+}
+
+// DeleteCrossInstanceMediaByGroup removes all overlap data for a group.
+func (db *DB) DeleteCrossInstanceMediaByGroup(ctx context.Context, groupID uuid.UUID) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM cross_instance_media WHERE group_id = $1`, groupID)
+	if err != nil {
+		return fmt.Errorf("delete cross instance media: %w", err)
+	}
+	return nil
 }

@@ -123,9 +123,13 @@ type Store interface {
 	GetInstanceGroup(ctx context.Context, id uuid.UUID) (*database.InstanceGroup, error)
 	CreateInstanceGroup(ctx context.Context, appType database.AppType, name string) (*database.InstanceGroup, error)
 	UpdateInstanceGroup(ctx context.Context, id uuid.UUID, name string) error
+	UpdateInstanceGroupMode(ctx context.Context, id uuid.UUID, mode string) error
 	DeleteInstanceGroup(ctx context.Context, id uuid.UUID) error
 	SetGroupMembers(ctx context.Context, groupID uuid.UUID, members []database.InstanceGroupMember) error
 	GetInstanceGroupForInstance(ctx context.Context, instanceID uuid.UUID) (*database.InstanceGroup, error)
+
+	// Cross-Instance Media
+	ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]database.CrossInstanceMedia, error)
 
 	// WebAuthn Credentials
 	CreateWebAuthnCredential(ctx context.Context, c *database.WebAuthnCredential) error
