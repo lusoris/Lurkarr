@@ -1,32 +1,26 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/lib/utils';
-	import { tv } from 'tailwind-variants';
+	import { Button as ShadcnButton, buttonVariants, type ButtonVariant, type ButtonSize } from './button';
 	import { Loader2 } from 'lucide-svelte';
 
-	const buttonVariants = tv({
-		base: 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
-		variants: {
-			variant: {
-				primary: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
-				secondary: 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
-				danger: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
-				ghost: 'hover:bg-accent hover:text-accent-foreground',
-				outline: 'border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
-				link: 'text-primary underline-offset-4 hover:underline'
-			},
-			size: {
-				sm: 'h-8 rounded-md px-3 text-xs',
-				md: 'h-9 px-4 py-2',
-				lg: 'h-10 rounded-md px-6',
-				icon: 'h-9 w-9'
-			}
-		},
-		defaultVariants: {
-			variant: 'primary',
-			size: 'md'
-		}
-	});
+	// Map our app-level variant names to shadcn variant names.
+	const variantMap: Record<string, ButtonVariant> = {
+		primary: 'default',
+		secondary: 'secondary',
+		danger: 'destructive',
+		ghost: 'ghost',
+		outline: 'outline',
+		link: 'link'
+	};
+
+	// Map our size names to shadcn size names.
+	const sizeMap: Record<string, ButtonSize> = {
+		sm: 'sm',
+		md: 'default',
+		lg: 'lg',
+		icon: 'icon'
+	};
 
 	interface Props {
 		variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'link';
@@ -55,7 +49,7 @@
 	{type}
 	disabled={disabled || loading}
 	{onclick}
-	class={cn(buttonVariants({ variant, size }), className)}
+	class={cn(buttonVariants({ variant: variantMap[variant], size: sizeMap[size] }), className)}
 >
 	{#if loading}
 		<Loader2 class="h-4 w-4 animate-spin" />

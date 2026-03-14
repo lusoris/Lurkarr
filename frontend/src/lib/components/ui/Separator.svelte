@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cn } from '$lib/lib/utils';
+	import { Separator as ShadcnSeparator } from './separator';
 
 	interface Props {
 		orientation?: 'horizontal' | 'vertical';
@@ -9,12 +9,4 @@
 	let { orientation = 'horizontal', class: className = '' }: Props = $props();
 </script>
 
-<div
-	role="separator"
-	aria-orientation={orientation}
-	class={cn(
-		'shrink-0 bg-border',
-		orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
-		className
-	)}
-></div>
+<ShadcnSeparator {orientation} class={className} />

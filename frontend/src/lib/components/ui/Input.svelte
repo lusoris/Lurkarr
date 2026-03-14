@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/lib/utils';
+	import { Input as ShadcnInput } from './input';
 
 	interface Props {
 		value?: string | number;
@@ -11,6 +12,9 @@
 		disabled?: boolean;
 		class?: string;
 		oninput?: (e: Event) => void;
+		min?: number | string;
+		max?: number | string;
+		step?: number | string;
 	}
 
 	let {
@@ -22,7 +26,10 @@
 		error = '',
 		disabled = false,
 		class: className = '',
-		oninput
+		oninput,
+		min,
+		max,
+		step
 	}: Props = $props();
 </script>
 
@@ -30,20 +37,16 @@
 	{#if label}
 		<span class="text-sm font-medium text-foreground">{label}</span>
 	{/if}
-	<input
+	<ShadcnInput
 		{type}
 		{placeholder}
 		{disabled}
 		{oninput}
+		{min}
+		{max}
+		{step}
 		bind:value
-		class={cn(
-			'flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-			'file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground',
-			'placeholder:text-muted-foreground',
-			'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-			'disabled:cursor-not-allowed disabled:opacity-50',
-			error ? 'border-destructive focus-visible:ring-destructive' : 'border-input'
-		)}
+		aria-invalid={error ? true : undefined}
 	/>
 	{#if error}
 		<p class="text-xs text-destructive">{error}</p>
