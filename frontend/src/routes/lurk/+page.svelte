@@ -2,17 +2,19 @@
 	import { api } from '$lib/api';
 	import { appTypes, appDisplayName, appTabLabel, appLogo, appAccentBorder, appBgColor, appButtonClass } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
+	import { getInstances } from '$lib/stores/instances.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
-	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import InstanceSwitcher from '$lib/components/InstanceSwitcher.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
 
 	const toasts = getToasts();
+	const store = getInstances();
 
 	interface AppSettings {
 		app_type: string;
@@ -30,15 +32,10 @@
 	}
 
 	let appSettings = $state<Record<string, AppSettings>>({});
-	let selectedApp = $state<string>('sonarr');
+	let selectedApp = $derived(store.selectedApp);
 	let saving = $state(false);
 
-	const tabs = appTypes.map(app => ({
-		value: app,
-		label: appTabLabel(app),
-		icon: appLogo(app),
-		activeClass: appBgColor(app) + ' text-white shadow-sm'
-	}));
+
 
 	async function loadAppSettings(app: string) {
 		try {
@@ -68,7 +65,7 @@
 <div class="space-y-6">
 	<PageHeader title="Lurk Settings" description="Configure lurking behavior per app — how many items to search, modes, rate limits, and more." />
 
-	<Tabs {tabs} bind:value={selectedApp} />
+	<InstanceSwitcher showInstances={false} />
 
 	<Card class="border-l-2 {appAccentBorder(selectedApp)}">
 		{#if appSettings[selectedApp]}

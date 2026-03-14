@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import { getAuth } from '$lib/stores/auth.svelte';
+	import { getInstances } from '$lib/stores/instances.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import { Loader2 } from 'lucide-svelte';
@@ -10,10 +11,16 @@
 	let { children }: { children: Snippet } = $props();
 
 	const auth = getAuth();
+	const instances = getInstances();
 	const isLogin = $derived(page.url.pathname.startsWith('/login'));
 
 	$effect(() => {
 		if (!isLogin) auth.check();
+	});
+
+	// Pre-fetch instances once authenticated.
+	$effect(() => {
+		if (auth.user) instances.fetch();
 	});
 </script>
 
@@ -32,6 +39,11 @@
 				{@render children()}
 			</div>
 		</main>
+	</div>
+{:else}
+	<div class="flex flex-col items-center justify-center h-screen bg-background gap-4">
+		<p class="text-sm text-muted-foreground">Unable to authenticate. Please try again.</p>
+		<a href="/login" class="text-sm text-primary hover:underline">Go to Login</a>
 	</div>
 {/if}
 

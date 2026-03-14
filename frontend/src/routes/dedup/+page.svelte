@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { getToasts } from '$lib/stores/toast.svelte';
+	import { getInstances } from '$lib/stores/instances.svelte';
 	import { appTypes, appDisplayName, appTabLabel, appLogo, appBgColor, appAccentBorder, appColor } from '$lib';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
-	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import InstanceSwitcher from '$lib/components/InstanceSwitcher.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -14,6 +15,7 @@
 	import { Layers, RefreshCw, Search, CheckCircle, XCircle, Minus, AlertTriangle } from 'lucide-svelte';
 
 	const toasts = getToasts();
+	const store = getInstances();
 
 	// --- Types ---
 
@@ -82,7 +84,7 @@
 	// --- State ---
 
 	let loading = $state(true);
-	let selectedApp = $state('radarr');
+	let selectedApp = $derived(store.selectedApp);
 	let groups = $state<InstanceGroup[]>([]);
 	let selectedGroupId = $state<string | null>(null);
 	let overlaps = $state<CrossInstanceMedia[]>([]);
@@ -95,14 +97,7 @@
 	const memberInstances = $derived(selectedGroup?.members?.sort((a, b) => a.quality_rank - b.quality_rank) ?? []);
 	const hasGroups = $derived(groups.length > 0);
 
-	const appTabs = appTypes
-		.filter(a => ['radarr', 'sonarr', 'lidarr', 'readarr', 'whisparr', 'eros'].includes(a))
-		.map(app => ({
-			value: app,
-			label: appTabLabel(app),
-			icon: appLogo(app),
-			activeClass: appBgColor(app) + ' text-white shadow-sm'
-		}));
+
 
 	// --- Loaders ---
 
@@ -223,7 +218,7 @@
 		{/snippet}
 	</PageHeader>
 
-	<Tabs tabs={appTabs} bind:value={selectedApp} />
+	<InstanceSwitcher showInstances={false} onchange={refreshAll} />
 
 	{#if loading}
 		<Skeleton rows={6} height="h-12" />

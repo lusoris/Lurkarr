@@ -3,18 +3,20 @@
 	import { appTypes, appDisplayName, appTabLabel, appLogo, appColor, appAccentBorder, appBgColor, appButtonClass } from '$lib';
 	import { SquarePen, Trash2 } from 'lucide-svelte';
 	import { getToasts } from '$lib/stores/toast.svelte';
+	import { getInstances } from '$lib/stores/instances.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
-	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import InstanceSwitcher from '$lib/components/InstanceSwitcher.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 
 	const toasts = getToasts();
+	const store = getInstances();
 
 	interface QueueCleanerSettings {
 		app_type: string;
@@ -103,7 +105,7 @@
 	type Tab = 'cleaner' | 'scoring' | 'blocklist' | 'imports';
 
 	let activeTab = $state<Tab>('cleaner');
-	let selectedApp = $state<string>('sonarr');
+	let selectedApp = $derived(store.selectedApp);
 	let cleanerSettings = $state<Record<string, QueueCleanerSettings>>({});
 	let scoringProfiles = $state<Record<string, ScoringProfile>>({});
 	let blocklist = $state<BlocklistLog[]>([]);
@@ -311,12 +313,7 @@
 		{ id: 'imports', label: 'Import Log' }
 	];
 
-	const appTabs = appTypes.map(app => ({
-		value: app,
-		label: appTabLabel(app),
-		icon: appLogo(app),
-		activeClass: appBgColor(app) + ' text-white shadow-sm'
-	}));
+
 </script>
 
 <svelte:head><title>Queue Management - Lurkarr</title></svelte:head>
@@ -325,7 +322,7 @@
 	<PageHeader title="Queue Management" description="Queue cleaner, scoring profiles, blocklist, and import history." />
 
 	<!-- App selector -->
-	<Tabs tabs={appTabs} bind:value={selectedApp} />
+	<InstanceSwitcher showInstances={false} onchange={loadTabData} />
 
 	<!-- Tab navigation -->
 	<div class="flex gap-0.5 rounded-lg bg-muted/50 p-0.5 overflow-x-auto">
