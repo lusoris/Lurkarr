@@ -44,6 +44,7 @@ type Store interface {
 	ListEnabledBlocklistRules(ctx context.Context) ([]database.BlocklistRule, error)
 	IsSearchOnCooldown(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID, cooldownHours int) (bool, error)
 	RecordSearch(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int) error
+	MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, operation string) error
 }
 
 // removal tracks a removed queue item with both its title and media key for
@@ -1299,6 +1300,11 @@ func (c *Cleaner) triggerReSearch(ctx context.Context, log *slog.Logger, lurker 
 			if err := c.db.RecordSearch(ctx, appType, instID, mediaID); err != nil {
 				log.Warn("failed to record search cooldown", "media_id", mediaID, "error", err)
 			}
+		}
+		// Mark as processed in the lurking engine so it doesn't redundantly
+		// search for the same media on its next cycle.
+		if err := c.db.MarkProcessed(ctx, appType, instID, mediaID, "missing"); err != nil {
+			log.Debug("failed to mark lurk-processed after re-search", "media_id", mediaID, "error", err)
 		}
 	}
 }

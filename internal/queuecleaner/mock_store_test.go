@@ -262,3 +262,17 @@ func (mr *MockStoreMockRecorder) ResetStrikes(ctx, appType, instanceID, download
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetStrikes", reflect.TypeOf((*MockStore)(nil).ResetStrikes), ctx, appType, instanceID, downloadID)
 }
+
+// MarkProcessed mocks base method.
+func (m *MockStore) MarkProcessed(ctx context.Context, appType database.AppType, instanceID uuid.UUID, mediaID int, operation string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkProcessed", ctx, appType, instanceID, mediaID, operation)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkProcessed indicates an expected call of MarkProcessed.
+func (mr *MockStoreMockRecorder) MarkProcessed(ctx, appType, instanceID, mediaID, operation any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkProcessed", reflect.TypeOf((*MockStore)(nil).MarkProcessed), ctx, appType, instanceID, mediaID, operation)
+}
