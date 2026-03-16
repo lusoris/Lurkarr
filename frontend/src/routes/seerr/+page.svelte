@@ -10,10 +10,10 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
-	import { Clapperboard, Tv, ScanSearch, Film, RefreshCw } from 'lucide-svelte';
+	import { Clapperboard, Tv, ScanSearch, Film, RefreshCw } from '@lucide/svelte';
 
 	const toasts = getToasts();
-	import type { SeerrUser, SeerrMedia, MediaRequest, RequestCount } from '$lib/types';
+	import type { SeerrUser, SeerrMedia, MediaRequest, RequestCount, DuplicateFlag, DupScanResult } from '$lib/types';
 
 	interface PageInfo {
 		pages: number;
@@ -35,7 +35,7 @@
 	let loading = $state(true);
 	let countsLoading = $state(true);
 	let scanning = $state(false);
-	let duplicates = $state<any[]>([]);
+	let duplicates = $state<DuplicateFlag[]>([]);
 
 	const filterMap: Record<FilterTab, string> = {
 		all: '',
@@ -72,7 +72,7 @@
 	async function scanDuplicates() {
 		scanning = true;
 		try {
-			const result = await api.post<{ duplicates: any[] }>('/seerr/scan-duplicates');
+			const result = await api.post<DupScanResult>('/seerr/scan-duplicates');
 			duplicates = result.duplicates ?? [];
 			if (duplicates.length === 0) {
 				toasts.success('No duplicates found');

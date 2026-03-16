@@ -253,3 +253,93 @@ var (
 		Help:      "Total items in the arr download queue.",
 	}, []string{"app_type", "instance"})
 )
+
+// ── Database Pool metrics ────────────────────────────────────────────────────
+
+var (
+	DBPoolAcquireCount = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "db_pool",
+		Name:      "acquire_count_total",
+		Help:      "Cumulative number of pool connection acquires.",
+	})
+
+	DBPoolAcquiredConns = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "db_pool",
+		Name:      "acquired_conns",
+		Help:      "Number of currently acquired connections.",
+	})
+
+	DBPoolIdleConns = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "db_pool",
+		Name:      "idle_conns",
+		Help:      "Number of idle connections in the pool.",
+	})
+
+	DBPoolTotalConns = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "db_pool",
+		Name:      "total_conns",
+		Help:      "Total number of connections in the pool.",
+	})
+
+	DBPoolMaxConns = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Subsystem: "db_pool",
+		Name:      "max_conns",
+		Help:      "Maximum number of connections allowed in the pool.",
+	})
+
+	ActiveSessions = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "lurkarr",
+		Name:      "active_sessions",
+		Help:      "Number of active (non-expired) user sessions.",
+	})
+)
+
+// ── External API metrics ─────────────────────────────────────────────────────
+
+var (
+	ExternalAPIDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "lurkarr",
+		Subsystem: "external_api",
+		Name:      "duration_seconds",
+		Help:      "Duration of outbound HTTP calls to external services.",
+		Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30},
+	}, []string{"client", "method"})
+
+	ExternalAPIErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "lurkarr",
+		Subsystem: "external_api",
+		Name:      "errors_total",
+		Help:      "Total errors from outbound HTTP calls to external services.",
+	}, []string{"client", "method"})
+)
+
+// ── Blocklist Sync metrics ───────────────────────────────────────────────────
+
+var (
+	BlocklistSyncDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "lurkarr",
+		Subsystem: "blocklist_sync",
+		Name:      "duration_seconds",
+		Help:      "Duration of blocklist source syncs in seconds.",
+		Buckets:   []float64{0.1, 0.5, 1, 2.5, 5, 10, 30},
+	}, []string{"source"})
+
+	BlocklistSyncErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "lurkarr",
+		Subsystem: "blocklist_sync",
+		Name:      "errors_total",
+		Help:      "Total blocklist sync errors.",
+	}, []string{"source"})
+
+	BlocklistSyncRulesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "lurkarr",
+		Subsystem: "blocklist_sync",
+		Name:      "rules_synced_total",
+		Help:      "Total rules synced from blocklist sources.",
+	}, []string{"source"})
+)

@@ -1,4 +1,4 @@
-.PHONY: build test test-integration test-all lint generate frontend coder-push
+.PHONY: build test test-integration test-all lint generate frontend coder-push security cover
 
 build:
 	go build ./...
@@ -22,3 +22,12 @@ frontend:
 
 coder-push:
 	./deploy/coder/push-template.sh
+
+security:
+	govulncheck ./...
+	gosec ./...
+
+cover:
+	go test -coverprofile=coverage/coverage.out ./...
+	go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	@echo "Coverage report: coverage/coverage.html"

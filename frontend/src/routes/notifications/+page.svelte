@@ -19,7 +19,7 @@
 	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Label } from '$lib/components/ui/label';
-	import { Bell, Plus, Trash2 } from 'lucide-svelte';
+	import { Bell, Plus, Trash2 } from '@lucide/svelte';
 	import type { NotificationProvider } from '$lib/types';
 
 	const toasts = getToasts();
@@ -410,7 +410,7 @@
 							<Button size="sm" variant="secondary" loading={testing === provider.id} onclick={() => testProvider(provider.id)}>Test</Button>
 							<Button size="sm" variant="ghost" onclick={() => openEdit(provider)}>Edit</Button>
 							<ConfirmAction onconfirm={() => deleteProvider(provider.id)}>
-								<Button size="sm" variant="ghost">
+								<Button size="sm" variant="ghost" aria-label="Delete provider">
 									<Trash2 class="w-4 h-4 text-destructive" />
 								</Button>
 							</ConfirmAction>
@@ -461,7 +461,7 @@
 			</Select>
 		{/if}
 
-		<Input bind:value={formName} label="Name" placeholder="My {providerLabel(formType)} notifications" />
+		<Input bind:value={formName} label="Name" placeholder="My {providerLabel(formType)} notifications" required maxlength={100} />
 		<Toggle bind:checked={formEnabled} label="Enabled" />
 
 		<!-- Provider-specific config fields -->
@@ -472,16 +472,16 @@
 					{#if formType === 'email'}
 						<!-- Email: group SMTP connection and addresses -->
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-						<Input bind:value={formConfig['host']} label="SMTP Host" placeholder={fieldPlaceholders['host']} />
-						<Input bind:value={formConfig['port']} label="SMTP Port" placeholder={fieldPlaceholders['port']} hint={fieldHints['port']} />
+						<Input bind:value={formConfig['host']} label="SMTP Host" placeholder={fieldPlaceholders['host']} required />
+						<Input bind:value={formConfig['port']} label="SMTP Port" placeholder={fieldPlaceholders['port']} hint={fieldHints['port']} required />
 					</div>
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 						<Input bind:value={formConfig['username']} label="Username" />
 						<Input bind:value={formConfig['password']} label="Password" type="password" />
 					</div>
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-						<Input bind:value={formConfig['from']} label="From Address" placeholder={fieldPlaceholders['from']} />
-						<Input bind:value={formConfig['to']} label="To Address(es)" placeholder={fieldPlaceholders['to']} hint={fieldHints['to']} />
+						<Input bind:value={formConfig['from']} label="From Address" placeholder={fieldPlaceholders['from']} required />
+						<Input bind:value={formConfig['to']} label="To Address(es)" placeholder={fieldPlaceholders['to']} hint={fieldHints['to']} required />
 						</div>
 					{:else}
 						{#each selectedProvider.fields as field}

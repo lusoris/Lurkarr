@@ -17,7 +17,7 @@
 	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Progress } from '$lib/components/ui/progress';
-	import { RotateCcw, LayoutDashboard, Plug, Moon, AlertTriangle, Flame, ListOrdered, CalendarDays, Search, Shield, Zap, ArrowRightLeft, Clock } from 'lucide-svelte';
+	import { RotateCcw, LayoutDashboard, Plug, Moon, AlertTriangle, Flame, ListOrdered, CalendarDays, Search, Shield, Zap, ArrowRightLeft, Clock } from '@lucide/svelte';
 
 	const toasts = getToasts();
 	const instanceStore = getInstances();
@@ -59,7 +59,10 @@
 			stats = s;
 			caps = c;
 			dlClients = dls ?? [];
-		} catch { /* handled by error boundary */ }
+		} catch (e) {
+			console.error('Failed to load dashboard data', e);
+			toasts.error('Failed to load dashboard data');
+		}
 
 		// Non-blocking: health checks, services, seerr count, activity, app settings
 		checkAllHealth();
@@ -111,7 +114,7 @@
 					prowlarrHealth = { status: 'offline' };
 				}
 			}
-		} catch { /* not configured */ }
+		} catch { /* service not configured — expected */ }
 
 		// Seerr
 		try {
@@ -124,7 +127,7 @@
 					seerrHealth = { status: 'offline' };
 				}
 			}
-		} catch { /* not configured */ }
+		} catch { /* service not configured — expected */ }
 	}
 
 	async function loadSeerrCount() {
@@ -154,7 +157,7 @@
 				try {
 					const settings = await api.get<AppSettings>(`/settings/${app}`);
 					appSettingsMap = { ...appSettingsMap, [app]: settings };
-				} catch { /* not configured */ }
+				} catch { /* app not configured — expected */ }
 			})
 		);
 	}
@@ -421,7 +424,7 @@
 							<div class="flex items-center justify-between mb-3">
 								<div class="flex items-center gap-2">
 									{#if logo}
-										<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />
+										<img src={logo} alt="{appDisplayName(appType)} logo" class="w-4 h-4 rounded shrink-0" />
 									{/if}
 									<span class="text-sm font-medium {appColor(appType)}">
 										{appDisplayName(appType)}
@@ -453,6 +456,7 @@
 													class="h-auto w-auto p-0 shrink-0"
 													onclick={() => confirmResetInstance = `${s.app_type}:${s.instance_id}`}
 													disabled={resettingInstance === `${s.app_type}:${s.instance_id}`}
+													aria-label="Reset instance stats"
 												>
 													<RotateCcw class="h-3.5 w-3.5" />
 												</Button>
@@ -472,7 +476,7 @@
 							<div class="flex items-center justify-between mb-3">
 								<div class="flex items-center gap-2">
 									{#if logo}
-										<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />
+										<img src={logo} alt="{appDisplayName(appType)} logo" class="w-4 h-4 rounded shrink-0" />
 									{/if}
 									<span class="text-sm font-medium {appColor(appType)}">
 										{appDisplayName(appType)}
@@ -533,7 +537,7 @@
 					<Card class="border-l-2 border-l-purple-400">
 						<div class="flex items-center justify-between mb-3">
 							<div class="flex items-center gap-2">
-								<img src={appLogo('seerr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('seerr')} alt="Seerr logo" class="w-4 h-4 rounded shrink-0" />
 								<span class="text-sm font-medium text-purple-400">Seerr</span>
 							</div>
 							<Badge variant="info">Connected</Badge>

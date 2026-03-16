@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/lib/utils';
 	import { Button as ShadcnButton, buttonVariants, type ButtonVariant, type ButtonSize } from './button';
-	import { Loader2 } from 'lucide-svelte';
+	import { Loader2 } from '@lucide/svelte';
 
 	// Map our app-level variant names to shadcn variant names.
 	const variantMap: Record<string, ButtonVariant> = {

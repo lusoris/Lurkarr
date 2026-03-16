@@ -10,7 +10,7 @@
 	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import { ScrollText, RefreshCw, Search, Shield, ArrowRightLeft, Clock, Zap } from 'lucide-svelte';
+	import { ScrollText, RefreshCw, Search, Shield, ArrowRightLeft, Clock, Zap } from '@lucide/svelte';
 	import type { ActivityEvent } from '$lib/types';
 	import { timeAgo } from '$lib/format';
 

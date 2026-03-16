@@ -16,6 +16,7 @@
 </script>
 
 <Card class={cn('text-center py-10', className)}>
+	<div role="status">
 	{#if icon}
 		{@const Icon = icon}
 		<div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
@@ -31,4 +32,5 @@
 			{@render actions()}
 		</div>
 	{/if}
+	</div>
 </Card>

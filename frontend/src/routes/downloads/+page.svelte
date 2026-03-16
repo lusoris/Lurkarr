@@ -10,7 +10,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Progress from '$lib/components/ui/progress/progress.svelte';
-	import { ArrowDown, ArrowUp, Cable, Pause, Play } from 'lucide-svelte';
+	import { ArrowDown, ArrowUp, Cable, Pause, Play } from '@lucide/svelte';
 	import type { DownloadClientInstance, ClientStatus, DownloadItem, SABnzbdSettings, SABnzbdQueueSlot, SABnzbdQueue, SABnzbdStats } from '$lib/types';
 	import { formatBytes, formatSpeed, formatETA } from '$lib/format';
 
@@ -73,7 +73,7 @@
 			}
 			await loadSABnzbdData();
 		} catch {
-			// ignore
+			console.warn('Failed to toggle SABnzbd pause');
 		}
 		sabPausing = false;
 	}
@@ -296,7 +296,7 @@
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">
 								{#if appLogo('sabnzbd')}
-									<img src={appLogo('sabnzbd')} alt="" class="w-6 h-6 rounded" />
+									<img src={appLogo('sabnzbd')} alt="SABnzbd logo" class="w-6 h-6 rounded" />
 								{/if}
 								<div>
 									<div class="flex items-center gap-2">

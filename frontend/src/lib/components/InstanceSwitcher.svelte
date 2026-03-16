@@ -43,7 +43,7 @@
 				onclick={() => onAppChange(app)}
 			>
 				{#if logo}
-					<img src={logo} alt="" class="w-4 h-4 rounded-sm" />
+					<img src={logo} alt="{appTabLabel(app)} logo" class="w-4 h-4 rounded-sm" />
 				{/if}
 				{appTabLabel(app)}
 			</Button>

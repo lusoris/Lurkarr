@@ -70,7 +70,7 @@ describe('Select', () => {
 		const { container } = render(Select, {
 			props: { class: 'my-select', children: optionsSnippet() }
 		});
-		expect(container.querySelector('label.my-select')).not.toBeNull();
+		expect(container.querySelector('div.my-select')).not.toBeNull();
 	});
 });
 

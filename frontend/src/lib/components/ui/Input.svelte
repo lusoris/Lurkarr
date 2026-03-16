@@ -16,6 +16,10 @@
 		min?: number | string;
 		max?: number | string;
 		step?: number | string;
+		required?: boolean;
+		pattern?: string;
+		minlength?: number;
+		maxlength?: number;
 	}
 
 	let {
@@ -30,7 +34,11 @@
 		oninput,
 		min,
 		max,
-		step
+		step,
+		required,
+		pattern,
+		minlength,
+		maxlength
 	}: Props = $props();
 </script>
 
@@ -46,6 +54,10 @@
 		{min}
 		{max}
 		{step}
+		{required}
+		{pattern}
+		{minlength}
+		{maxlength}
 		bind:value
 		aria-invalid={error ? true : undefined}
 	/>

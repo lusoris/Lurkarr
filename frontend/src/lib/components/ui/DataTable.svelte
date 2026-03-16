@@ -1,9 +1,9 @@
 <script lang="ts" module>
-	export interface Column<T = any> {
+	export interface Column<T = Record<string, unknown>> {
 		key: string;
 		header: string;
 		sortable?: boolean;
-		/** Extract a sortable/filterable value from the row. Defaults to (row as any)[key]. */
+		/** Extract a sortable/filterable value from the row. Defaults to row[key]. */
 		accessor?: (row: T) => string | number;
 		class?: string;
 		headerClass?: string;
@@ -13,7 +13,7 @@
 <script lang="ts" generics="T">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/lib/utils';
-	import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-svelte';
+	import { ArrowUpDown, ArrowUp, ArrowDown } from '@lucide/svelte';
 	import * as Table from './table';
 	import * as Pagination from './pagination';
 	import { Input as ShadcnInput } from './input';

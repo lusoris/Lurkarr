@@ -8,7 +8,7 @@
 	import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import * as S from '$lib/components/ui/sidebar';
-	import { Loader2 } from 'lucide-svelte';
+	import { Loader2 } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
@@ -42,7 +42,7 @@
 				<S.Trigger />
 				<img src="/banner.png" alt="Lurkarr" class="h-7 w-auto object-contain" />
 			</header>
-			<main class="flex-1 overflow-y-auto bg-background">
+			<main class="flex-1 overflow-y-auto bg-background" aria-live="polite">
 				<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
 					<Breadcrumbs />
 					{@render children()}

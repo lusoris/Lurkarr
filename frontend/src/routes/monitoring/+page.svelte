@@ -11,7 +11,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
 	import * as Table from '$lib/components/ui/table';
-	import { Activity, ExternalLink, RefreshCw, Heart, Terminal, BarChart3, Trash2 } from 'lucide-svelte';
+	import { Activity, ExternalLink, RefreshCw, Heart, Terminal, BarChart3, Trash2 } from '@lucide/svelte';
 	import type { HealthInfo, Stats, HourlyCap } from '$lib/types';
 
 	const store = getInstances();
@@ -58,7 +58,9 @@
 			]);
 			stats = s;
 			caps = c;
-		} catch { /* handled */ }
+		} catch (e) {
+			console.error('Failed to load monitoring stats', e);
+		}
 		loadingStats = false;
 	}
 

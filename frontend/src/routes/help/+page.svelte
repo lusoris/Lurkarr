@@ -10,7 +10,7 @@
 		Search, Rocket, Cable, Flame, ListOrdered, CalendarDays, Download,
 		Film, Layers, Bell, Activity, Settings, User, HelpCircle, ChevronRight,
 		BarChart3, ExternalLink
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	const pageCards: { key: string; label: string; href: string; icon: typeof Cable; color: string }[] = [
 		{ key: 'apps', label: 'Connections', href: '/apps', icon: Cable, color: 'text-blue-400' },

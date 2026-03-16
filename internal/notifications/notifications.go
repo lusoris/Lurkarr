@@ -27,6 +27,12 @@ const (
 	EventTestNotification EventType = "test"
 )
 
+// Circuit breaker thresholds.
+const (
+	cbMaxFailures  = 5               // consecutive failures before opening
+	cbCooldownTime = 5 * time.Minute // how long the circuit stays open
+)
+
 // Event represents a notification event.
 type Event struct {
 	Type     EventType
@@ -101,6 +107,10 @@ type providerEntry struct {
 	events   map[EventType]bool // which events this provider subscribes to
 	titleTpl *template.Template // optional custom title template
 	bodyTpl  *template.Template // optional custom body template
+
+	// Circuit breaker state.
+	consecutiveFailures int
+	openUntil           time.Time // if non-zero, provider is disabled until this time
 }
 
 // NewManager creates a notification manager.
@@ -177,13 +187,21 @@ func (m *Manager) Notify(ctx context.Context, event Event) {
 		pt    ProviderType
 		entry providerEntry
 	}, 0, len(m.providers))
+	now := time.Now()
 	for pt, e := range m.providers {
-		if e.events[event.Type] {
-			entries = append(entries, struct {
-				pt    ProviderType
-				entry providerEntry
-			}{pt, e})
+		if !e.events[event.Type] {
+			continue
 		}
+		// Circuit breaker: skip providers that are in open state.
+		if !e.openUntil.IsZero() && now.Before(e.openUntil) {
+			slog.Debug("notification circuit breaker open, skipping",
+				"provider", e.provider.Name(), "until", e.openUntil)
+			continue
+		}
+		entries = append(entries, struct {
+			pt    ProviderType
+			entry providerEntry
+		}{pt, e})
 	}
 	recorder := m.recorder
 	m.mu.RUnlock()
@@ -212,6 +230,14 @@ func (m *Manager) Notify(ctx context.Context, event Event) {
 			start := time.Now()
 			name := e.provider.Name()
 			sendErr := e.provider.Send(ctx, ev)
+
+			// Retry once on failure with a short backoff.
+			if sendErr != nil {
+				slog.Warn("notification delivery failed, retrying",
+					"provider", name, "event", event.Type, "error", sendErr)
+				time.Sleep(2 * time.Second)
+				sendErr = e.provider.Send(ctx, ev)
+			}
 			dur := time.Since(start)
 
 			if sendErr != nil {
@@ -221,8 +247,29 @@ func (m *Manager) Notify(ctx context.Context, event Event) {
 					"event", event.Type,
 					"error", sendErr,
 				)
+				// Update circuit breaker on failure.
+				m.mu.Lock()
+				if entry, ok := m.providers[pt]; ok {
+					entry.consecutiveFailures++
+					if entry.consecutiveFailures >= cbMaxFailures {
+						entry.openUntil = time.Now().Add(cbCooldownTime)
+						slog.Warn("notification circuit breaker opened",
+							"provider", name, "failures", entry.consecutiveFailures,
+							"cooldown", cbCooldownTime)
+					}
+					m.providers[pt] = entry
+				}
+				m.mu.Unlock()
 			} else {
 				metrics.NotificationSentTotal.WithLabelValues(name, string(event.Type)).Inc()
+				// Reset circuit breaker on success.
+				m.mu.Lock()
+				if entry, ok := m.providers[pt]; ok {
+					entry.consecutiveFailures = 0
+					entry.openUntil = time.Time{}
+					m.providers[pt] = entry
+				}
+				m.mu.Unlock()
 			}
 			metrics.NotificationDuration.WithLabelValues(name).Observe(dur.Seconds())
 

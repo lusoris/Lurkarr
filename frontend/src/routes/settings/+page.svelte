@@ -95,8 +95,8 @@
 			<CollapsibleCard title="Lurking Behaviour">
 				<p class="text-xs text-muted-foreground mb-4">Controls how Lurkarr searches and manages your media libraries.</p>
 				<div class="space-y-4">
-					<Input bind:value={general.stateful_reset_hours} type="number" label="State Reset (hours)" hint="Hours after which lurk progress resets and starts fresh" />
-					<Input bind:value={general.max_download_queue_size} type="number" label="Max Download Queue Size (0 = disabled)" hint="Pause lurking when the download queue has this many items or more. 0 disables" />
+					<Input bind:value={general.stateful_reset_hours} type="number" label="State Reset (hours)" hint="Hours after which lurk progress resets and starts fresh" required min={1} />
+					<Input bind:value={general.max_download_queue_size} type="number" label="Max Download Queue Size (0 = disabled)" hint="Pause lurking when the download queue has this many items or more. 0 disables" min={0} />
 				</div>
 			</CollapsibleCard>
 
@@ -104,10 +104,10 @@
 			<CollapsibleCard title="API & Command Execution">
 				<p class="text-xs text-muted-foreground mb-4">Tune how Lurkarr communicates with your Arr apps.</p>
 				<div class="space-y-4">
-					<Input bind:value={general.api_timeout} type="number" label="API Timeout (seconds)" hint="How long to wait for arr API responses before timing out" />
+					<Input bind:value={general.api_timeout} type="number" label="API Timeout (seconds)" hint="How long to wait for arr API responses before timing out" required min={1} max={300} />
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<Input bind:value={general.command_wait_delay} type="number" label="Command Wait Delay (ms)" hint="Delay between command-completion checks" />
-						<Input bind:value={general.command_wait_attempts} type="number" label="Command Wait Attempts" hint="Max retries for command completion" />
+						<Input bind:value={general.command_wait_delay} type="number" label="Command Wait Delay (ms)" hint="Delay between command-completion checks" required min={100} />
+						<Input bind:value={general.command_wait_attempts} type="number" label="Command Wait Attempts" hint="Max retries for command completion" required min={1} max={100} />
 					</div>
 				</div>
 			</CollapsibleCard>
@@ -135,10 +135,10 @@
 					<Toggle bind:checked={oidc.enabled} label="Enable OIDC" hint="Allow users to sign in via the configured OIDC provider" />
 
 					{#if oidc.enabled}
-						<Input bind:value={oidc.issuer_url} type="text" label="Issuer URL" hint="The OIDC provider's issuer URL (e.g. https://auth.example.com/application/o/lurkarr/)" />
+						<Input bind:value={oidc.issuer_url} type="text" label="Issuer URL" hint="The OIDC provider's issuer URL (e.g. https://auth.example.com/application/o/lurkarr/)" required />
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<Input bind:value={oidc.client_id} type="text" label="Client ID" hint="OAuth2 client ID from your OIDC provider" />
-							<Input bind:value={oidc.client_secret} type="password" label="Client Secret" hint="OAuth2 client secret" />
+							<Input bind:value={oidc.client_id} type="text" label="Client ID" hint="OAuth2 client ID from your OIDC provider" required />
+							<Input bind:value={oidc.client_secret} type="password" label="Client Secret" hint="OAuth2 client secret" required />
 						</div>
 						<Input bind:value={oidc.redirect_url} type="text" label="Redirect URL" hint="Callback URL — usually https://your-domain/api/auth/oidc/callback" />
 						<Input bind:value={oidc.scopes} type="text" label="Scopes" hint="Comma-separated scopes (default: openid,profile,email)" />

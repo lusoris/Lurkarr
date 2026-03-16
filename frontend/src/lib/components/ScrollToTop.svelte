@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowUp } from 'lucide-svelte';
+	import { ArrowUp } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 
 	let visible = $state(false);
@@ -17,7 +17,7 @@
 
 {#if visible}
 	<div class="fixed bottom-6 right-6 z-50">
-		<Button variant="outline" size="icon" class="rounded-full shadow-lg" onclick={scrollToTop}>
+		<Button variant="outline" size="icon" class="rounded-full shadow-lg" onclick={scrollToTop} aria-label="Scroll to top">
 			<ArrowUp class="h-4 w-4" />
 		</Button>
 	</div>

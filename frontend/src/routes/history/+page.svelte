@@ -16,7 +16,7 @@
 	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
 	import * as T from '$lib/components/ui/table';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
-	import { History, Trash2 } from 'lucide-svelte';
+	import { History, Trash2 } from '@lucide/svelte';
 	import type { HistoryItem, BlocklistEntry, ImportEntry, StrikeEntry } from '$lib/types';
 
 	const toasts = getToasts();

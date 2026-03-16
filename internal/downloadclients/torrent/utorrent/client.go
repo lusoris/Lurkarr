@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -170,24 +171,45 @@ func parseTorrent(raw []json.RawMessage) (Torrent, error) {
 	if err := json.Unmarshal(raw[2], &t.Name); err != nil {
 		return Torrent{}, fmt.Errorf("utorrent: unmarshal name: %w", err)
 	}
-	_ = json.Unmarshal(raw[1], &t.Status)
-	_ = json.Unmarshal(raw[3], &t.Size)
-	_ = json.Unmarshal(raw[4], &t.Progress)
-	_ = json.Unmarshal(raw[5], &t.Downloaded)
-	_ = json.Unmarshal(raw[6], &t.Uploaded)
-	_ = json.Unmarshal(raw[7], &t.Ratio)
-	_ = json.Unmarshal(raw[8], &t.UploadSpeed)
-	_ = json.Unmarshal(raw[9], &t.DownloadSpeed)
-	_ = json.Unmarshal(raw[10], &t.ETA)
-	_ = json.Unmarshal(raw[11], &t.Label)
+	// Non-critical fields: log warnings on parse failure instead of silently discarding.
+	for _, f := range []struct {
+		idx  int
+		name string
+		dest any
+	}{
+		{1, "status", &t.Status},
+		{3, "size", &t.Size},
+		{4, "progress", &t.Progress},
+		{5, "downloaded", &t.Downloaded},
+		{6, "uploaded", &t.Uploaded},
+		{7, "ratio", &t.Ratio},
+		{8, "upload_speed", &t.UploadSpeed},
+		{9, "download_speed", &t.DownloadSpeed},
+		{10, "eta", &t.ETA},
+		{11, "label", &t.Label},
+	} {
+		if err := json.Unmarshal(raw[f.idx], f.dest); err != nil {
+			slog.Warn("utorrent: failed to parse torrent field",
+				"field", f.name, "index", f.idx, "hash", t.Hash, "error", err)
+		}
+	}
 	if len(raw) > 23 {
-		_ = json.Unmarshal(raw[23], &t.AddedOn)
+		if err := json.Unmarshal(raw[23], &t.AddedOn); err != nil {
+			slog.Warn("utorrent: failed to parse torrent field",
+				"field", "added_on", "index", 23, "hash", t.Hash, "error", err)
+		}
 	}
 	if len(raw) > 24 {
-		_ = json.Unmarshal(raw[24], &t.CompletedOn)
+		if err := json.Unmarshal(raw[24], &t.CompletedOn); err != nil {
+			slog.Warn("utorrent: failed to parse torrent field",
+				"field", "completed_on", "index", 24, "hash", t.Hash, "error", err)
+		}
 	}
 	if len(raw) > 26 {
-		_ = json.Unmarshal(raw[26], &t.SavePath)
+		if err := json.Unmarshal(raw[26], &t.SavePath); err != nil {
+			slog.Warn("utorrent: failed to parse torrent field",
+				"field", "save_path", "index", 26, "hash", t.Hash, "error", err)
+		}
 	}
 	return t, nil
 }

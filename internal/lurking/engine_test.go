@@ -71,14 +71,15 @@ func TestSelectItemsRandom(t *testing.T) {
 }
 
 func TestLurkerForKnownTypes(t *testing.T) {
+	// Verify Prowlarr is NOT in AllAppTypes (it's an indexer manager, not an arr)
 	for _, appType := range database.AllAppTypes() {
 		if appType == database.AppProwlarr {
-			// Prowlarr doesn't have a lurker (it's an indexer manager, not an arr)
-			if LurkerFor(appType) != nil {
-				t.Errorf("expected nil lurker for Prowlarr, got %v", LurkerFor(appType))
-			}
-			continue
+			t.Errorf("Prowlarr should not be in AllAppTypes, but found it")
 		}
+	}
+
+	// Verify all arr types have lurkers
+	for _, appType := range database.AllAppTypes() {
 		h := LurkerFor(appType)
 		if h == nil {
 			t.Errorf("expected lurker for %s, got nil", appType)
@@ -90,5 +91,25 @@ func TestLurkerForUnknown(t *testing.T) {
 	h := LurkerFor(database.AppType("nonexistent"))
 	if h != nil {
 		t.Errorf("expected nil for unknown type, got %v", h)
+	}
+}
+
+func TestProwlarrExcludedFromLurking(t *testing.T) {
+	// Verify Prowlarr constant still exists (for connections/config)
+	if database.AppProwlarr != "prowlarr" {
+		t.Errorf("AppProwlarr constant changed unexpectedly")
+	}
+
+	// But Prowlarr should not be in AllAppTypes (used by lurking engine)
+	allTypes := database.AllAppTypes()
+	for _, appType := range allTypes {
+		if appType == database.AppProwlarr {
+			t.Fatal("Prowlarr must not be in AllAppTypes() - lurking engine must skip indexer apps")
+		}
+	}
+
+	// And LurkerFor(Prowlarr) should return nil
+	if LurkerFor(database.AppProwlarr) != nil {
+		t.Error("LurkerFor(AppProwlarr) must return nil - Prowlarr is an indexer, not an arr app")
 	}
 }

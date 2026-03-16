@@ -8,7 +8,7 @@
 		LayoutDashboard, Cable, Flame, CalendarDays, History, Download,
 		ListOrdered, Bell, Activity, Settings, Users, UserCircle,
 		Heart, LogOut, Layers, ScrollText, Film, HelpCircle
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	const auth = getAuth();
 

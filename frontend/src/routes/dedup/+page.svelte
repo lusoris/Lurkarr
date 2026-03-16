@@ -14,7 +14,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
-	import { Layers, RefreshCw, Search, CheckCircle, XCircle, Minus, AlertTriangle } from 'lucide-svelte';
+	import { Layers, RefreshCw, Search, CheckCircle, XCircle, Minus, AlertTriangle } from '@lucide/svelte';
 	import type { InstanceGroupMember, InstanceGroup, CrossInstancePresence, CrossInstanceMedia, CrossInstanceAction, DuplicateFlag, DupScanResult } from '$lib/types';
 
 	const toasts = getToasts();

@@ -23,6 +23,7 @@ frontend/.svelte-kit/
 .vscode/
 *.swp
 *.swo
+*.bak
 *~
 
 # OS

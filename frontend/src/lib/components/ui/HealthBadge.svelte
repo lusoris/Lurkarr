@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { HealthInfo } from '$lib/types';
 	import { fmtVersion } from '$lib/format';
-	import Badge from './Badge.svelte';
+	import Badge from './badge/badge.svelte';
 	import * as Popover from './popover';
 
 	interface Props {

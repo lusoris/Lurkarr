@@ -16,7 +16,7 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import * as ScrollArea from '$lib/components/ui/scroll-area';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import { CalendarDays, Plus, Clock } from 'lucide-svelte';
+	import { CalendarDays, Plus, Clock } from '@lucide/svelte';
 	import type { Schedule, ScheduleExecution } from '$lib/types';
 
 	const toasts = getToasts();

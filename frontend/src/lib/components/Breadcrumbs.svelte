@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import * as Breadcrumb from './ui/breadcrumb';
-	import { Home } from 'lucide-svelte';
+	import { Home } from '@lucide/svelte';
 
 	/** Maps route segments to display labels. */
 	const labels: Record<string, string> = {

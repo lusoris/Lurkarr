@@ -3,7 +3,7 @@
 	import { cn } from '$lib/lib/utils';
 	import Card from './Card.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible';
-	import { ChevronRight } from 'lucide-svelte';
+	import { ChevronRight } from '@lucide/svelte';
 
 	interface Props {
 		title: string;

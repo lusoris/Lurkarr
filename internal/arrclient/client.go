@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 // Client is a generic *Arr API client.
@@ -58,8 +60,14 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 	}
 	req.Header.Set("X-Api-Key", c.APIKey)
 	req.Header.Set("Content-Type", "application/json")
+
+	start := time.Now()
 	resp, err := c.HTTPClient.Do(req)
+	dur := time.Since(start)
+	metrics.ExternalAPIDuration.WithLabelValues("arr", method).Observe(dur.Seconds())
+
 	if err != nil {
+		metrics.ExternalAPIErrorsTotal.WithLabelValues("arr", method).Inc()
 		return nil, fmt.Errorf("do request: %w", err)
 	}
 	if resp.StatusCode >= 400 {

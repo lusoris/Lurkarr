@@ -4,7 +4,7 @@
 	import Badge from './ui/Badge.svelte';
 	import Button from './ui/Button.svelte';
 	import { Input as ShadcnInput } from './ui/input';
-	import { HelpCircle, Search, ExternalLink, Lightbulb, BookOpen } from 'lucide-svelte';
+	import { HelpCircle, Search, ExternalLink, Lightbulb, BookOpen } from '@lucide/svelte';
 	import { helpData } from '$lib/help-data';
 
 	interface Props {

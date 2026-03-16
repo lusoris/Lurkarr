@@ -564,6 +564,8 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 		middleware.Recovery,
 		middleware.RequestID,
 		middleware.Logging,
+		middleware.SecurityHeaders,
+		middleware.HSTS,
 		corsMiddleware,
 	)
 

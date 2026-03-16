@@ -6,7 +6,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
 	import * as Alert from '$lib/components/ui/alert';
-	import { Loader2, Fingerprint, CircleAlert } from 'lucide-svelte';
+	import { Loader2, Fingerprint, CircleAlert } from '@lucide/svelte';
 
 	const auth = getAuth();
 
@@ -43,7 +43,7 @@
 				passkeyEnabled = data.enabled === true;
 			}
 		} catch {
-			// Silently ignore
+			console.warn('Failed to check auth setup');
 		} finally {
 			checkingSetup = false;
 		}

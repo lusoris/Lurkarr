@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
+	"github.com/lusoris/lurkarr/internal/metrics"
 )
 
 // SyncStore defines the database operations needed by the syncer.
@@ -57,6 +58,17 @@ func (s *Syncer) SyncAll(ctx context.Context) {
 
 // SyncSource fetches a single blocklist source and updates its rules.
 func (s *Syncer) SyncSource(ctx context.Context, src database.BlocklistSource) error {
+	start := time.Now()
+	err := s.syncSource(ctx, src)
+	dur := time.Since(start)
+	metrics.BlocklistSyncDuration.WithLabelValues(src.Name).Observe(dur.Seconds())
+	if err != nil {
+		metrics.BlocklistSyncErrorsTotal.WithLabelValues(src.Name).Inc()
+	}
+	return err
+}
+
+func (s *Syncer) syncSource(ctx context.Context, src database.BlocklistSource) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.URL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -104,6 +116,7 @@ func (s *Syncer) SyncSource(ctx context.Context, src database.BlocklistSource) e
 	}
 
 	slog.Info("blocklist sync: updated source", "source", src.Name, "rules", len(rules))
+	metrics.BlocklistSyncRulesTotal.WithLabelValues(src.Name).Add(float64(len(rules)))
 	return nil
 }
 

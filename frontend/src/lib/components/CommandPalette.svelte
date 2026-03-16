@@ -5,7 +5,7 @@
 		LayoutDashboard, Cable, Flame, CalendarDays, History, Download,
 		ListOrdered, Bell, Activity, Settings, Users, UserCircle,
 		Layers, ScrollText, Film, HelpCircle
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { getAuth } from '$lib/stores/auth.svelte';
 
 	const auth = getAuth();

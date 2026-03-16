@@ -12,6 +12,10 @@
 				destructive:
 					"bg-destructive [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/70 border-transparent text-white",
 				outline: "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+				success: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+				error: "bg-destructive/10 text-destructive border-destructive/20",
+				warning: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+				info: "bg-blue-500/10 text-blue-500 border-blue-500/20",
 			},
 		},
 		defaultVariants: {

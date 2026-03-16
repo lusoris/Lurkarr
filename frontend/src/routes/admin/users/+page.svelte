@@ -13,7 +13,7 @@
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import * as T from '$lib/components/ui/table';
 	import * as Avatar from '$lib/components/ui/avatar';
-	import { Plus, Users, ShieldCheck, Trash2 } from 'lucide-svelte';
+	import { Plus, Users, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import type { LurkarrUser } from '$lib/types';
 
 	const toasts = getToasts();
@@ -59,8 +59,8 @@
 			newPassword = '';
 			newIsAdmin = false;
 			await load();
-		} catch (e: any) {
-			toasts.error(e?.message || 'Failed to create user');
+		} catch (e: unknown) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to create user');
 		}
 		creating = false;
 	}
@@ -78,8 +78,8 @@
 			toasts.success(`User "${confirmDelete.username}" deleted`);
 			confirmDelete = null;
 			await load();
-		} catch (e: any) {
-			toasts.error(e?.message || 'Failed to delete user');
+		} catch (e: unknown) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to delete user');
 		}
 	}
 
@@ -88,8 +88,8 @@
 			await api.post(`/admin/users/${id}/toggle-admin`, { is_admin: !currentAdmin });
 			toasts.success('Admin status updated');
 			await load();
-		} catch (e: any) {
-			toasts.error(e?.message || 'Failed to toggle admin');
+		} catch (e: unknown) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to toggle admin');
 		}
 	}
 
@@ -110,8 +110,8 @@
 			await api.post(`/admin/users/${resetUserId}/reset-password`, { password: resetPassword });
 			toasts.success(`Password reset for "${resetUsername}"`);
 			showReset = false;
-		} catch (e: any) {
-			toasts.error(e?.message || 'Failed to reset password');
+		} catch (e: unknown) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to reset password');
 		}
 		resetting = false;
 	}
@@ -210,8 +210,8 @@
 <!-- Create User Modal -->
 <Modal open={showCreate} title="Create User" onclose={() => showCreate = false}>
 	<div class="space-y-4">
-		<Input bind:value={newUsername} label="Username" placeholder="Enter username" />
-		<Input bind:value={newPassword} type="password" label="Password" placeholder="Min 8 chars, upper + lower + digit" />
+		<Input bind:value={newUsername} label="Username" placeholder="Enter username" required minlength={3} maxlength={50} pattern="[a-zA-Z0-9_-]+" />
+		<Input bind:value={newPassword} type="password" label="Password" placeholder="Min 8 chars, upper + lower + digit" required minlength={8} />
 		<Checkbox bind:checked={newIsAdmin} label="Admin privileges" />
 		<div class="flex gap-2">
 			<Button onclick={createUser} loading={creating}>Create User</Button>
@@ -223,7 +223,7 @@
 <!-- Reset Password Modal -->
 <Modal open={showReset} title="Reset Password — {resetUsername}" onclose={() => showReset = false}>
 	<div class="space-y-4">
-		<Input bind:value={resetPassword} type="password" label="New Password" placeholder="Min 8 chars, upper + lower + digit" />
+		<Input bind:value={resetPassword} type="password" label="New Password" placeholder="Min 8 chars, upper + lower + digit" required minlength={8} />
 		<div class="flex gap-2">
 			<Button onclick={resetUserPassword} loading={resetting}>Reset Password</Button>
 			<Button variant="ghost" onclick={() => showReset = false}>Cancel</Button>

@@ -2,7 +2,7 @@
 	import { api } from '$lib/api';
 	import { base64urlToBuffer, bufferToBase64url } from '$lib/webauthn';
 	import ScrollToTop from '$lib/components/ScrollToTop.svelte';
-	import { ShieldCheck, Plus, Fingerprint, Pencil } from 'lucide-svelte';
+	import { ShieldCheck, Plus, Fingerprint, Pencil } from '@lucide/svelte';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -56,14 +56,16 @@
 				const data = await res.json();
 				passkeyEnabled = data.enabled === true;
 			}
-		} catch { /* ignore */ }
+		} catch { /* passkey info not available — feature disabled */ }
 	}
 
 	async function loadPasskeys() {
 		if (!passkeyEnabled) return;
 		try {
 			passkeys = await api.get<Passkey[]>('/passkeys');
-		} catch { /* handled */ }
+		} catch {
+			console.warn('Failed to load passkeys');
+		}
 	}
 
 	async function registerPasskey() {
@@ -165,13 +167,17 @@
 		try {
 			user = await api.get<LurkarrUser>('/user');
 			newUsername = user?.username ?? '';
-		} catch { /* handled */ }
+		} catch {
+			console.warn('Failed to load user profile');
+		}
 	}
 
 	async function loadSessions() {
 		try {
 			sessions = await api.get<UserSession[]>('/sessions');
-		} catch { /* handled */ }
+		} catch {
+			console.warn('Failed to load sessions');
+		}
 	}
 
 	async function updateUsername() {
