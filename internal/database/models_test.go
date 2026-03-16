@@ -6,17 +6,25 @@ import (
 
 func TestAllAppTypes(t *testing.T) {
 	types := AllAppTypes()
-	if len(types) != 7 {
-		t.Fatalf("AllAppTypes() returned %d types, want 7", len(types))
+	if len(types) != 6 {
+		t.Fatalf("AllAppTypes() returned %d types, want 6", len(types))
 	}
 
+	// AllAppTypes returns only arr apps, excluding Prowlarr (indexer manager)
 	expected := map[AppType]bool{
 		AppSonarr: true, AppRadarr: true, AppLidarr: true,
-		AppReadarr: true, AppWhisparr: true, AppEros: true, AppProwlarr: true,
+		AppReadarr: true, AppWhisparr: true, AppEros: true,
 	}
 	for _, at := range types {
 		if !expected[at] {
-			t.Errorf("unexpected app type: %s", at)
+			t.Errorf("unexpected app type in AllAppTypes: %s", at)
+		}
+	}
+
+	// Verify Prowlarr is NOT in AllAppTypes
+	for _, at := range types {
+		if at == AppProwlarr {
+			t.Errorf("Prowlarr should not be in AllAppTypes (it's an indexer, not an arr)")
 		}
 	}
 }
@@ -32,7 +40,7 @@ func TestValidAppType(t *testing.T) {
 		{"readarr", true},
 		{"whisparr", true},
 		{"eros", true},
-		{"prowlarr", true},
+		{"prowlarr", true}, // Still valid for config/connections, just not lurking
 		{"invalid", false},
 		{"Sonarr", false},
 		{"", false},

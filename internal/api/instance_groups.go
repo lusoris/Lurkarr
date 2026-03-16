@@ -22,7 +22,7 @@ func (h *InstanceGroupsHandler) HandleListGroups(w http.ResponseWriter, r *http.
 
 	groups, err := h.DB.ListInstanceGroups(r.Context(), appType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list instance groups"))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if groups == nil {
