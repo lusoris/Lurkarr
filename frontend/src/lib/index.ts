@@ -78,7 +78,10 @@ const accentBorders: Record<string, string> = {
 	deluge: 'border-l-cyan-400',
 	rtorrent: 'border-l-teal-400',
 	nzbget: 'border-l-lime-400',
-	seerr: 'border-l-purple-400'
+	seerr: 'border-l-purple-400',
+	bazarr: 'border-l-green-400',
+	kapowarr: 'border-l-indigo-400',
+	shoko: 'border-l-fuchsia-400'
 };
 
 export function appAccentBorder(appType: string): string {
@@ -100,7 +103,10 @@ const bgColors: Record<string, string> = {
 	deluge: 'bg-cyan-500',
 	rtorrent: 'bg-teal-500',
 	nzbget: 'bg-lime-500',
-	seerr: 'bg-purple-500'
+	seerr: 'bg-purple-500',
+	bazarr: 'bg-green-500',
+	kapowarr: 'bg-indigo-500',
+	shoko: 'bg-fuchsia-500'
 };
 
 export function appBgColor(appType: string): string {
@@ -122,7 +128,10 @@ const hoverBgColors: Record<string, string> = {
 	deluge: 'hover:bg-cyan-600',
 	rtorrent: 'hover:bg-teal-600',
 	nzbget: 'hover:bg-lime-600',
-	seerr: 'hover:bg-purple-600'
+	seerr: 'hover:bg-purple-600',
+	bazarr: 'hover:bg-green-600',
+	kapowarr: 'hover:bg-indigo-600',
+	shoko: 'hover:bg-fuchsia-600'
 };
 
 // Full button class for an app-colored action button (save, submit, etc.)
@@ -131,6 +140,20 @@ export function appButtonClass(appType: string): string {
 	const hover = hoverBgColors[appType] ?? 'hover:bg-primary/90';
 	return `${bg} ${hover} text-white shadow-sm`;
 }
+
+// Tailwind safelist — Toggle.svelte dynamically constructs data-[state=checked]:bg-*
+// classes from appBgColor(). List them statically so Tailwind generates the CSS.
+// prettier-ignore
+const _switchSafelist = [
+	'data-[state=checked]:bg-sky-500', 'data-[state=checked]:bg-amber-500',
+	'data-[state=checked]:bg-emerald-500', 'data-[state=checked]:bg-rose-500',
+	'data-[state=checked]:bg-pink-500', 'data-[state=checked]:bg-purple-500',
+	'data-[state=checked]:bg-orange-500', 'data-[state=checked]:bg-yellow-500',
+	'data-[state=checked]:bg-blue-500', 'data-[state=checked]:bg-red-500',
+	'data-[state=checked]:bg-cyan-500', 'data-[state=checked]:bg-teal-500',
+	'data-[state=checked]:bg-lime-500', 'data-[state=checked]:bg-green-500',
+	'data-[state=checked]:bg-indigo-500',
+];
 
 // Logo paths for each app type (served from /logos/).
 const logos: Record<string, string> = {
@@ -147,7 +170,10 @@ const logos: Record<string, string> = {
 	transmission: '/logos/transmission.png',
 	deluge: '/logos/deluge.png',
 	rtorrent: '/logos/rtorrent.svg',
-	nzbget: '/logos/nzbget.png'
+	nzbget: '/logos/nzbget.png',
+	bazarr: '/logos/bazarr.png',
+	kapowarr: '/logos/kapowarr.svg',
+	shoko: '/logos/shoko.ico'
 };
 
 export function appLogo(appType: string): string | undefined {
@@ -169,7 +195,10 @@ const websites: Record<string, string> = {
 	transmission: 'https://transmissionbt.com',
 	deluge: 'https://deluge-torrent.org',
 	rtorrent: 'https://rakshasa.github.io/rtorrent/',
-	nzbget: 'https://nzbget.com'
+	nzbget: 'https://nzbget.com',
+	bazarr: 'https://www.bazarr.media',
+	kapowarr: 'https://casvt.github.io/Kapowarr/',
+	shoko: 'https://shokoanime.com'
 };
 
 export function appWebsite(appType: string): string | undefined {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"image/png"
 
 	"github.com/pquerna/otp/totp"
 	qrcode "github.com/yeqown/go-qrcode/v2"
@@ -18,7 +17,7 @@ type nopCloseBuffer struct {
 
 func (nopCloseBuffer) Close() error { return nil }
 
-// GenerateTOTP creates a new TOTP secret and returns the secret string and a QR code as base64 PNG.
+// GenerateTOTP creates a new TOTP secret and returns the secret string and a QR code as base64 JPEG.
 func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) {
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      issuer,
@@ -43,18 +42,7 @@ func GenerateTOTP(username, issuer string) (secret, qrBase64 string, err error) 
 		return secret, "", nil //nolint:nilerr // intentional fallback
 	}
 
-	// Re-encode as PNG
-	img, decErr := png.Decode(&buf)
-	if decErr != nil {
-		return secret, "", nil //nolint:nilerr // intentional fallback
-	}
-
-	var pngBuf bytes.Buffer
-	if err := png.Encode(&pngBuf, img); err != nil {
-		return secret, "", nil //nolint:nilerr // intentional fallback
-	}
-
-	qrBase64 = base64.StdEncoding.EncodeToString(pngBuf.Bytes())
+	qrBase64 = base64.StdEncoding.EncodeToString(buf.Bytes())
 	return secret, qrBase64, nil
 }
 

@@ -264,15 +264,19 @@ func TestLurkInstance_StateReset(t *testing.T) {
 	// ResetState expectation with Times(1) (implicit) verifies it was called
 }
 
-func TestLurkInstance_MinDownloadQueueSize(t *testing.T) {
+func TestLurkInstance_MaxDownloadQueueSize(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
-	// Server returns queue with 10 items (above threshold)
+	// Server returns queue with 10 items (above threshold of 5)
+	queueRecords := make([]arrclient.QueueRecord, 10)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v3/queue" {
-			json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 10})
+			json.NewEncoder(w).Encode(map[string]any{
+				"totalRecords": 10,
+				"records":      queueRecords,
+			})
 			return
 		}
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1})
@@ -283,7 +287,7 @@ func TestLurkInstance_MinDownloadQueueSize(t *testing.T) {
 	instID := uuid.New()
 	store.EXPECT().GetCurrentHourHits(gomock.Any(), database.AppSonarr, instID).Return(0, nil)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{
-		APITimeout: 30, SSLVerify: true, StatefulResetHours: 24, MinDownloadQueueSize: 5,
+		APITimeout: 30, SSLVerify: true, StatefulResetHours: 24, MaxDownloadQueueSize: 5,
 	}, nil)
 	store.EXPECT().GetLastReset(gomock.Any(), database.AppSonarr, instID).Return(nil, nil)
 	// No IncrementStats or AddLurkHistory expected — queue at capacity

@@ -51,13 +51,7 @@ func (a *DelugeAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error) 
 	if err != nil {
 		return nil, err
 	}
-	var completed []DownloadItem
-	for _, item := range items {
-		if item.Progress >= 1.0 {
-			completed = append(completed, item)
-		}
-	}
-	return completed, nil
+	return filterCompleted(items), nil
 }
 
 func (a *DelugeAdapter) PauseAll(ctx context.Context) error {

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -59,14 +58,12 @@ func (h *AdminHandler) HandleCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		IsAdmin  bool   `json:"is_admin"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -113,9 +110,8 @@ func (h *AdminHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	targetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid user ID"))
+	targetID, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -141,17 +137,18 @@ func (h *AdminHandler) HandleResetUserPassword(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	targetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid user ID"))
+	targetID, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Password string `json:"password"`
+	}](w, r)
+	if !ok {
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Password == "" {
+	if req.Password == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("password required"))
 		return
 	}
@@ -182,9 +179,8 @@ func (h *AdminHandler) HandleToggleAdmin(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	targetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid user ID"))
+	targetID, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -194,12 +190,10 @@ func (h *AdminHandler) HandleToggleAdmin(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		IsAdmin bool `json:"is_admin"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 

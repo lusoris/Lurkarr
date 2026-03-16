@@ -28,9 +28,11 @@
 		disabled?: boolean;
 		loading?: boolean;
 		type?: 'button' | 'submit';
+		href?: string;
 		class?: string;
 		onclick?: (e: MouseEvent) => void;
 		children: Snippet;
+		[key: string]: unknown;
 	}
 
 	let {
@@ -39,20 +41,38 @@
 		disabled = false,
 		loading = false,
 		type = 'button',
+		href,
 		class: className = '',
 		onclick,
-		children
+		children,
+		...restProps
 	}: Props = $props();
+
+	const classes = $derived(cn(buttonVariants({ variant: variantMap[variant], size: sizeMap[size] }), className));
 </script>
 
+{#if href}
+<a
+	{href}
+	class={classes}
+	{...restProps}
+>
+	{#if loading}
+		<Loader2 class="h-4 w-4 animate-spin" />
+	{/if}
+	{@render children()}
+</a>
+{:else}
 <button
 	{type}
 	disabled={disabled || loading}
 	{onclick}
-	class={cn(buttonVariants({ variant: variantMap[variant], size: sizeMap[size] }), className)}
+	class={classes}
+	{...restProps}
 >
 	{#if loading}
 		<Loader2 class="h-4 w-4 animate-spin" />
 	{/if}
 	{@render children()}
 </button>
+{/if}

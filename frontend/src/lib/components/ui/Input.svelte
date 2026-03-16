@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/lib/utils';
 	import { Input as ShadcnInput } from './input';
+	import { Label } from './label';
 
 	interface Props {
 		value?: string | number;
@@ -33,9 +34,9 @@
 	}: Props = $props();
 </script>
 
-<label class={cn('block space-y-1.5', className)}>
+<div class={cn('block space-y-1.5', className)}>
 	{#if label}
-		<span class="text-sm font-medium text-foreground">{label}</span>
+		<Label>{label}</Label>
 	{/if}
 	<ShadcnInput
 		{type}
@@ -53,4 +54,4 @@
 	{:else if hint}
 		<p class="text-xs text-muted-foreground">{hint}</p>
 	{/if}
-</label>
+</div>

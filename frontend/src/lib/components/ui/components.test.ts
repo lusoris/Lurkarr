@@ -24,19 +24,19 @@ describe('Badge', () => {
 	it('applies default variant classes', () => {
 		render(Badge, { props: { children: textSnippet('Tag') } });
 		const el = screen.getByText('Tag').closest('span.inline-flex');
-		expect(el!.className).toContain('bg-surface-700');
+		expect(el!.className).toContain('bg-secondary');
 	});
 
 	it('applies success variant classes', () => {
 		render(Badge, { props: { variant: 'success', children: textSnippet('OK') } });
 		const el = screen.getByText('OK').closest('span.inline-flex');
-		expect(el!.className).toContain('bg-lurk-900/50');
+		expect(el!.className).toContain('text-emerald-400');
 	});
 
 	it('applies error variant classes', () => {
 		render(Badge, { props: { variant: 'error', children: textSnippet('Fail') } });
 		const el = screen.getByText('Fail').closest('span.inline-flex');
-		expect(el!.className).toContain('bg-red-900/50');
+		expect(el!.className).toContain('text-destructive');
 	});
 });
 
@@ -61,7 +61,7 @@ describe('Button', () => {
 	it('applies danger variant classes', () => {
 		render(Button, { props: { variant: 'danger', children: textSnippet('Delete') } });
 		const btn = screen.getByRole('button');
-		expect(btn.className).toContain('bg-red-600');
+		expect(btn.className).toContain('bg-destructive');
 	});
 
 	it('applies size classes', () => {

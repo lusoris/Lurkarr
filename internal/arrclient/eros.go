@@ -43,10 +43,13 @@ func (c *Client) ErosGetCutoffUnmet(_ context.Context) ([]ErosMovie, error) {
 
 // ErosSearchMovie triggers a search for scenes/movies by ID.
 func (c *Client) ErosSearchMovie(ctx context.Context, movieIDs []int) (*CommandResponse, error) {
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		"name":     "MoviesSearch",
 		"movieIds": movieIDs,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal eros search: %w", err)
+	}
 	var resp CommandResponse
 	if err := c.post(ctx, erosAPI+"/command", bytes.NewReader(body), &resp); err != nil {
 		return nil, fmt.Errorf("eros search: %w", err)
@@ -56,20 +59,20 @@ func (c *Client) ErosSearchMovie(ctx context.Context, movieIDs []int) (*CommandR
 
 // ErosGetQueue returns the current download queue.
 func (c *Client) ErosGetQueue(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, erosAPI+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, erosAPI+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("eros get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // ErosGetQueueEnriched returns the queue with embedded movie data.
 func (c *Client) ErosGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, erosAPI+"/queue?pageSize=1000&includeMovie=true", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, erosAPI+"/queue?includeMovie=true")
+	if err != nil {
 		return nil, fmt.Errorf("eros get enriched queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // ErosTestConnection tests the Eros (Whisparr v3) API connection.

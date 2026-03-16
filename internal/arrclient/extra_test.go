@@ -316,10 +316,10 @@ func TestClientGetServerError(t *testing.T) {
 
 func TestQueueRecordMediaHasFile(t *testing.T) {
 	tests := []struct {
-		name    string
-		record  QueueRecord
-		want    bool
-		wantOK  bool
+		name   string
+		record QueueRecord
+		want   bool
+		wantOK bool
 	}{
 		{"movie has file", QueueRecord{Movie: &QueueMovie{HasFile: true}}, true, true},
 		{"movie no file", QueueRecord{Movie: &QueueMovie{HasFile: false}}, false, true},
@@ -350,10 +350,10 @@ func TestQueueRecordMediaHasFile(t *testing.T) {
 
 func TestQueueRecordMediaMonitored(t *testing.T) {
 	tests := []struct {
-		name    string
-		record  QueueRecord
-		want    bool
-		wantOK  bool
+		name   string
+		record QueueRecord
+		want   bool
+		wantOK bool
 	}{
 		{"movie monitored", QueueRecord{Movie: &QueueMovie{Monitored: true}}, true, true},
 		{"movie unmonitored", QueueRecord{Movie: &QueueMovie{Monitored: false}}, false, true},

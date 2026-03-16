@@ -31,7 +31,7 @@ func TestDetectProblemStalled(t *testing.T) {
 		StrikePrivate: true,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "stalled" {
 		t.Errorf("detectProblem() = %q, want stalled", reason)
 	}
@@ -49,7 +49,7 @@ func TestDetectProblemStalledPublicSkip(t *testing.T) {
 		StrikePrivate: true,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty reason for public torrent with StrikePublic=false, got %q", reason)
 	}
@@ -66,7 +66,7 @@ func TestDetectProblemUsenetSABnzbdQueued(t *testing.T) {
 	settings := &database.QueueCleanerSettings{StrikePublic: true}
 	sabStatuses := map[string]string{"sab123": "Queued"}
 
-	reason := c.detectProblem(record, settings, sabStatuses, false)
+	reason := c.detectProblem(record, settings, sabStatuses, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty reason for SABnzbd Queued item, got %q", reason)
 	}
@@ -83,7 +83,7 @@ func TestDetectProblemUsenetSABnzbdGrabbing(t *testing.T) {
 	settings := &database.QueueCleanerSettings{StrikePublic: true}
 	sabStatuses := map[string]string{"sab456": "Grabbing"}
 
-	reason := c.detectProblem(record, settings, sabStatuses, false)
+	reason := c.detectProblem(record, settings, sabStatuses, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty reason for SABnzbd Grabbing, got %q", reason)
 	}
@@ -98,7 +98,7 @@ func TestDetectProblemUsenetSABnzbdPaused(t *testing.T) {
 	settings := &database.QueueCleanerSettings{}
 	sabStatuses := map[string]string{"sab789": "Paused"}
 
-	reason := c.detectProblem(record, settings, sabStatuses, false)
+	reason := c.detectProblem(record, settings, sabStatuses, nil, false)
 	if reason != "paused_in_sabnzbd" {
 		t.Errorf("detectProblem() = %q, want paused_in_sabnzbd", reason)
 	}
@@ -115,7 +115,7 @@ func TestDetectProblemMetadataStuck(t *testing.T) {
 		MetadataStuckMinutes: 15,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "metadata_stuck" {
 		t.Errorf("detectProblem() = %q, want metadata_stuck", reason)
 	}
@@ -132,7 +132,7 @@ func TestDetectProblemMetadataStuckDelay(t *testing.T) {
 		MetadataStuckMinutes: 15,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "metadata_stuck" {
 		t.Errorf("detectProblem() = %q, want metadata_stuck", reason)
 	}
@@ -149,7 +149,7 @@ func TestDetectProblemMetadataStuckDisabled(t *testing.T) {
 		MetadataStuckMinutes: 0,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty for disabled metadata stuck, got %q", reason)
 	}
@@ -166,7 +166,7 @@ func TestDetectProblemSlowDownload(t *testing.T) {
 		SlowThresholdBytesPerSec: 100 * 1024, // 100 KB/s
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "slow" {
 		t.Errorf("detectProblem() = %q, want slow", reason)
 	}
@@ -184,7 +184,7 @@ func TestDetectProblemSlowIgnoreAboveBytes(t *testing.T) {
 		SlowIgnoreAboveBytes:     30 * 1024 * 1024 * 1024, // Ignore if >30GB remaining
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty for large remaining download, got %q", reason)
 	}
@@ -203,7 +203,7 @@ func TestDetectProblemNoProblem(t *testing.T) {
 		SlowThresholdBytesPerSec: 100 * 1024,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "" {
 		t.Errorf("expected empty for healthy download, got %q", reason)
 	}
@@ -231,54 +231,76 @@ func TestAPIVersionFor(t *testing.T) {
 	}
 }
 
+const defaultPublicList = "1337x,rarbg,yts,nyaa,eztv,limetorrents,thepiratebay,kickasstorrents,torrentz2,glodls,magnetdl,ettv,isohunt,bt4g,solidtorrents,bitsearch,torrentgalaxy,fitgirl"
+
 func TestIsPrivateTracker(t *testing.T) {
 	tests := []struct {
 		name    string
 		record  arrclient.QueueRecord
+		list    string
 		private bool
 	}{
 		{
 			name:    "empty indexer is public",
 			record:  arrclient.QueueRecord{},
+			list:    defaultPublicList,
 			private: false,
 		},
 		{
 			name:    "known public indexer 1337x",
 			record:  arrclient.QueueRecord{Indexer: "1337x"},
+			list:    defaultPublicList,
 			private: false,
 		},
 		{
 			name:    "known public indexer YTS case-insensitive",
 			record:  arrclient.QueueRecord{Indexer: "YTS"},
+			list:    defaultPublicList,
 			private: false,
 		},
 		{
 			name:    "known public indexer nyaa",
 			record:  arrclient.QueueRecord{Indexer: "nyaa"},
+			list:    defaultPublicList,
 			private: false,
 		},
 		{
 			name:    "indexer flags set means private",
 			record:  arrclient.QueueRecord{Indexer: "1337x", IndexerFlags: 1},
+			list:    defaultPublicList,
 			private: true,
 		},
 		{
 			name:    "unknown indexer treated as private",
 			record:  arrclient.QueueRecord{Indexer: "MyPrivateTracker"},
+			list:    defaultPublicList,
 			private: true,
 		},
 		{
 			name:    "indexer flags only no name",
 			record:  arrclient.QueueRecord{IndexerFlags: 32},
+			list:    defaultPublicList,
+			private: true,
+		},
+		{
+			name:    "custom public list matches",
+			record:  arrclient.QueueRecord{Indexer: "MyCustomPublic"},
+			list:    "MyCustomPublic,AnotherOne",
+			private: false,
+		},
+		{
+			name:    "empty public list treats all named as private",
+			record:  arrclient.QueueRecord{Indexer: "1337x"},
+			list:    "",
 			private: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isPrivateTracker(tt.record)
+			got := isPrivateTracker(tt.record, tt.list)
 			if got != tt.private {
-				t.Errorf("isPrivateTracker(%+v) = %v, want %v", tt.record, got, tt.private)
+				t.Errorf("isPrivateTracker(%+v, %q) = %v, want %v", tt.record, tt.list, got, tt.private)
 			}
 		})
 	}
@@ -736,7 +758,7 @@ func TestDetectProblemUnregistered(t *testing.T) {
 		UnregisteredEnabled: true,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "unregistered" {
 		t.Errorf("detectProblem() = %q, want unregistered", reason)
 	}
@@ -759,7 +781,7 @@ func TestDetectProblemUnregisteredDisabled(t *testing.T) {
 	}
 
 	// When disabled, should fall through to "stalled"
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "stalled" {
 		t.Errorf("detectProblem() = %q, want stalled (detection disabled)", reason)
 	}
@@ -782,7 +804,7 @@ func TestDetectProblemUnregisteredUsenet(t *testing.T) {
 		UnregisteredEnabled: true,
 	}
 
-	reason := c.detectProblem(record, settings, nil, false)
+	reason := c.detectProblem(record, settings, nil, nil, false)
 	if reason != "stalled" {
 		t.Errorf("detectProblem() = %q, want stalled (usenet can't be unregistered)", reason)
 	}

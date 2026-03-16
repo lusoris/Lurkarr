@@ -98,6 +98,45 @@ func (e *Engine) RunOnce(ctx context.Context) {
 	slog.Info("lurking engine run-once complete")
 }
 
+// RunOnceForApp performs a single lurk pass for a specific app type and mode.
+// Mode can be "missing", "upgrade", or "all".
+func (e *Engine) RunOnceForApp(ctx context.Context, appType database.AppType, mode string) error {
+	if LurkerFor(appType) == nil {
+		return fmt.Errorf("no lurker for app type: %s", appType)
+	}
+	log := e.logger.ForApp(string(appType))
+	settings, err := e.db.GetAppSettings(ctx, appType)
+	if err != nil {
+		return fmt.Errorf("load settings: %w", err)
+	}
+
+	// Temporarily override counts based on mode
+	switch mode {
+	case "missing":
+		settings.LurkUpgradeCount = 0
+	case "upgrade":
+		settings.LurkMissingCount = 0
+	case "all":
+		// keep both
+	default:
+		return fmt.Errorf("unknown lurk mode: %s", mode)
+	}
+
+	instances, err := e.db.ListEnabledInstances(ctx, appType)
+	if err != nil {
+		return fmt.Errorf("list instances: %w", err)
+	}
+	for _, inst := range instances {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err := e.lurkInstance(ctx, log, appType, settings, inst); err != nil {
+			log.Error("run-once-for-app: instance error", "instance", inst.Name, "error", err)
+		}
+	}
+	return nil
+}
+
 // Stop cancels all lurking goroutines.
 func (e *Engine) Stop() {
 	if e.cancel != nil {
@@ -211,6 +250,16 @@ func parseArrDate(s string) time.Time {
 func (e *Engine) lurkInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.AppSettings, inst database.AppInstance) error {
 	log = log.With("instance", inst.Name)
 
+	if e.notifier != nil {
+		e.notifier.Notify(ctx, notifications.Event{
+			Type:     notifications.EventLurkStarted,
+			Title:    "Lurk Started",
+			Message:  fmt.Sprintf("Starting lurk for %s/%s", appType, inst.Name),
+			AppType:  string(appType),
+			Instance: inst.Name,
+		})
+	}
+
 	// Check hourly cap
 	hits, err := e.db.GetCurrentHourHits(ctx, appType, inst.ID)
 	if err != nil {
@@ -241,22 +290,18 @@ func (e *Engine) lurkInstance(ctx context.Context, log *slog.Logger, appType dat
 		}
 	}
 
-	client := arrclient.NewClient(
-		inst.APIURL, inst.APIKey,
-		time.Duration(genSettings.APITimeout)*time.Second,
-		genSettings.SSLVerify,
-	)
+	client := arrclient.NewClientForInstance(inst.APIURL, inst.APIKey, genSettings.APITimeout, genSettings.SSLVerify)
 
-	// Check minimum download queue size — skip if queue is already large
-	if genSettings.MinDownloadQueueSize > 0 {
+	// Check download queue size — skip if queue is already large
+	if genSettings.MaxDownloadQueueSize > 0 {
 		lurker := LurkerFor(appType)
 		if lurker != nil {
 			queue, err := lurker.GetQueue(ctx, client)
 			if err != nil {
 				log.Warn("failed to check queue size", "error", err)
-			} else if queue != nil && queue.TotalRecords >= genSettings.MinDownloadQueueSize {
+			} else if queue != nil && queue.TotalRecords >= genSettings.MaxDownloadQueueSize {
 				log.Info("download queue at capacity, skipping lurk",
-					"queue_size", queue.TotalRecords, "min_size", genSettings.MinDownloadQueueSize)
+					"queue_size", queue.TotalRecords, "max_size", genSettings.MaxDownloadQueueSize)
 				return nil
 			}
 		}

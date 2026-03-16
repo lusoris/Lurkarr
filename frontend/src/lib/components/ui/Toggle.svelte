@@ -7,6 +7,7 @@
 		label?: string;
 		hint?: string;
 		disabled?: boolean;
+		/** Pass a bg-* class (e.g. from appBgColor) to color the switch when checked. */
 		color?: string;
 		onchange?: (checked: boolean) => void;
 	}
@@ -19,6 +20,12 @@
 		color = '',
 		onchange
 	}: Props = $props();
+
+	// Convert e.g. "bg-sky-500" → "data-[state=checked]:bg-sky-500" so it
+	// properly overrides the switch primitive's default data-[state=checked]:bg-primary.
+	const checkedColorClass = $derived(
+		color ? `data-[state=checked]:${color}` : ''
+	);
 </script>
 
 <div class="flex flex-col gap-1">
@@ -27,7 +34,7 @@
 			bind:checked
 			{disabled}
 			onCheckedChange={(v) => onchange?.(v)}
-			class={cn(color && checked ? color : '')}
+			class={cn(checkedColorClass)}
 		/>
 		{#if label}
 			<span class="text-sm text-foreground">{label}</span>

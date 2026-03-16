@@ -1,6 +1,7 @@
 package api
 
 //go:generate mockgen -destination=mock_store_test.go -package=api github.com/lusoris/lurkarr/internal/api Store
+//go:generate mockgen -destination=mock_webauthn_test.go -package=api github.com/lusoris/lurkarr/internal/api WebAuthnProvider
 
 import (
 	"context"
@@ -15,6 +16,7 @@ type Store interface {
 	// Users
 	GetUserByUsername(ctx context.Context, username string) (*database.User, error)
 	CreateUser(ctx context.Context, username, passwordHash string) (*database.User, error)
+	SetupFirstUser(ctx context.Context, username, passwordHash string, settings *database.GeneralSettings) (*database.User, error)
 	UserCount(ctx context.Context) (int, error)
 	UpdateUsername(ctx context.Context, id uuid.UUID, username string) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
@@ -33,6 +35,7 @@ type Store interface {
 	DeleteUserSessionsExcept(ctx context.Context, userID uuid.UUID, keep uuid.UUID) error
 
 	// Instances
+	ListAllInstances(ctx context.Context) ([]database.AppInstance, error)
 	ListInstances(ctx context.Context, appType database.AppType) ([]database.AppInstance, error)
 	GetInstance(ctx context.Context, id uuid.UUID) (*database.AppInstance, error)
 	CreateInstance(ctx context.Context, appType database.AppType, name, apiURL, apiKey string) (*database.AppInstance, error)
@@ -87,6 +90,18 @@ type Store interface {
 	// Prowlarr
 	GetProwlarrSettings(ctx context.Context) (*database.ProwlarrSettings, error)
 	UpdateProwlarrSettings(ctx context.Context, s *database.ProwlarrSettings) error
+
+	// Bazarr
+	GetBazarrSettings(ctx context.Context) (*database.BazarrSettings, error)
+	UpdateBazarrSettings(ctx context.Context, s *database.BazarrSettings) error
+
+	// Kapowarr
+	GetKapowarrSettings(ctx context.Context) (*database.KapowarrSettings, error)
+	UpdateKapowarrSettings(ctx context.Context, s *database.KapowarrSettings) error
+
+	// Shoko
+	GetShokoSettings(ctx context.Context) (*database.ShokoSettings, error)
+	UpdateShokoSettings(ctx context.Context, s *database.ShokoSettings) error
 
 	// SABnzbd
 	GetSABnzbdSettings(ctx context.Context) (*database.SABnzbdSettings, error)

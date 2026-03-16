@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { appTypes, appDisplayName, appTabLabel, appLogo, appAccentBorder, appBgColor, appButtonClass } from '$lib';
+	import ScrollToTop from '$lib/components/ScrollToTop.svelte';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import { getInstances } from '$lib/stores/instances.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
@@ -10,30 +11,30 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import InstanceSwitcher from '$lib/components/InstanceSwitcher.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
+	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
+	import { RotateCcw } from 'lucide-svelte';
+	import type { AppSettings, StateEntry } from '$lib/types';
 
 	const toasts = getToasts();
 	const store = getInstances();
 
-	interface AppSettings {
-		app_type: string;
-		lurk_missing_count: number;
-		lurk_upgrade_count: number;
-		lurk_missing_mode: string;
-		upgrade_mode: string;
-		sleep_duration: number;
-		monitored_only: boolean;
-		skip_future: boolean;
-		hourly_cap: number;
-		selection_mode: string;
-		max_search_failures: number;
-		debug_mode: boolean;
-	}
-
 	let appSettings = $state<Record<string, AppSettings>>({});
 	let selectedApp = $derived(store.selectedApp);
 	let saving = $state(false);
+
+	// State management
+	let stateEntries = $state<StateEntry[]>([]);
+	let loadingState = $state(false);
+	let resettingInstance = $state<string | null>(null);
+	let confirmResetId = $state<string | null>(null);
+
+	let currentAppStates = $derived(
+		stateEntries.filter(s => s.app_type === selectedApp ||
+			(selectedApp === 'whisparr' && (s.app_type === 'whisparr' || s.app_type === 'eros')))
+	);
 
 
 
@@ -58,12 +59,42 @@
 	}
 
 	$effect(() => { loadAppSettings(selectedApp); });
+	$effect(() => { loadState(); });
+
+	async function loadState() {
+		loadingState = true;
+		try {
+			stateEntries = await api.get<StateEntry[]>('/state');
+		} catch { stateEntries = []; }
+		loadingState = false;
+	}
+
+	async function resetInstanceState(appType: string, instanceId: string, name: string) {
+		resettingInstance = instanceId;
+		try {
+			await api.post(`/state/reset?app=${appType}&instance_id=${instanceId}`, {});
+			toasts.success(`State reset for ${name}`);
+			await loadState();
+		} catch {
+			toasts.error(`Failed to reset state for ${name}`);
+		}
+		resettingInstance = null;
+		confirmResetId = null;
+	}
+
+	function formatDate(iso: string): string {
+		return new Date(iso).toLocaleString();
+	}
 </script>
 
 <svelte:head><title>Lurk Settings - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Lurk Settings" description="Configure lurking behavior per app — how many items to search, modes, rate limits, and more." />
+	<PageHeader title="Lurk Settings" description="Configure lurking behavior per app — how many items to search, modes, rate limits, and more.">
+		{#snippet actions()}
+			<HelpDrawer page="lurk" />
+		{/snippet}
+	</PageHeader>
 
 	<InstanceSwitcher showInstances={false} />
 
@@ -139,4 +170,50 @@
 			<Skeleton rows={6} height="h-10" />
 		{/if}
 	</Card>
+
+	<!-- Instance State -->
+	<Card>
+		<h3 class="text-sm font-semibold text-foreground mb-3">Lurk State</h3>
+		<p class="text-xs text-muted-foreground mb-3">Per-instance lurk progress tracking. Resetting clears cached state so the next lurk cycle starts fresh.</p>
+		{#if loadingState}
+			<Skeleton rows={2} height="h-8" />
+		{:else if currentAppStates.length === 0}
+			<p class="text-sm text-muted-foreground">No state tracked for this app yet.</p>
+		{:else}
+			<div class="space-y-2">
+				{#each currentAppStates as entry}
+					<div class="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-medium text-foreground truncate">{entry.name}</p>
+							<p class="text-xs text-muted-foreground">
+								{#if entry.last_reset}
+									Last reset: {formatDate(entry.last_reset)}
+								{:else}
+									Never reset
+								{/if}
+							</p>
+						</div>
+						<ConfirmAction
+							active={confirmResetId === entry.instance_id}
+							message="Reset state?"
+							onconfirm={() => resetInstanceState(entry.app_type, entry.instance_id, entry.name)}
+							oncancel={() => confirmResetId = null}
+						>
+							<Button
+								size="sm"
+								variant="ghost"
+								onclick={() => confirmResetId = entry.instance_id}
+								loading={resettingInstance === entry.instance_id}
+							>
+								<RotateCcw class="h-3.5 w-3.5" />
+								Reset
+							</Button>
+						</ConfirmAction>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</Card>
 </div>
+
+<ScrollToTop />

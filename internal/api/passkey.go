@@ -50,11 +50,23 @@ func dbCredToWebAuthn(c database.WebAuthnCredential) webauthn.Credential {
 	}
 }
 
+// WebAuthnProvider abstracts the go-webauthn library for testability.
+type WebAuthnProvider interface {
+	BeginRegistration(user webauthn.User, opts ...webauthn.RegistrationOption) (*protocol.CredentialCreation, *webauthn.SessionData, error)
+	FinishRegistration(user webauthn.User, session webauthn.SessionData, r *http.Request) (*webauthn.Credential, error)
+	BeginDiscoverableLogin(opts ...webauthn.LoginOption) (*protocol.CredentialAssertion, *webauthn.SessionData, error)
+	ValidatePasskeyLogin(handler webauthn.DiscoverableUserHandler, session webauthn.SessionData, parsedResponse *protocol.ParsedCredentialAssertionData) (webauthn.User, *webauthn.Credential, error)
+}
+
 // PasskeyHandler handles WebAuthn/passkey endpoints.
 type PasskeyHandler struct {
 	DB       Store
 	Auth     *auth.Middleware
-	WebAuthn *webauthn.WebAuthn
+	WebAuthn WebAuthnProvider
+
+	// parseCredentialRequest parses a WebAuthn assertion from the request body.
+	// Defaults to protocol.ParseCredentialRequestResponse; overridden in tests.
+	parseCredentialRequest func(*http.Request) (*protocol.ParsedCredentialAssertionData, error)
 
 	// In-memory session storage (challenge → session data).
 	// Entries expire after 5 minutes.
@@ -68,12 +80,13 @@ type sessionEntry struct {
 }
 
 // NewPasskeyHandler creates a PasskeyHandler with the given WebAuthn configuration.
-func NewPasskeyHandler(ctx context.Context, db Store, authMw *auth.Middleware, wa *webauthn.WebAuthn) *PasskeyHandler {
+func NewPasskeyHandler(ctx context.Context, db Store, authMw *auth.Middleware, wa WebAuthnProvider) *PasskeyHandler {
 	h := &PasskeyHandler{
-		DB:       db,
-		Auth:     authMw,
-		WebAuthn: wa,
-		sessions: make(map[string]*sessionEntry),
+		DB:                     db,
+		Auth:                   authMw,
+		WebAuthn:               wa,
+		parseCredentialRequest: protocol.ParseCredentialRequestResponse,
+		sessions:               make(map[string]*sessionEntry),
 	}
 	// Background cleanup of expired challenge sessions.
 	go func() {
@@ -126,7 +139,12 @@ func (h *PasskeyHandler) HandleBeginRegistration(w http.ResponseWriter, r *http.
 	}
 
 	// Build webauthn user with existing credentials to exclude.
-	dbCreds, _ := h.DB.ListWebAuthnCredentials(r.Context(), user.ID)
+	dbCreds, err := h.DB.ListWebAuthnCredentials(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("failed to list webauthn credentials", "error", err)
+		writeJSON(w, http.StatusInternalServerError, errorResponse("database error"))
+		return
+	}
 	waCreds := make([]webauthn.Credential, len(dbCreds))
 	for i, c := range dbCreds {
 		waCreds[i] = dbCredToWebAuthn(c)
@@ -173,7 +191,12 @@ func (h *PasskeyHandler) HandleFinishRegistration(w http.ResponseWriter, r *http
 		return
 	}
 
-	dbCreds, _ := h.DB.ListWebAuthnCredentials(r.Context(), user.ID)
+	dbCreds, credErr := h.DB.ListWebAuthnCredentials(r.Context(), user.ID)
+	if credErr != nil {
+		slog.Error("failed to list webauthn credentials", "error", credErr)
+		writeJSON(w, http.StatusInternalServerError, errorResponse("database error"))
+		return
+	}
 	waCreds := make([]webauthn.Credential, len(dbCreds))
 	for i, c := range dbCreds {
 		waCreds[i] = dbCredToWebAuthn(c)
@@ -352,7 +375,7 @@ func (h *PasskeyHandler) HandleBeginLogin(w http.ResponseWriter, r *http.Request
 // POST /api/auth/passkey/login/finish
 func (h *PasskeyHandler) HandleFinishLogin(w http.ResponseWriter, r *http.Request) {
 	// Parse the credential assertion to get the challenge.
-	parsedResponse, err := protocol.ParseCredentialRequestResponse(r)
+	parsedResponse, err := h.parseCredentialRequest(r)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid passkey response"))
 		return
@@ -394,7 +417,9 @@ func (h *PasskeyHandler) HandleFinishLogin(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Update sign count.
-	_ = h.DB.UpdateWebAuthnSignCount(r.Context(), cred.ID, int64(cred.Authenticator.SignCount))
+	if err := h.DB.UpdateWebAuthnSignCount(r.Context(), cred.ID, int64(cred.Authenticator.SignCount)); err != nil {
+		slog.Error("failed to update webauthn sign count", "error", err)
+	}
 
 	// Get the actual database user from the webauthn user.
 	dbUser := waUser.(*webAuthnUser).user
@@ -402,7 +427,9 @@ func (h *PasskeyHandler) HandleFinishLogin(w http.ResponseWriter, r *http.Reques
 	// Session rotation: invalidate any existing session.
 	if cookie, cookieErr := r.Cookie("lurkarr_session"); cookieErr == nil {
 		if oldID, parseErr := uuid.Parse(cookie.Value); parseErr == nil {
-			_ = h.DB.DeleteSession(r.Context(), oldID)
+			if err := h.DB.DeleteSession(r.Context(), oldID); err != nil {
+				slog.Error("failed to delete old session during passkey rotation", "error", err, "session_id", oldID)
+			}
 		}
 	}
 

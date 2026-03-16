@@ -21,8 +21,22 @@ type DownloadItem struct {
 	SeedingTime   int64    `json:"seeding_time"` // seconds spent seeding (torrent only)
 	CompletedAt   int64    `json:"completed_at"` // unix timestamp of completion
 	AddedAt       int64    `json:"added_at"`     // unix timestamp when added
-	Tags          []string `json:"tags"`          // qBit: parsed from comma-sep; Transmission: labels
-	TrackerURL    string   `json:"tracker_url"`   // primary tracker URL/domain
+	Tags          []string `json:"tags"`         // qBit: parsed from comma-sep; Transmission: labels
+	TrackerURL    string   `json:"tracker_url"`  // primary tracker URL/domain
+}
+
+// GetProgress returns the item's download progress (0.0 to 1.0).
+func (d DownloadItem) GetProgress() float64 { return d.Progress }
+
+// filterCompleted returns only items that are fully downloaded.
+func filterCompleted(items []DownloadItem) []DownloadItem {
+	var completed []DownloadItem
+	for _, item := range items {
+		if item.Progress >= 1.0 {
+			completed = append(completed, item)
+		}
+	}
+	return completed
 }
 
 // ClientStatus represents the overall status of a download client.
@@ -66,4 +80,5 @@ const (
 	TypeTransmission ClientType = "transmission"
 	TypeDeluge       ClientType = "deluge"
 	TypeRTorrent     ClientType = "rtorrent"
+	TypeUTorrent     ClientType = "utorrent"
 )

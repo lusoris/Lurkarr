@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/lusoris/lurkarr/internal/database"
 )
 
 // StatsHandler handles stats endpoints.
@@ -15,6 +17,9 @@ func (h *StatsHandler) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load stats"))
 		return
+	}
+	if stats == nil {
+		stats = []database.LurkStats{}
 	}
 
 	writeJSON(w, http.StatusOK, stats)
@@ -36,6 +41,9 @@ func (h *StatsHandler) HandleGetHourlyCaps(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load hourly caps"))
 		return
+	}
+	if caps == nil {
+		caps = []database.HourlyCap{}
 	}
 
 	writeJSON(w, http.StatusOK, caps)

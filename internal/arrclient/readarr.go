@@ -22,34 +22,23 @@ type ReadarrBook struct {
 
 // ReadarrGetMissing fetches books without files.
 func (c *Client) ReadarrGetMissing(ctx context.Context) ([]ReadarrBook, error) {
-	var resp struct {
-		TotalRecords int           `json:"totalRecords"`
-		Records      []ReadarrBook `json:"records"`
-	}
-	if err := c.get(ctx, readarrAPI+"/wanted/missing?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("readarr get missing: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[ReadarrBook](ctx, c, readarrAPI, "missing", "title", "ascending", "readarr get missing")
 }
 
 // ReadarrGetCutoffUnmet fetches books that haven't met quality cutoff.
 func (c *Client) ReadarrGetCutoffUnmet(ctx context.Context) ([]ReadarrBook, error) {
-	var resp struct {
-		TotalRecords int           `json:"totalRecords"`
-		Records      []ReadarrBook `json:"records"`
-	}
-	if err := c.get(ctx, readarrAPI+"/wanted/cutoff?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("readarr get cutoff unmet: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[ReadarrBook](ctx, c, readarrAPI, "cutoff", "title", "ascending", "readarr get cutoff unmet")
 }
 
 // ReadarrSearchBook triggers a search for books.
 func (c *Client) ReadarrSearchBook(ctx context.Context, bookIDs []int) (*CommandResponse, error) {
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		"name":    "BookSearch",
 		"bookIds": bookIDs,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal readarr search: %w", err)
+	}
 	var resp CommandResponse
 	if err := c.post(ctx, readarrAPI+"/command", bytes.NewReader(body), &resp); err != nil {
 		return nil, fmt.Errorf("readarr search book: %w", err)
@@ -59,20 +48,20 @@ func (c *Client) ReadarrSearchBook(ctx context.Context, bookIDs []int) (*Command
 
 // ReadarrGetQueue returns the current download queue.
 func (c *Client) ReadarrGetQueue(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, readarrAPI+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, readarrAPI+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("readarr get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // ReadarrGetQueueEnriched returns the queue with embedded book data.
 func (c *Client) ReadarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, readarrAPI+"/queue?pageSize=1000&includeBook=true", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, readarrAPI+"/queue?includeBook=true")
+	if err != nil {
 		return nil, fmt.Errorf("readarr get enriched queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // ReadarrTestConnection tests the Readarr API connection.

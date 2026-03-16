@@ -2,10 +2,13 @@ package server
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -66,11 +69,16 @@ type Config struct {
 	WebAuthnRPID          string   // e.g. "localhost" or "lurkarr.example.com"
 	WebAuthnRPDisplayName string   // e.g. "Lurkarr"
 	WebAuthnRPOrigins     []string // e.g. ["http://localhost:9705"]
+
+	// Rate limiting (requests per minute)
+	LoginRateLimit int
+	APIRateLimit   int
 }
 
 // Server is the main HTTP server.
 type Server struct {
-	httpServer *http.Server
+	httpServer   *http.Server
+	rateLimiters []*middleware.IPRateLimiter
 }
 
 // csrfInjectToken wraps a handler to expose the CSRF token in a response header
@@ -93,28 +101,71 @@ func csrfPlaintextHTTP(next http.Handler) http.Handler {
 	})
 }
 
-// spaHandler serves an SPA from an fs.FS. It tries the exact path first,
-// then falls back to index.html for client-side routing.
+// spaHandler serves an SPA from an fs.FS with content-negotiation for
+// pre-compressed (.br, .gz) variants. Falls back to index.html for
+// client-side routing.
 func spaHandler(fsys fs.FS) http.Handler {
-	fileServer := http.FileServerFS(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try to serve the exact file.
 		path := strings.TrimPrefix(r.URL.Path, "/")
 		if path == "" {
 			path = "index.html"
 		}
-		if _, err := fs.Stat(fsys, path); err == nil {
-			// Cache immutable assets aggressively.
-			if strings.HasPrefix(path, "_app/immutable/") {
-				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-			}
-			fileServer.ServeHTTP(w, r)
-			return
+		// If the exact file doesn't exist, SPA fallback to index.html.
+		if _, err := fs.Stat(fsys, path); err != nil {
+			path = "index.html"
 		}
-		// SPA fallback: serve index.html for all other paths.
-		r.URL.Path = "/"
-		fileServer.ServeHTTP(w, r)
+		if strings.HasPrefix(path, "_app/immutable/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		serveCompressed(w, r, fsys, path)
 	})
+}
+
+// serveCompressed tries to serve a pre-compressed variant (.br then .gz)
+// based on the Accept-Encoding header, falling back to the original file.
+func serveCompressed(w http.ResponseWriter, r *http.Request, fsys fs.FS, path string) {
+	ae := r.Header.Get("Accept-Encoding")
+	ct := mime.TypeByExtension(filepath.Ext(path))
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+
+	type variant struct {
+		suffix   string
+		encoding string
+	}
+	variants := []variant{
+		{".br", "br"},
+		{".gz", "gzip"},
+	}
+
+	for _, v := range variants {
+		if !strings.Contains(ae, v.encoding) {
+			continue
+		}
+		f, err := fsys.Open(path + v.suffix)
+		if err != nil {
+			continue
+		}
+		defer f.Close()
+		w.Header().Set("Content-Encoding", v.encoding)
+		w.Header().Set("Content-Type", ct)
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.WriteHeader(http.StatusOK)
+		io.Copy(w, f) //nolint:errcheck // best-effort copy
+		return
+	}
+
+	// No pre-compressed variant found or accepted — serve original.
+	f, err := fsys.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", ct)
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, f) //nolint:errcheck // best-effort copy
 }
 
 // New creates a new Server with all routes registered.
@@ -141,6 +192,9 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	stateH := &api.StateHandler{DB: db}
 	schedulerH := &api.SchedulerHandler{DB: db, Scheduler: sched}
 	prowlarrH := &api.ProwlarrHandler{DB: db}
+	bazarrH := &api.BazarrHandler{DB: db}
+	kapowarrH := &api.KapowarrHandler{DB: db}
+	shokoH := &api.ShokoHandler{DB: db}
 	sabnzbdH := &api.SABnzbdHandler{DB: db}
 	userH := &api.UserHandler{DB: db}
 	queueH := &api.QueueHandler{DB: db}
@@ -175,8 +229,24 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 
 	mux := http.NewServeMux()
 
-	// Rate limiter for login: 5 attempts per minute per IP (burst 5).
-	loginRL := middleware.NewIPRateLimiter(rate.Limit(5.0/60.0), 5)
+	// Rate limiter for login (configurable, default 5/min).
+	loginPerMin := 5
+	if cfg.LoginRateLimit > 0 {
+		loginPerMin = cfg.LoginRateLimit
+	}
+	loginRL := middleware.NewIPRateLimiter(rate.Limit(float64(loginPerMin)/60.0), loginPerMin)
+
+	// General API rate limiter (configurable, default 300/min).
+	// SPAs fire many parallel requests per page load (sidebar + page data + health checks).
+	apiPerMin := 300
+	if cfg.APIRateLimit > 0 {
+		apiPerMin = cfg.APIRateLimit
+	}
+	apiBurst := apiPerMin / 3
+	if apiBurst < 60 {
+		apiBurst = 60
+	}
+	apiRL := middleware.NewIPRateLimiter(rate.Limit(float64(apiPerMin)/60.0), apiBurst)
 
 	// --- Public routes (no auth) ---
 	mux.Handle("POST /api/auth/login", middleware.RateLimit(loginRL)(http.HandlerFunc(authH.HandleLogin)))
@@ -191,7 +261,10 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 
 	// --- Seed OIDC settings from env vars if DB row is empty ---
 	if cfg.OIDCEnabled {
-		oidcDB, _ := db.GetOIDCSettings(context.Background())
+		oidcDB, oidcErr := db.GetOIDCSettings(context.Background())
+		if oidcErr != nil {
+			slog.Warn("failed to load OIDC settings for env seeding", "error", oidcErr)
+		}
 		if oidcDB != nil && oidcDB.IssuerURL == "" {
 			oidcDB.Enabled = cfg.OIDCEnabled
 			oidcDB.IssuerURL = cfg.OIDCIssuerURL
@@ -203,8 +276,11 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 			if len(cfg.OIDCScopes) > 0 {
 				oidcDB.Scopes = strings.Join(cfg.OIDCScopes, ",")
 			}
-			_ = db.UpdateOIDCSettings(context.Background(), oidcDB)
-			slog.Info("seeded OIDC settings from environment variables")
+			if err := db.UpdateOIDCSettings(context.Background(), oidcDB); err != nil {
+				slog.Error("failed to seed OIDC settings from env", "error", err)
+			} else {
+				slog.Info("seeded OIDC settings from environment variables")
+			}
 		}
 	}
 
@@ -262,7 +338,9 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	})
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.HealthCheck(r.Context()); err != nil {
-			http.Error(w, `{"status":"not ready"}`, http.StatusServiceUnavailable)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"status":"not ready"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -328,6 +406,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("PUT /api/settings/{app}", settingsH.HandleUpdateAppSettings)
 
 	// App Instances
+	protected.HandleFunc("GET /api/instances", appsH.HandleListAllInstances)
 	protected.HandleFunc("GET /api/instances/{app}", appsH.HandleListInstances)
 	protected.HandleFunc("POST /api/instances/{app}", appsH.HandleCreateInstance)
 	protected.HandleFunc("PUT /api/instances/{id}", appsH.HandleUpdateInstance)
@@ -364,6 +443,29 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	protected.HandleFunc("GET /api/prowlarr/indexers", prowlarrH.HandleGetIndexers)
 	protected.HandleFunc("GET /api/prowlarr/indexers/stats", prowlarrH.HandleGetIndexerStats)
 	protected.HandleFunc("POST /api/prowlarr/test", prowlarrH.HandleTestConnection)
+
+	// Bazarr
+	protected.HandleFunc("GET /api/bazarr/settings", bazarrH.HandleGetSettings)
+	protected.HandleFunc("PUT /api/bazarr/settings", bazarrH.HandleUpdateSettings)
+	protected.HandleFunc("POST /api/bazarr/test", bazarrH.HandleTestConnection)
+	protected.HandleFunc("GET /api/bazarr/wanted", bazarrH.HandleGetWanted)
+	protected.HandleFunc("GET /api/bazarr/health", bazarrH.HandleGetHealth)
+	protected.HandleFunc("GET /api/bazarr/history", bazarrH.HandleGetHistory)
+
+	// Kapowarr
+	protected.HandleFunc("GET /api/kapowarr/settings", kapowarrH.HandleGetSettings)
+	protected.HandleFunc("PUT /api/kapowarr/settings", kapowarrH.HandleUpdateSettings)
+	protected.HandleFunc("POST /api/kapowarr/test", kapowarrH.HandleTestConnection)
+	protected.HandleFunc("GET /api/kapowarr/stats", kapowarrH.HandleGetStats)
+	protected.HandleFunc("GET /api/kapowarr/queue", kapowarrH.HandleGetQueue)
+	protected.HandleFunc("GET /api/kapowarr/tasks", kapowarrH.HandleGetTasks)
+
+	// Shoko
+	protected.HandleFunc("GET /api/shoko/settings", shokoH.HandleGetSettings)
+	protected.HandleFunc("PUT /api/shoko/settings", shokoH.HandleUpdateSettings)
+	protected.HandleFunc("POST /api/shoko/test", shokoH.HandleTestConnection)
+	protected.HandleFunc("GET /api/shoko/stats", shokoH.HandleGetStats)
+	protected.HandleFunc("GET /api/shoko/series-summary", shokoH.HandleGetSeriesSummary)
 
 	// SABnzbd
 	protected.HandleFunc("GET /api/sabnzbd/settings", sabnzbdH.HandleGetSettings)
@@ -448,7 +550,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 	// Mount protected routes with auth + CSRF + token injection.
 	// csrfPlaintextHTTP must wrap the CSRF middleware so gorilla/csrf knows when
 	// the request arrives over plain HTTP (no TLS, no X-Forwarded-Proto: https).
-	mux.Handle("/api/", csrfPlaintextHTTP(authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected)))))
+	mux.Handle("/api/", middleware.RateLimit(apiRL)(csrfPlaintextHTTP(authMw.CSRFProtect()(csrfInjectToken(authMw.RequireAuth(protected))))))
 
 	// Serve embedded frontend SPA (if built).
 	if cfg.FrontendFS != nil {
@@ -478,6 +580,7 @@ func New(ctx context.Context, cfg Config, db *database.DB, sched *scheduler.Sche
 			ReadHeaderTimeout: 10 * time.Second,
 			IdleTimeout:       120 * time.Second,
 		},
+		rateLimiters: []*middleware.IPRateLimiter{loginRL, apiRL},
 	}
 }
 
@@ -493,5 +596,8 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	slog.Info("server shutting down")
+	for _, rl := range s.rateLimiters {
+		rl.Stop()
+	}
 	return s.httpServer.Shutdown(ctx)
 }

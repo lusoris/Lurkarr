@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/lusoris/lurkarr/internal/database"
@@ -20,10 +19,8 @@ func (h *ProwlarrHandler) HandleGetSettings(w http.ResponseWriter, r *http.Reque
 
 // HandleUpdateProwlarrSettings updates Prowlarr settings.
 func (h *ProwlarrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var update database.ProwlarrSettings
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	update, ok := decodeJSON[database.ProwlarrSettings](w, r)
+	if !ok {
 		return
 	}
 	// If masked key sent back, preserve existing

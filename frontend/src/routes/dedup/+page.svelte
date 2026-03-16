@@ -4,6 +4,7 @@
 	import { getInstances } from '$lib/stores/instances.svelte';
 	import { appTypes, appDisplayName, appTabLabel, appLogo, appBgColor, appAccentBorder, appColor } from '$lib';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import InstanceSwitcher from '$lib/components/InstanceSwitcher.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
@@ -14,73 +15,10 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
 	import { Layers, RefreshCw, Search, CheckCircle, XCircle, Minus, AlertTriangle } from 'lucide-svelte';
+	import type { InstanceGroupMember, InstanceGroup, CrossInstancePresence, CrossInstanceMedia, CrossInstanceAction, DuplicateFlag, DupScanResult } from '$lib/types';
 
 	const toasts = getToasts();
 	const store = getInstances();
-
-	// --- Types ---
-
-	interface InstanceGroupMember {
-		group_id: string;
-		instance_id: string;
-		instance_name?: string;
-		quality_rank: number;
-		is_independent: boolean;
-	}
-
-	interface InstanceGroup {
-		id: string;
-		app_type: string;
-		name: string;
-		mode: string;
-		created_at: string;
-		members?: InstanceGroupMember[];
-	}
-
-	interface CrossInstancePresence {
-		media_id: string;
-		instance_id: string;
-		instance_name?: string;
-		monitored: boolean;
-		has_file: boolean;
-	}
-
-	interface CrossInstanceMedia {
-		id: string;
-		group_id: string;
-		external_id: string;
-		title: string;
-		detected_at: string;
-		presence?: CrossInstancePresence[];
-	}
-
-	interface CrossInstanceAction {
-		id: string;
-		group_id: string;
-		external_id: string;
-		title: string;
-		action: string;
-		reason: string;
-		seerr_request_id?: number;
-		source_instance_id?: string;
-		target_instance_id?: string;
-		executed_at: string;
-	}
-
-	interface DuplicateFlag {
-		request_id: number;
-		media_title: string;
-		external_id: string;
-		request_type: string;
-		is4k: boolean;
-		requested_by: string;
-		reason: string;
-	}
-
-	interface DupScanResult {
-		total_scanned: number;
-		duplicates: DuplicateFlag[];
-	}
 
 	// --- State ---
 
@@ -98,13 +36,19 @@
 	const memberInstances = $derived(selectedGroup?.members?.sort((a, b) => a.quality_rank - b.quality_rank) ?? []);
 	const hasGroups = $derived(groups.length > 0);
 
+	const modeDescriptions: Record<string, string> = {
+		quality_hierarchy: 'Rank-1 instance keeps the file; lower-ranked duplicates are removed or unmonitored.',
+		overlap_detect: 'Flags media present in multiple instances without automatic removal.',
+		split_season: 'Splits seasons across instances using configured rules (e.g. odd/even, range).'
+	};
+
 
 
 	// --- Loaders ---
 
 	async function loadGroups() {
 		try {
-			groups = await api.get<InstanceGroup[]>(`/api/instance-groups/${selectedApp}`);
+			groups = await api.get<InstanceGroup[]>(`/instance-groups/${selectedApp}`);
 			if (groups.length > 0 && !selectedGroupId) {
 				selectedGroupId = groups[0].id;
 			} else if (groups.length > 0 && !groups.find(g => g.id === selectedGroupId)) {
@@ -126,7 +70,7 @@
 		}
 		loadingOverlaps = true;
 		try {
-			overlaps = await api.get<CrossInstanceMedia[]>(`/api/instance-groups/by-id/${selectedGroupId}/overlaps`);
+			overlaps = await api.get<CrossInstanceMedia[]>(`/instance-groups/by-id/${selectedGroupId}/overlaps`);
 		} catch {
 			toasts.error('Failed to load overlaps');
 			overlaps = [];
@@ -137,7 +81,7 @@
 
 	async function loadActions() {
 		try {
-			actions = await api.get<CrossInstanceAction[]>('/api/instance-groups/actions?limit=50');
+			actions = await api.get<CrossInstanceAction[]>('/instance-groups/actions?limit=50');
 		} catch {
 			actions = [];
 		}
@@ -147,7 +91,7 @@
 		scanning = true;
 		scanResult = null;
 		try {
-			scanResult = await api.post<DupScanResult>('/api/seerr/scan-duplicates');
+			scanResult = await api.post<DupScanResult>('/seerr/scan-duplicates');
 			if (scanResult.duplicates?.length === 0) {
 				toasts.success('No duplicate requests found');
 			} else {
@@ -193,7 +137,7 @@
 	function cellColor(presence: CrossInstancePresence | null, member: InstanceGroupMember): string {
 		if (!presence) return 'bg-muted/30 text-muted-foreground';
 		if (presence.has_file && member.quality_rank === 1) return 'bg-emerald-500/15 text-emerald-400';
-		if (presence.has_file) return 'bg-red-500/15 text-red-400';
+		if (presence.has_file) return 'bg-destructive/15 text-destructive';
 		if (presence.monitored) return 'bg-amber-500/15 text-amber-400';
 		return 'bg-muted/30 text-muted-foreground';
 	}
@@ -242,6 +186,7 @@
 					{#snippet children()}<RefreshCw class="h-4 w-4 mr-1.5" />Refresh{/snippet}
 				</Button>
 			</div>
+			<HelpDrawer page="dedup" />
 		{/snippet}
 	</PageHeader>
 
@@ -250,24 +195,31 @@
 	{#if loading}
 		<Skeleton rows={6} height="h-12" />
 	{:else if !hasGroups}
-		<EmptyState icon={Layers} title="No instance groups" description="Create instance groups on the Connections page to start tracking cross-instance media.">
+		<EmptyState icon={Layers} title="No instance groups" description="Create instance groups on the Connections page to group multiple instances of the same app and start tracking cross-instance media.">
 			{#snippet actions()}
 				<Button size="sm" variant="outline" onclick={() => window.location.href = '/apps'}>
 					{#snippet children()}Go to Connections{/snippet}
 				</Button>
 			{/snippet}
 		</EmptyState>
+		<Card class="!p-4">
+			<p class="text-sm text-muted-foreground">
+				<strong class="text-foreground">How it works:</strong> On the <a href="/apps" class="underline hover:text-foreground">Connections</a> page, click <em>Add Connection → Instance Group</em> to group e.g. your Radarr and Radarr 4K instances. Then come back here to scan for overlaps.
+			</p>
+		</Card>
 	{:else}
 		<!-- Group selector (if multiple groups for this app) -->
 		{#if groups.length > 1}
 			<div class="flex gap-2 flex-wrap">
 				{#each groups as group}
-					<button
-						class="px-3 py-1.5 rounded-md text-sm font-medium transition-all {group.id === selectedGroupId ? appBgColor(selectedApp) + ' text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'}"
+					<Button
+						size="sm"
+						variant={group.id === selectedGroupId ? 'primary' : 'outline'}
+						class={group.id === selectedGroupId ? appBgColor(selectedApp) + ' text-white border-transparent' : ''}
 						onclick={() => { selectedGroupId = group.id; }}
 					>
 						{group.name}
-					</button>
+					</Button>
 				{/each}
 			</div>
 		{/if}
@@ -277,11 +229,14 @@
 				<div class="space-y-5">
 					<!-- Group info bar -->
 					<div class="flex flex-wrap items-center gap-3">
-						<h2 class="text-sm font-semibold text-foreground">{selectedGroup.name}</h2>
+						<h3 class="text-sm font-semibold text-foreground">{selectedGroup.name}</h3>
 						<Badge variant={selectedGroup.mode === 'quality_hierarchy' ? 'info' : 'default'}>
 							{#snippet children()}{selectedGroup.mode.replace('_', ' ')}{/snippet}
 						</Badge>
 						<span class="text-xs text-muted-foreground">{memberInstances.length} instance{memberInstances.length !== 1 ? 's' : ''}</span>
+						{#if modeDescriptions[selectedGroup.mode]}
+							<span class="text-xs text-muted-foreground italic">{modeDescriptions[selectedGroup.mode]}</span>
+						{/if}
 					</div>
 
 					<!-- Member legend -->
@@ -301,7 +256,7 @@
 					<!-- Color legend -->
 					<div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
 						<span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-emerald-500/15 border border-emerald-500/30"></span> Winner (rank 1 + file)</span>
-						<span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-red-500/15 border border-red-500/30"></span> Duplicate (lower rank + file)</span>
+						<span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-destructive/15 border border-destructive/30"></span> Duplicate (lower rank + file)</span>
 						<span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-amber-500/15 border border-amber-500/30"></span> Monitored (no file)</span>
 						<span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-muted/30 border border-border"></span> Not present</span>
 					</div>

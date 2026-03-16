@@ -39,6 +39,10 @@ type Config struct {
 	WebAuthnRPDisplayName string
 	WebAuthnRPOrigins     []string
 
+	// Rate limiting
+	LoginRateLimit int
+	APIRateLimit   int
+
 	// Run-once mode
 	RunOnce bool
 }
@@ -68,6 +72,10 @@ func Load() (*Config, error) {
 		// WebAuthn / Passkeys
 		WebAuthnRPID:          getEnv("WEBAUTHN_RP_ID", ""),
 		WebAuthnRPDisplayName: getEnv("WEBAUTHN_RP_NAME", "Lurkarr"),
+
+		// Rate limiting
+		LoginRateLimit: getEnvInt("LOGIN_RATE_LIMIT", 5),
+		APIRateLimit:   getEnvInt("API_RATE_LIMIT", 120),
 
 		// Run-once
 		RunOnce: getEnvBool("RUN_ONCE", false),
@@ -154,6 +162,18 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return fallback
+	}
+	return n
 }
 
 func getEnvBool(key string, fallback bool) bool {

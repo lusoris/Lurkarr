@@ -132,11 +132,7 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 		return
 	}
 
-	client := arrclient.NewClient(
-		inst.APIURL, inst.APIKey,
-		time.Duration(genSettings.APITimeout)*time.Second,
-		genSettings.SSLVerify,
-	)
+	client := arrclient.NewClientForInstance(inst.APIURL, inst.APIKey, genSettings.APITimeout, genSettings.SSLVerify)
 
 	queue, err := lurker.GetQueue(ctx, client)
 	if err != nil {
@@ -190,12 +186,20 @@ func (imp *Importer) checkInstance(ctx context.Context, log *slog.Logger, appTyp
 					}
 				}
 				if len(best.Rejections) == 0 {
-					log.Info("manual import candidate found",
+					log.Info("triggering manual import",
 						"file", best.Name,
 						"score", best.CustomFormatScore,
 						"queue_score", record.CustomFormatScore)
-					if err := imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "manual_import_available", best.Name); err != nil {
-						log.Warn("failed to log auto import", "title", record.Title, "error", err)
+
+					best.ImportMode = "move"
+					if err := client.PostManualImport(ctx, apiVersion, []arrclient.ManualImportItem{best}); err != nil {
+						log.Error("failed to trigger manual import", "title", record.Title, "error", err)
+						metrics.AutoimportErrors.WithLabelValues(string(appType), inst.Name).Inc()
+					} else {
+						if err := imp.db.LogAutoImport(ctx, appType, inst.ID, mediaID, record.Title, record.ID, "manual_import_triggered", best.Name); err != nil {
+							log.Warn("failed to log auto import", "title", record.Title, "error", err)
+						}
+						metrics.AutoimportActionsTotal.WithLabelValues(string(appType), inst.Name, "manual_import").Inc()
 					}
 					continue
 				}

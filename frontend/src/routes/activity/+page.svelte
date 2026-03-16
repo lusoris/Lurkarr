@@ -7,19 +7,12 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { ScrollText, RefreshCw, Search, Shield, ArrowRightLeft, Clock, Zap } from 'lucide-svelte';
-
-	interface ActivityEvent {
-		id: string;
-		source: string;
-		app_type?: string;
-		title: string;
-		action: string;
-		detail?: string;
-		timestamp: string;
-	}
+	import type { ActivityEvent } from '$lib/types';
+	import { timeAgo } from '$lib/format';
 
 	let events = $state<ActivityEvent[]>([]);
 	let loading = $state(true);
@@ -56,20 +49,6 @@
 		}
 	}
 
-	function formatTime(ts: string): string {
-		const d = new Date(ts);
-		const now = new Date();
-		const diffMs = now.getTime() - d.getTime();
-		const diffMin = Math.floor(diffMs / 60000);
-		if (diffMin < 1) return 'just now';
-		if (diffMin < 60) return `${diffMin}m ago`;
-		const diffHr = Math.floor(diffMin / 60);
-		if (diffHr < 24) return `${diffHr}h ago`;
-		const diffDay = Math.floor(diffHr / 24);
-		if (diffDay < 7) return `${diffDay}d ago`;
-		return d.toLocaleDateString();
-	}
-
 	let filtered = $derived(
 		filterSource ? events.filter(e => e.source === filterSource) : events
 	);
@@ -101,6 +80,7 @@
 				<RefreshCw class="h-4 w-4 mr-1.5" />
 				Refresh
 			</Button>
+			<HelpDrawer page="history" />
 		{/snippet}
 	</PageHeader>
 
@@ -112,9 +92,9 @@
 			{/each}
 		</Select>
 		{#if filterSource}
-			<button class="text-xs text-muted-foreground hover:text-foreground transition-colors" onclick={() => filterSource = ''}>
+			<Button size="sm" variant="link" class="h-auto p-0 text-xs text-muted-foreground" onclick={() => filterSource = ''}>
 				Clear filter
-			</button>
+			</Button>
 		{/if}
 		<span class="text-xs text-muted-foreground ml-auto">{filtered.length} events</span>
 	</div>
@@ -149,7 +129,7 @@
 							{/if}
 						</div>
 						<span class="shrink-0 text-xs text-muted-foreground whitespace-nowrap" title={new Date(event.timestamp).toLocaleString()}>
-							{formatTime(event.timestamp)}
+							{timeAgo(event.timestamp)}
 						</span>
 					</div>
 				</Card>

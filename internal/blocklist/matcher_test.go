@@ -172,3 +172,37 @@ func TestMatcherUnknownPatternType(t *testing.T) {
 		t.Error("unknown pattern type should not match")
 	}
 }
+
+func TestMatcherFilePatternTitle(t *testing.T) {
+	m := NewMatcher([]database.BlocklistRule{rule("file_pattern", `(?i)\.(exe|scr|bat|cmd|msi)$`)}, testParser)
+	result := m.Check(arrclient.QueueRecord{Title: "Movie.2024.1080p.exe"})
+	if !result.Matched {
+		t.Error("file_pattern should match malware extension in title")
+	}
+}
+
+func TestMatcherFilePatternStatusMessage(t *testing.T) {
+	m := NewMatcher([]database.BlocklistRule{rule("file_pattern", `(?i)\.(exe|scr|bat|cmd|msi)$`)}, testParser)
+	result := m.Check(arrclient.QueueRecord{
+		Title: "Movie.2024.1080p.BluRay-GROUP",
+		StatusMessages: []arrclient.StatusMessage{
+			{Title: "movie.2024.1080p.bluray.scr", Messages: []string{"Not a valid media file"}},
+		},
+	})
+	if !result.Matched {
+		t.Error("file_pattern should match malware extension in status message filename")
+	}
+}
+
+func TestMatcherFilePatternNoMatch(t *testing.T) {
+	m := NewMatcher([]database.BlocklistRule{rule("file_pattern", `(?i)\.(exe|scr|bat|cmd|msi)$`)}, testParser)
+	result := m.Check(arrclient.QueueRecord{
+		Title: "Movie.2024.1080p.BluRay-GROUP",
+		StatusMessages: []arrclient.StatusMessage{
+			{Title: "movie.2024.1080p.bluray.mkv", Messages: []string{"Imported"}},
+		},
+	})
+	if result.Matched {
+		t.Error("file_pattern should not match legitimate media extension")
+	}
+}

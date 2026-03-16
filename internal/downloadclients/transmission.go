@@ -62,13 +62,7 @@ func (a *TransmissionAdapter) GetHistory(ctx context.Context) ([]DownloadItem, e
 	if err != nil {
 		return nil, err
 	}
-	var completed []DownloadItem
-	for _, item := range items {
-		if item.Progress >= 1.0 {
-			completed = append(completed, item)
-		}
-	}
-	return completed, nil
+	return filterCompleted(items), nil
 }
 
 func transmissionStatusString(status int) string {

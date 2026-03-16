@@ -2,39 +2,21 @@
 	import { api } from '$lib/api';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
+	import CollapsibleCard from '$lib/components/ui/CollapsibleCard.svelte';
+	import ScrollToTop from '$lib/components/ScrollToTop.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
 
 	const toasts = getToasts();
+	import type { GeneralSettings, OIDCSettings } from '$lib/types';
 
 	type SettingsTab = 'general' | 'sso';
 	let activeTab = $state<SettingsTab>('general');
-
-	interface GeneralSettings {
-		secret_key: string;
-		proxy_auth_bypass: boolean;
-		ssl_verify: boolean;
-		api_timeout: number;
-		stateful_reset_hours: number;
-		command_wait_delay: number;
-		command_wait_attempts: number;
-		min_download_queue_size: number;
-	}
-
-	interface OIDCSettings {
-		enabled: boolean;
-		issuer_url: string;
-		client_id: string;
-		client_secret: string;
-		redirect_url: string;
-		scopes: string;
-		auto_create: boolean;
-		admin_group: string;
-	}
 
 	let general = $state<GeneralSettings | null>(null);
 	let oidc = $state<OIDCSettings | null>(null);
@@ -93,7 +75,11 @@
 <svelte:head><title>Settings - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Settings" description="General behaviour, security and single sign-on configuration." />
+	<PageHeader title="Settings" description="General behaviour, security and single sign-on configuration.">
+		{#snippet actions()}
+			<HelpDrawer page="settings" />
+		{/snippet}
+	</PageHeader>
 
 	<Tabs
 		tabs={[
@@ -106,18 +92,16 @@
 	{#if activeTab === 'general'}
 		{#if general}
 			<!-- ── Lurking Behaviour ─────────────────────────────── -->
-			<Card>
-				<h2 class="text-lg font-semibold text-foreground mb-1">Lurking Behaviour</h2>
+			<CollapsibleCard title="Lurking Behaviour">
 				<p class="text-xs text-muted-foreground mb-4">Controls how Lurkarr searches and manages your media libraries.</p>
 				<div class="space-y-4">
 					<Input bind:value={general.stateful_reset_hours} type="number" label="State Reset (hours)" hint="Hours after which lurk progress resets and starts fresh" />
-					<Input bind:value={general.min_download_queue_size} type="number" label="Min Download Queue Size (-1 = disabled)" hint="Pause lurking if the download queue has fewer items. -1 disables" />
+					<Input bind:value={general.max_download_queue_size} type="number" label="Max Download Queue Size (0 = disabled)" hint="Pause lurking when the download queue has this many items or more. 0 disables" />
 				</div>
-			</Card>
+			</CollapsibleCard>
 
-			<!-- ── API & Command Execution ───────────────────────── -->
-			<Card>
-				<h2 class="text-lg font-semibold text-foreground mb-1">API &amp; Command Execution</h2>
+			<!-- ── API & Command Execution ───────────────────────────── -->
+			<CollapsibleCard title="API & Command Execution">
 				<p class="text-xs text-muted-foreground mb-4">Tune how Lurkarr communicates with your Arr apps.</p>
 				<div class="space-y-4">
 					<Input bind:value={general.api_timeout} type="number" label="API Timeout (seconds)" hint="How long to wait for arr API responses before timing out" />
@@ -126,17 +110,16 @@
 						<Input bind:value={general.command_wait_attempts} type="number" label="Command Wait Attempts" hint="Max retries for command completion" />
 					</div>
 				</div>
-			</Card>
+			</CollapsibleCard>
 
 			<!-- ── Security ──────────────────────────────────────── -->
-			<Card>
-				<h2 class="text-lg font-semibold text-foreground mb-1">Security</h2>
+			<CollapsibleCard title="Security">
 				<p class="text-xs text-muted-foreground mb-4">Connection security and authentication settings.</p>
 				<div class="space-y-4">
 					<Toggle bind:checked={general.ssl_verify} label="SSL Verification" hint="Verify TLS certificates when connecting to arr apps" />
 					<Toggle bind:checked={general.proxy_auth_bypass} label="Proxy Auth Bypass" hint="Trust X-Forwarded headers from a reverse proxy for authentication" />
 				</div>
-			</Card>
+			</CollapsibleCard>
 
 			<div class="flex justify-end">
 				<Button onclick={saveGeneral} loading={saving}>Save Settings</Button>
@@ -146,8 +129,7 @@
 		{/if}
 	{:else if activeTab === 'sso'}
 		{#if oidc}
-			<Card>
-				<h2 class="text-lg font-semibold text-foreground mb-1">OpenID Connect Provider</h2>
+			<CollapsibleCard title="OpenID Connect Provider">
 				<p class="text-xs text-muted-foreground mb-4">Configure an OIDC provider (Authentik, Keycloak, Authelia, etc.) for SSO login.</p>
 				<div class="space-y-4">
 					<Toggle bind:checked={oidc.enabled} label="Enable OIDC" hint="Allow users to sign in via the configured OIDC provider" />
@@ -162,17 +144,16 @@
 						<Input bind:value={oidc.scopes} type="text" label="Scopes" hint="Comma-separated scopes (default: openid,profile,email)" />
 					{/if}
 				</div>
-			</Card>
+			</CollapsibleCard>
 
 			{#if oidc.enabled}
-				<Card>
-					<h2 class="text-lg font-semibold text-foreground mb-1">User Management</h2>
+				<CollapsibleCard title="User Management">
 					<p class="text-xs text-muted-foreground mb-4">Control how OIDC users are provisioned.</p>
 					<div class="space-y-4">
 						<Toggle bind:checked={oidc.auto_create} label="Auto-Create Users" hint="Automatically create local accounts for new OIDC users on first login" />
 						<Input bind:value={oidc.admin_group} type="text" label="Admin Group" hint="OIDC group claim value that grants admin privileges (leave empty to disable)" />
 					</div>
-				</Card>
+				</CollapsibleCard>
 			{/if}
 
 			<div class="flex justify-end gap-2">
@@ -186,3 +167,5 @@
 		{/if}
 	{/if}
 </div>
+
+<ScrollToTop />

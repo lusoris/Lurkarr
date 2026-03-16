@@ -13,9 +13,11 @@ import (
 //  1. Custom format score (authoritative, from the *arr quality profile)
 //  2. Resolution rank (2160p > 1080p > 720p > 480p)
 //  3. Source rank (Remux > BluRay > WEB-DL > WEBRip > HDTV > DVD)
-//  4. Revision bonus (PROPER/REPACK)
-//  5. Size tiebreaker
-//  6. Progress tiebreaker (more complete = prefer keeping)
+//  4. HDR rank (HDR10+ > DV > HDR10 > HDR > none)
+//  5. Audio rank (Atmos > TrueHD > DTS-HD MA > FLAC > DDP > DTS > AC3 > AAC)
+//  6. Revision bonus (PROPER/REPACK)
+//  7. Size tiebreaker
+//  8. Progress tiebreaker (more complete = prefer keeping)
 func ScoreQueueItem(item *arrclient.QueueRecord, profile *database.ScoringProfile) int {
 	score := 0
 
@@ -30,12 +32,18 @@ func ScoreQueueItem(item *arrclient.QueueRecord, profile *database.ScoringProfil
 	info := ParseRelease(item.Title)
 	score += sourceRank(info.Source) * profile.SourceWeight
 
-	// 4. Revision bonus (PROPER/REPACK get a flat bonus)
+	// 4. HDR rank
+	score += hdrRank(info.HDR) * profile.HDRWeight
+
+	// 5. Audio rank
+	score += audioRank(info.Audio) * profile.AudioWeight
+
+	// 6. Revision bonus (PROPER/REPACK get a flat bonus)
 	if item.Quality != nil && item.Quality.Revision.Version > 1 {
 		score += profile.RevisionBonus
 	}
 
-	// 5. Size tiebreaker
+	// 7. Size tiebreaker
 	if profile.PreferLargerSize && item.Size > 0 {
 		sizeGB := int(item.Size / (1024 * 1024 * 1024))
 		if sizeGB > 100 {
@@ -44,7 +52,7 @@ func ScoreQueueItem(item *arrclient.QueueRecord, profile *database.ScoringProfil
 		score += sizeGB * profile.SizeWeight
 	}
 
-	// 6. Download progress as tiebreaker (more complete = prefer keeping)
+	// 8. Download progress as tiebreaker (more complete = prefer keeping)
 	if item.Size > 0 {
 		progress := int(((item.Size - item.Sizeleft) * 100) / item.Size)
 		score += progress // 0-100 points
@@ -91,6 +99,44 @@ func sourceRank(src string) int {
 	}
 }
 
+// hdrRank maps HDR format strings to numeric rank values.
+func hdrRank(hdr string) int {
+	switch hdr {
+	case "HDR10+":
+		return 4
+	case "DV":
+		return 3
+	case "HDR10":
+		return 2
+	case "HDR":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// audioRank maps audio format strings to numeric rank values.
+func audioRank(audio string) int {
+	switch {
+	case strings.Contains(audio, "Atmos"):
+		return 7
+	case strings.Contains(audio, "TrueHD"):
+		return 6
+	case strings.Contains(audio, "DTS-HD MA"):
+		return 5
+	case strings.Contains(audio, "FLAC"):
+		return 4
+	case strings.Contains(audio, "EAC3"), strings.Contains(audio, "DDP"):
+		return 3
+	case strings.Contains(audio, "DTS"):
+		return 2
+	case strings.Contains(audio, "AC3"), strings.Contains(audio, "DD"):
+		return 1
+	default:
+		return 0 // AAC, MP3, unknown
+	}
+}
+
 var reResolutionFromName = regexp.MustCompile(`(?i)(4320p|2160p|1080p|720p|576p|480p)`)
 
 // extractResolution gets the resolution from the quality name first (e.g. "Bluray-1080p")
@@ -132,10 +178,20 @@ func FindDuplicates(records []arrclient.QueueRecord, profile *database.ScoringPr
 		keepIdx := 0
 		if profile.Strategy == "adequate" {
 			// Keep the first item that meets the threshold
+			found := false
 			for i, item := range items {
 				if item.score >= profile.AdequateThreshold {
 					keepIdx = i
+					found = true
 					break
+				}
+			}
+			// No item meets threshold — fall back to highest score
+			if !found {
+				for i := 1; i < len(items); i++ {
+					if items[i].score > items[keepIdx].score {
+						keepIdx = i
+					}
 				}
 			}
 		} else {

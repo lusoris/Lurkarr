@@ -44,7 +44,7 @@ func NewMatcher(rules []database.BlocklistRule, parse ReleaseParser) *Matcher {
 		parse:    parse,
 	}
 	for _, r := range rules {
-		if r.PatternType == "title_regex" && len(r.Pattern) <= MaxRegexPatternLength {
+		if (r.PatternType == "title_regex" || r.PatternType == "file_pattern") && len(r.Pattern) <= MaxRegexPatternLength {
 			re, err := regexp.Compile(r.Pattern)
 			if err == nil {
 				m.compiled[r.ID.String()] = re
@@ -88,6 +88,22 @@ func (m *Matcher) matches(rule database.BlocklistRule, record arrclient.QueueRec
 		return re.MatchString(record.Title)
 	case "indexer":
 		return strings.EqualFold(record.Indexer, rule.Pattern)
+	case "file_pattern":
+		re, ok := m.compiled[rule.ID.String()]
+		if !ok {
+			return false
+		}
+		// Match against the release title itself.
+		if re.MatchString(record.Title) {
+			return true
+		}
+		// Match against filenames reported in status messages.
+		for _, sm := range record.StatusMessages {
+			if sm.Title != "" && re.MatchString(sm.Title) {
+				return true
+			}
+		}
+		return false
 	default:
 		return false
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/rtorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/utorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/nzbget"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 	"github.com/lusoris/lurkarr/internal/logging"
@@ -133,6 +134,42 @@ func (c *Cleaner) RunOnce(ctx context.Context) {
 	slog.Info("queue cleaner run-once complete")
 }
 
+// RunOnceForApp performs a single clean pass for a specific app type and returns.
+func (c *Cleaner) RunOnceForApp(ctx context.Context, appType database.AppType) error {
+	if lurking.LurkerFor(appType) == nil {
+		return fmt.Errorf("no lurker for app type: %s", appType)
+	}
+	log := c.logger.ForApp(string(appType))
+	settings, err := c.db.GetQueueCleanerSettings(ctx, appType)
+	if err != nil {
+		return fmt.Errorf("load queue cleaner settings: %w", err)
+	}
+	if !settings.Enabled {
+		return fmt.Errorf("queue cleaner disabled for %s", appType)
+	}
+	instances, err := c.db.ListEnabledInstances(ctx, appType)
+	if err != nil {
+		return fmt.Errorf("list instances: %w", err)
+	}
+	removals := make(map[uuid.UUID][]removal)
+	for _, inst := range instances {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		removed := c.cleanInstance(ctx, log, appType, settings, inst)
+		if len(removed) > 0 {
+			removals[inst.ID] = removed
+		}
+	}
+	if settings.OrphanEnabled {
+		c.cleanOrphans(ctx, log, appType, settings, instances)
+	}
+	if settings.CrossArrSync && len(instances) > 1 && len(removals) > 0 {
+		c.syncBlocklistAcross(ctx, log, appType, settings, instances, removals)
+	}
+	return nil
+}
+
 // Stop cancels all cleaner goroutines.
 func (c *Cleaner) Stop() {
 	if c.cancel != nil {
@@ -207,6 +244,9 @@ func (c *Cleaner) cleanLoop(ctx context.Context, appType database.AppType) {
 func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType database.AppType, settings *database.QueueCleanerSettings, inst database.AppInstance) []removal {
 	log = log.With("instance", inst.Name)
 
+	// Apply any user-configured extra keywords for this app type.
+	setCustomKeywords(settings)
+
 	lurker := lurking.LurkerFor(appType)
 	if lurker == nil {
 		return nil
@@ -218,11 +258,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		return nil
 	}
 
-	client := arrclient.NewClient(
-		inst.APIURL, inst.APIKey,
-		time.Duration(genSettings.APITimeout)*time.Second,
-		genSettings.SSLVerify,
-	)
+	client := arrclient.NewClientForInstance(inst.APIURL, inst.APIKey, genSettings.APITimeout, genSettings.SSLVerify)
 
 	// Use enriched queue when cross-arr sync, protected tags, deletion detection,
 	// or unmonitored cleanup is enabled so we get external IDs and media status
@@ -259,8 +295,16 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 		queue.Records = filterIgnoredDownloadClients(log, settings.IgnoredDownloadClients, queue.Records)
 	}
 
+	// Filter out records from ignored release groups.
+	if settings.IgnoredReleaseGroups != "" {
+		queue.Records = filterIgnoredReleaseGroups(log, settings.IgnoredReleaseGroups, queue.Records)
+	}
+
 	// Get SABnzbd queue status for Usenet items
 	sabStatuses := c.getSABnzbdStatuses(ctx)
+
+	// Get real download speeds from all download client instances.
+	dlSpeeds := c.getDownloadClientSpeeds(ctx)
 
 	apiVersion := apiVersionFor(appType)
 
@@ -436,28 +480,28 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 	// 2. Stalled/slow detection with strike system — pack-aware: evaluate the
 	// representative record (all pack members share the same download state),
 	// strike once per DownloadID, and remove all queue records on max strikes.
-	pipeSaturated := isBandwidthSaturated(log, settings, queue.Records)
+	pipeSaturated := isBandwidthSaturated(log, settings, queue.Records, dlSpeeds)
 	for _, pack := range packs {
 		rep := pack.Representative()
 		if rep.TrackedDownloadState == "importPending" {
 			continue // Don't strike items waiting for import
 		}
 
-		// Reset strikes for downloads that are making progress
+		// Reset strikes for downloads that are making good progress
 		if rep.Size > 0 && rep.Sizeleft < rep.Size {
 			progress := float64(rep.Size-rep.Sizeleft) / float64(rep.Size)
 			if progress > 0.5 && rep.TrackedDownloadStatus != "warning" {
-				// Over 50% and healthy — clear any old strikes
+				// Over 50% and healthy — clear any old strikes but still
+				// run detectProblem so new issues (e.g. stalled speed) are caught
 				if !settings.DryRun {
 					if err := c.db.ResetStrikes(ctx, appType, inst.ID, rep.DownloadID); err != nil {
 						log.Warn("failed to reset strikes", "download_id", rep.DownloadID, "error", err)
 					}
 				}
-				continue
 			}
 		}
 
-		reason := c.detectProblem(rep, settings, sabStatuses, pipeSaturated)
+		reason := c.detectProblem(rep, settings, sabStatuses, dlSpeeds, pipeSaturated)
 		if reason == "" {
 			continue
 		}
@@ -537,7 +581,7 @@ func (c *Cleaner) cleanInstance(ctx context.Context, log *slog.Logger, appType d
 
 // detectProblem checks if a queue item is stalled, slow, or metadata-stuck.
 // Returns the reason string, or "" if no problem.
-func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string, pipeSaturated bool) string {
+func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database.QueueCleanerSettings, sabStatuses map[string]string, dlSpeeds map[string]int64, pipeSaturated bool) string {
 	// Skip all strike-based detection for items above the size threshold
 	if settings.IgnoreAboveBytes > 0 && record.Size > settings.IgnoreAboveBytes {
 		return ""
@@ -560,7 +604,15 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 	// Check for metadata stuck (no size yet, been in queue too long)
 	if settings.MetadataStuckMinutes > 0 && record.Size == 0 && record.Sizeleft == 0 {
 		if record.Status == "downloading" || record.Status == "delay" {
-			return "metadata_stuck"
+			// Only flag as stuck if the item has been in the queue longer than the configured threshold.
+			threshold := time.Duration(settings.MetadataStuckMinutes) * time.Minute
+			if !record.Added.IsZero() && time.Since(record.Added) >= threshold {
+				return "metadata_stuck"
+			}
+			// Added is zero (old arr versions) — fall back to strike-based timing.
+			if record.Added.IsZero() {
+				return "metadata_stuck"
+			}
 		}
 	}
 
@@ -572,7 +624,7 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 		}
 
 		if record.Protocol == "torrent" {
-			isPrivate := isPrivateTracker(record)
+			isPrivate := isPrivateTracker(record, settings.PublicTrackerList)
 			if isPrivate && !settings.StrikePrivate {
 				return "" // Skip private trackers per config
 			}
@@ -595,7 +647,17 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 			return ""
 		}
 
-		// Parse timeleft to estimate speed
+		// Prefer real speed from the download client when available.
+		if record.DownloadID != "" {
+			if realSpeed, ok := dlSpeeds[strings.ToLower(record.DownloadID)]; ok {
+				if realSpeed >= 0 && realSpeed < settings.SlowThresholdBytesPerSec {
+					return "slow"
+				}
+				return "" // has real speed and it's above threshold
+			}
+		}
+
+		// Fall back to ETA-derived estimate from the arr API.
 		if tl := parseTimeleft(record.TimeleftStr); tl > 0 {
 			estimatedSpeed := record.Sizeleft / int64(tl.Seconds())
 			if estimatedSpeed > 0 && estimatedSpeed < settings.SlowThresholdBytesPerSec {
@@ -609,8 +671,8 @@ func (c *Cleaner) detectProblem(record arrclient.QueueRecord, settings *database
 
 // isPrivateTracker determines if a torrent is from a private tracker.
 // It uses indexer flags from the arr API (set only by private indexers) as the
-// primary signal, with a known-public-tracker fallback for older arr versions.
-func isPrivateTracker(record arrclient.QueueRecord) bool {
+// primary signal, with a configurable known-public-tracker fallback list.
+func isPrivateTracker(record arrclient.QueueRecord, publicList string) bool {
 	// Indexer flags are only populated by private trackers (freeleech, internal, etc.).
 	if record.IndexerFlags != 0 {
 		return true
@@ -621,15 +683,10 @@ func isPrivateTracker(record arrclient.QueueRecord) bool {
 		return false
 	}
 
-	// Well-known public indexers — if matched, definitely not private.
-	publicIndexers := []string{
-		"1337x", "rarbg", "yts", "nyaa", "eztv", "limetorrents",
-		"thepiratebay", "kickasstorrents", "torrentz2", "glodls",
-		"magnetdl", "ettv", "isohunt", "bt4g", "solidtorrents",
-		"bitsearch", "torrentgalaxy", "fitgirl",
-	}
-	for _, pub := range publicIndexers {
-		if indexer == pub {
+	// Parse the configurable public tracker list.
+	for _, pub := range strings.Split(publicList, ",") {
+		pub = strings.TrimSpace(strings.ToLower(pub))
+		if pub != "" && indexer == pub {
 			return false
 		}
 	}
@@ -656,13 +713,17 @@ var unregisteredKeywords = []string{
 	"trumped",
 }
 
+// activeUnregisteredKeywords are the combined defaults + user-configured keywords.
+// Set at the start of each cleanup cycle via SetCustomKeywords.
+var activeUnregisteredKeywords = unregisteredKeywords
+
 // isUnregisteredTorrent checks whether a queue record's status messages indicate
 // that the torrent has been removed or unregistered from its tracker.
 func isUnregisteredTorrent(record arrclient.QueueRecord) bool {
 	for _, sm := range record.StatusMessages {
 		for _, msg := range sm.Messages {
 			lower := strings.ToLower(msg)
-			for _, kw := range unregisteredKeywords {
+			for _, kw := range activeUnregisteredKeywords {
 				if strings.Contains(lower, kw) {
 					return true
 				}
@@ -686,13 +747,17 @@ var mismatchKeywords = []string{
 	"unable to identify correct movie",
 }
 
+// activeMismatchKeywords are the combined defaults + user-configured keywords.
+// Set at the start of each cleanup cycle via SetCustomKeywords.
+var activeMismatchKeywords = mismatchKeywords
+
 // isMismatchedRelease checks whether a queue record's status messages indicate
 // the download doesn't match the expected media (wrong series/movie/episode).
 func isMismatchedRelease(record arrclient.QueueRecord) bool {
 	for _, sm := range record.StatusMessages {
 		for _, msg := range sm.Messages {
 			lower := strings.ToLower(msg)
-			for _, kw := range mismatchKeywords {
+			for _, kw := range activeMismatchKeywords {
 				if strings.Contains(lower, kw) {
 					return true
 				}
@@ -700,6 +765,28 @@ func isMismatchedRelease(record arrclient.QueueRecord) bool {
 		}
 	}
 	return false
+}
+
+// setCustomKeywords merges user-configured keywords with the built-in defaults.
+func setCustomKeywords(settings *database.QueueCleanerSettings) {
+	activeUnregisteredKeywords = mergeKeywords(unregisteredKeywords, settings.CustomUnregisteredKeywords)
+	activeMismatchKeywords = mergeKeywords(mismatchKeywords, settings.CustomMismatchKeywords)
+}
+
+// mergeKeywords appends comma-separated custom keywords to the default list.
+func mergeKeywords(defaults []string, custom string) []string {
+	if custom == "" {
+		return defaults
+	}
+	merged := make([]string, len(defaults))
+	copy(merged, defaults)
+	for _, kw := range strings.Split(custom, ",") {
+		kw = strings.TrimSpace(strings.ToLower(kw))
+		if kw != "" {
+			merged = append(merged, kw)
+		}
+	}
+	return merged
 }
 
 // cleanFailedImports removes queue items with import errors (statusMessages containing failure reasons).
@@ -879,6 +966,9 @@ func (c *Cleaner) getDownloadClient(ctx context.Context, appType database.AppTyp
 	case downloadclient.TypeRTorrent:
 		native := rtorrent.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
 		return downloadclient.NewRTorrentAdapter(native)
+	case downloadclient.TypeUTorrent:
+		native := utorrent.NewClient(dcs.URL, dcs.Username, dcs.Password, timeout)
+		return downloadclient.NewUTorrentAdapter(native)
 	default:
 		return nil
 	}
@@ -933,7 +1023,7 @@ func (c *Cleaner) cleanSeeding(ctx context.Context, log *slog.Logger, appType da
 		}
 
 		// Skip private trackers if configured.
-		if settings.SeedingSkipPrivate && isPrivateTracker(rep) {
+		if settings.SeedingSkipPrivate && isPrivateTracker(rep, settings.PublicTrackerList) {
 			continue
 		}
 
@@ -1434,6 +1524,11 @@ func (c *Cleaner) cleanOrphans(ctx context.Context, log *slog.Logger, appType da
 		if item.AddedAt == 0 && item.CompletedAt > 0 && (now-item.CompletedAt) < graceSeconds {
 			continue
 		}
+		// No timestamp at all — cannot determine age, skip to avoid premature removal.
+		if item.AddedAt == 0 && item.CompletedAt == 0 {
+			log.Debug("orphan: skipping item with unknown age", "name", item.Name, "id", item.ID)
+			continue
+		}
 
 		// Skip cross-seeded items to avoid breaking other seeders.
 		if settings.SkipCrossSeeds && isCrossSeeded(item, crossSeedCounts) {
@@ -1519,6 +1614,61 @@ func parseExcludedCategories(s string) map[string]bool {
 		}
 	}
 	return cats
+}
+
+// getDownloadClientSpeeds fetches items from all enabled download client
+// instances and returns a map of lowercase downloadID → download speed (bytes/sec).
+// This provides real-time speed data from the download client, which is more
+// accurate than the ETA-derived estimate from the arr API.
+func (c *Cleaner) getDownloadClientSpeeds(ctx context.Context) map[string]int64 {
+	speeds := make(map[string]int64)
+
+	instances, err := c.db.ListEnabledDownloadClientInstances(ctx)
+	if err != nil {
+		return speeds
+	}
+
+	for _, inst := range instances {
+		if inst.URL == "" {
+			continue
+		}
+		timeout := time.Duration(inst.Timeout) * time.Second
+		if timeout == 0 {
+			timeout = 30 * time.Second
+		}
+
+		var dc downloadclient.Client
+		switch downloadclient.ClientType(inst.ClientType) {
+		case downloadclient.TypeQBittorrent:
+			dc = downloadclient.NewQBittorrentAdapter(qbittorrent.NewClient(inst.URL, inst.Username, inst.Password, timeout))
+		case downloadclient.TypeTransmission:
+			dc = downloadclient.NewTransmissionAdapter(transmission.NewClient(inst.URL, inst.Username, inst.Password, timeout))
+		case downloadclient.TypeDeluge:
+			dc = downloadclient.NewDelugeAdapter(deluge.NewClient(inst.URL, inst.Password, timeout))
+		case downloadclient.TypeRTorrent:
+			dc = downloadclient.NewRTorrentAdapter(rtorrent.NewClient(inst.URL, inst.Username, inst.Password, timeout))
+		case downloadclient.TypeUTorrent:
+			dc = downloadclient.NewUTorrentAdapter(utorrent.NewClient(inst.URL, inst.Username, inst.Password, timeout))
+		case downloadclient.TypeSABnzbd:
+			dc = downloadclient.NewSABnzbdAdapter(sabnzbd.NewClient(inst.URL, inst.APIKey, timeout))
+		case downloadclient.TypeNZBGet:
+			dc = downloadclient.NewNZBGetAdapter(nzbget.NewClient(inst.URL, inst.Username, inst.Password, timeout))
+		default:
+			continue
+		}
+
+		items, err := dc.GetItems(ctx)
+		if err != nil {
+			continue
+		}
+		for _, item := range items {
+			if item.ID != "" {
+				speeds[strings.ToLower(item.ID)] = item.DownloadSpeed
+			}
+		}
+	}
+
+	return speeds
 }
 
 // getSABnzbdStatuses fetches the SABnzbd queue from all enabled SABnzbd download
@@ -1700,11 +1850,11 @@ func shouldBlocklist(reason string, settings *database.QueueCleanerSettings) boo
 // The first record is deleted with the full removeFromClient/blocklist flags;
 // subsequent records are deleted with removeFromClient=false since the download
 // is already gone. Returns true if at least the first deletion succeeded.
-func deletePackFromQueue(ctx context.Context, log *slog.Logger, client *arrclient.Client, apiVersion string, pack Pack, removeFromClient, blocklist bool) bool {
+func deletePackFromQueue(ctx context.Context, log *slog.Logger, client *arrclient.Client, apiVersion string, pack Pack, removeFromClient, addToBlocklist bool) bool {
 	for i, r := range pack.Records {
 		// Only the first deletion needs to remove the download from the client.
 		rfc := removeFromClient && i == 0
-		bl := blocklist
+		bl := addToBlocklist
 		if err := client.DeleteQueueItem(ctx, apiVersion, r.ID, rfc, bl); err != nil {
 			if i == 0 {
 				log.Error("failed to remove queue item", "queue_id", r.ID, "error", err)
@@ -1749,7 +1899,7 @@ func resolveTagID(ctx context.Context, log *slog.Logger, client *arrclient.Clien
 	return tag.ID
 }
 
-func isBandwidthSaturated(log *slog.Logger, settings *database.QueueCleanerSettings, records []arrclient.QueueRecord) bool {
+func isBandwidthSaturated(log *slog.Logger, settings *database.QueueCleanerSettings, records []arrclient.QueueRecord, dlSpeeds map[string]int64) bool {
 	if settings.BandwidthLimitBytesPerSec <= 0 || settings.SlowThresholdBytesPerSec <= 0 {
 		return false
 	}
@@ -1757,6 +1907,14 @@ func isBandwidthSaturated(log *slog.Logger, settings *database.QueueCleanerSetti
 	var totalSpeed int64
 	for _, rec := range records {
 		if rec.Size > 0 && rec.Sizeleft > 0 && rec.Sizeleft < rec.Size {
+			// Prefer real speed from the download client.
+			if rec.DownloadID != "" {
+				if realSpeed, ok := dlSpeeds[strings.ToLower(rec.DownloadID)]; ok {
+					totalSpeed += realSpeed
+					continue
+				}
+			}
+			// Fall back to ETA-derived estimate.
 			if tl := parseTimeleft(rec.TimeleftStr); tl > 0 {
 				totalSpeed += rec.Sizeleft / int64(tl.Seconds())
 			}
@@ -1816,6 +1974,34 @@ func filterIgnoredDownloadClients(log *slog.Logger, ignoredCSV string, records [
 		if _, ok := ignored[strings.ToLower(rec.DownloadClient)]; ok {
 			log.Info("skipping ignored download client item", "title", rec.Title, "client", rec.DownloadClient)
 			continue
+		}
+		filtered = append(filtered, rec)
+	}
+	return filtered
+}
+
+// filterIgnoredReleaseGroups removes queue records whose parsed release group
+// matches any name in the comma-separated ignoredCSV setting.
+func filterIgnoredReleaseGroups(log *slog.Logger, ignoredCSV string, records []arrclient.QueueRecord) []arrclient.QueueRecord {
+	ignored := make(map[string]struct{})
+	for _, raw := range strings.Split(ignoredCSV, ",") {
+		name := strings.TrimSpace(strings.ToLower(raw))
+		if name != "" {
+			ignored[name] = struct{}{}
+		}
+	}
+	if len(ignored) == 0 {
+		return records
+	}
+
+	filtered := make([]arrclient.QueueRecord, 0, len(records))
+	for _, rec := range records {
+		parsed := ParseRelease(rec.Title)
+		if parsed.ReleaseGroup != "" {
+			if _, ok := ignored[strings.ToLower(parsed.ReleaseGroup)]; ok {
+				log.Info("skipping ignored release group item", "title", rec.Title, "group", parsed.ReleaseGroup)
+				continue
+			}
 		}
 		filtered = append(filtered, rec)
 	}

@@ -125,22 +125,22 @@ func (c *Client) sendRPC(ctx context.Context, rpcURL string, body []byte) (*http
 
 // Torrent represents a Transmission torrent.
 type Torrent struct {
-	ID            int     `json:"id"`
-	Name          string  `json:"name"`
-	HashString    string  `json:"hashString"`
-	Status        int     `json:"status"`
-	TotalSize     int64   `json:"totalSize"`
-	PercentDone   float64 `json:"percentDone"`
-	RateDownload  int64   `json:"rateDownload"`
-	RateUpload    int64   `json:"rateUpload"`
-	UploadRatio   float64 `json:"uploadRatio"`
-	ETA           int64   `json:"eta"`
-	SeedRatioMode int     `json:"seedRatioMode"`
-	AddedDate     int64   `json:"addedDate"`
-	DoneDate      int64   `json:"doneDate"`
-	DownloadDir   string  `json:"downloadDir"`
-	SizeWhenDone  int64   `json:"sizeWhenDone"`
-	LeftUntilDone int64   `json:"leftUntilDone"`
+	ID            int      `json:"id"`
+	Name          string   `json:"name"`
+	HashString    string   `json:"hashString"`
+	Status        int      `json:"status"`
+	TotalSize     int64    `json:"totalSize"`
+	PercentDone   float64  `json:"percentDone"`
+	RateDownload  int64    `json:"rateDownload"`
+	RateUpload    int64    `json:"rateUpload"`
+	UploadRatio   float64  `json:"uploadRatio"`
+	ETA           int64    `json:"eta"`
+	SeedRatioMode int      `json:"seedRatioMode"`
+	AddedDate     int64    `json:"addedDate"`
+	DoneDate      int64    `json:"doneDate"`
+	DownloadDir   string   `json:"downloadDir"`
+	SizeWhenDone  int64    `json:"sizeWhenDone"`
+	LeftUntilDone int64    `json:"leftUntilDone"`
 	Error         int      `json:"error"`
 	ErrorString   string   `json:"errorString"`
 	Labels        []string `json:"labels"`

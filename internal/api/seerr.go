@@ -29,9 +29,7 @@ func (h *SeerrHandler) HandleGetSettings(w http.ResponseWriter, r *http.Request)
 
 // HandleUpdateSettings handles PUT /api/seerr/settings.
 func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-
-	var req struct {
+	req, ok := decodeJSON[struct {
 		URL                 string `json:"url"`
 		APIKey              string `json:"api_key"`
 		Enabled             bool   `json:"enabled"`
@@ -39,9 +37,8 @@ func (h *SeerrHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 		AutoApprove         bool   `json:"auto_approve"`
 		CleanupEnabled      bool   `json:"cleanup_enabled"`
 		CleanupAfterDays    int    `json:"cleanup_after_days"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -195,8 +192,6 @@ func (h *SeerrHandler) HandleScanDuplicates(w http.ResponseWriter, r *http.Reque
 // HandleReassignRequest handles POST /api/seerr/requests/{id}/reassign.
 // It modifies a Seerr request to target a different server/quality profile.
 func (h *SeerrHandler) HandleReassignRequest(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-
 	idStr := r.PathValue("id")
 	requestID, err := strconv.Atoi(idStr)
 	if err != nil || requestID <= 0 {
@@ -204,13 +199,12 @@ func (h *SeerrHandler) HandleReassignRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var body struct {
+	body, ok := decodeJSON[struct {
 		ServerID   int    `json:"server_id"`
 		ProfileID  int    `json:"profile_id"`
 		RootFolder string `json:"root_folder"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 	if body.ServerID <= 0 || body.ProfileID <= 0 {

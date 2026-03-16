@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // ListNotificationProviders returns all notification providers.
@@ -15,17 +16,7 @@ func (db *DB) ListNotificationProviders(ctx context.Context) ([]NotificationProv
 	if err != nil {
 		return nil, fmt.Errorf("list notification providers: %w", err)
 	}
-	defer rows.Close()
-
-	var providers []NotificationProvider
-	for rows.Next() {
-		var p NotificationProvider
-		if err := rows.Scan(&p.ID, &p.Type, &p.Name, &p.Enabled, &p.Config, &p.Events, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan notification provider: %w", err)
-		}
-		providers = append(providers, p)
-	}
-	return providers, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[NotificationProvider])
 }
 
 // ListEnabledNotificationProviders returns only enabled providers.
@@ -36,17 +27,7 @@ func (db *DB) ListEnabledNotificationProviders(ctx context.Context) ([]Notificat
 	if err != nil {
 		return nil, fmt.Errorf("list enabled notification providers: %w", err)
 	}
-	defer rows.Close()
-
-	var providers []NotificationProvider
-	for rows.Next() {
-		var p NotificationProvider
-		if err := rows.Scan(&p.ID, &p.Type, &p.Name, &p.Enabled, &p.Config, &p.Events, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan notification provider: %w", err)
-		}
-		providers = append(providers, p)
-	}
-	return providers, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[NotificationProvider])
 }
 
 // GetNotificationProvider returns a single notification provider by ID.

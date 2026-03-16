@@ -400,10 +400,11 @@ func TestImportLoop_ListInstancesError(t *testing.T) {
 	imp.wg.Wait()
 }
 
-func TestCheckInstance_ManualImportAvailable(t *testing.T) {
+func TestCheckInstance_ManualImportTriggered(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 
+	var postCalled bool
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v3/queue" {
@@ -422,10 +423,15 @@ func TestCheckInstance_ManualImportAvailable(t *testing.T) {
 			})
 			return
 		}
-		if r.URL.Path == "/api/v3/manualimport" {
+		if r.URL.Path == "/api/v3/manualimport" && r.Method == http.MethodGet {
 			json.NewEncoder(w).Encode([]arrclient.ManualImportItem{
 				{Name: "file1.mkv", CustomFormatScore: 100, Rejections: nil},
 			})
+			return
+		}
+		if r.URL.Path == "/api/v3/manualimport" && r.Method == http.MethodPost {
+			postCalled = true
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		json.NewEncoder(w).Encode(arrclient.CommandResponse{ID: 1})
@@ -434,7 +440,7 @@ func TestCheckInstance_ManualImportAvailable(t *testing.T) {
 	defer srv.Close()
 
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(defaultGeneralSettings(), nil)
-	store.EXPECT().LogAutoImport(gomock.Any(), database.AppSonarr, gomock.Any(), gomock.Any(), "Test.Movie.2024", 1, "manual_import_available", "file1.mkv").Return(nil)
+	store.EXPECT().LogAutoImport(gomock.Any(), database.AppSonarr, gomock.Any(), gomock.Any(), "Test.Movie.2024", 1, "manual_import_triggered", "file1.mkv").Return(nil)
 
 	logger := newTestLogger()
 	defer logger.Close()
@@ -444,6 +450,10 @@ func TestCheckInstance_ManualImportAvailable(t *testing.T) {
 	inst := database.AppInstance{ID: uuid.New(), Name: "s", APIURL: srv.URL, APIKey: "k"}
 	log := logger.ForApp("sonarr")
 	imp.checkInstance(context.Background(), log, database.AppSonarr, inst)
+
+	if !postCalled {
+		t.Error("expected POST /api/v3/manualimport to be called")
+	}
 }
 
 func TestCheckInstance_FallbackRescan(t *testing.T) {

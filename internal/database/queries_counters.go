@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // GetAllCounters returns all persisted counter rows.
@@ -12,17 +14,7 @@ func (db *DB) GetAllCounters(ctx context.Context) ([]PersistentCounter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get all counters: %w", err)
 	}
-	defer rows.Close()
-
-	var counters []PersistentCounter
-	for rows.Next() {
-		var c PersistentCounter
-		if err := rows.Scan(&c.MetricName, &c.LabelKey, &c.Value, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan counter: %w", err)
-		}
-		counters = append(counters, c)
-	}
-	return counters, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[PersistentCounter])
 }
 
 // UpsertCounters upserts a batch of counter values in a single statement.

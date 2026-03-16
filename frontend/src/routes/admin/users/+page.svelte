@@ -10,21 +10,15 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import * as T from '$lib/components/ui/table';
+	import * as Avatar from '$lib/components/ui/avatar';
 	import { Plus, Users, ShieldCheck, Trash2 } from 'lucide-svelte';
+	import type { LurkarrUser } from '$lib/types';
 
 	const toasts = getToasts();
 
-	interface UserEntry {
-		id: string;
-		username: string;
-		auth_provider: string;
-		is_admin: boolean;
-		has_2fa: boolean;
-		created_at: string;
-	}
-
-	let users = $state<UserEntry[]>([]);
+	let users = $state<LurkarrUser[]>([]);
 	let loading = $state(true);
 
 	// Create user
@@ -44,7 +38,7 @@
 	async function load() {
 		loading = true;
 		try {
-			users = await api.get<UserEntry[]>('/admin/users');
+			users = await api.get<LurkarrUser[]>('/admin/users');
 		} catch {
 			toasts.error('Failed to load users');
 		}
@@ -124,7 +118,7 @@
 
 	$effect(() => { load(); });
 
-	const userColumns: Column<UserEntry>[] = [
+	const userColumns: Column<LurkarrUser>[] = [
 		{ key: 'username', header: 'Username', sortable: true },
 		{ key: 'auth_provider', header: 'Provider', sortable: true },
 		{ key: 'is_admin', header: 'Role', sortable: true },
@@ -161,7 +155,14 @@
 		<DataTable data={users} columns={userColumns} searchable searchPlaceholder="Search users..." noun="users">
 			{#snippet row(u)}
 				<T.Row>
-					<T.Cell class="font-medium">{u.username}</T.Cell>
+					<T.Cell>
+						<div class="flex items-center gap-2">
+							<Avatar.Root class="size-7">
+								<Avatar.Fallback class="text-xs">{u.username.slice(0, 2).toUpperCase()}</Avatar.Fallback>
+							</Avatar.Root>
+							<span class="font-medium">{u.username}</span>
+						</div>
+					</T.Cell>
 					<T.Cell><Badge variant="default">{u.auth_provider}</Badge></T.Cell>
 					<T.Cell>
 						{#if u.is_admin}
@@ -172,7 +173,7 @@
 					</T.Cell>
 					<T.Cell>
 						{#if u.has_2fa}
-							<ShieldCheck class="h-4 w-4 text-green-400" />
+							<ShieldCheck class="h-4 w-4 text-emerald-400" />
 						{:else}
 							<span class="text-muted-foreground/50">—</span>
 						{/if}
@@ -211,10 +212,7 @@
 	<div class="space-y-4">
 		<Input bind:value={newUsername} label="Username" placeholder="Enter username" />
 		<Input bind:value={newPassword} type="password" label="Password" placeholder="Min 8 chars, upper + lower + digit" />
-		<label class="flex items-center gap-2 text-sm text-muted-foreground">
-			<input type="checkbox" bind:checked={newIsAdmin} class="rounded border-border bg-muted text-primary focus:ring-ring" />
-			Admin privileges
-		</label>
+		<Checkbox bind:checked={newIsAdmin} label="Admin privileges" />
 		<div class="flex gap-2">
 			<Button onclick={createUser} loading={creating}>Create User</Button>
 			<Button variant="ghost" onclick={() => showCreate = false}>Cancel</Button>

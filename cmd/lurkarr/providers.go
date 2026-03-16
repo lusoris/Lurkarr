@@ -234,6 +234,10 @@ func provideServerConfig(cfg *config.Config, db *database.DB) server.Config {
 		WebAuthnRPID:          cfg.WebAuthnRPID,
 		WebAuthnRPDisplayName: cfg.WebAuthnRPDisplayName,
 		WebAuthnRPOrigins:     cfg.WebAuthnRPOrigins,
+
+		// Rate limiting
+		LoginRateLimit: cfg.LoginRateLimit,
+		APIRateLimit:   cfg.APIRateLimit,
 	}
 }
 
@@ -261,9 +265,10 @@ func startServer(lc fx.Lifecycle, shutdowner fx.Shutdowner, cfg server.Config, d
 }
 
 // startLurkingEngine creates the lurking engine and manages its lifecycle.
-func startLurkingEngine(lc fx.Lifecycle, db *database.DB, logger *logging.Logger, notifMgr *notifications.Manager) {
+func startLurkingEngine(lc fx.Lifecycle, db *database.DB, logger *logging.Logger, notifMgr *notifications.Manager, sched *scheduler.Scheduler) {
 	e := lurking.New(db, logger)
 	e.SetNotifier(notifMgr)
+	sched.SetLurker(e)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			e.Start(context.Background()) //nolint:gosec // G118: engine manages its own lifecycle via Stop()
@@ -277,9 +282,10 @@ func startLurkingEngine(lc fx.Lifecycle, db *database.DB, logger *logging.Logger
 }
 
 // startQueueCleaner creates the queue cleaner and manages its lifecycle.
-func startQueueCleaner(lc fx.Lifecycle, db *database.DB, logger *logging.Logger, notifMgr *notifications.Manager) {
+func startQueueCleaner(lc fx.Lifecycle, db *database.DB, logger *logging.Logger, notifMgr *notifications.Manager, sched *scheduler.Scheduler) {
 	c := queuecleaner.New(db, logger)
 	c.SetNotifier(notifMgr)
+	sched.SetCleaner(c)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			c.Start(context.Background()) //nolint:gosec // G118: cleaner manages its own lifecycle via Stop()

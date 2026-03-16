@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { onMount } from 'svelte';
+	import ScrollToTop from '$lib/components/ScrollToTop.svelte';
 	import { appDisplayName, appColor, visibleAppTypes } from '$lib';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
@@ -8,12 +9,15 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
 	import DataTable, { type Column } from '$lib/components/ui/DataTable.svelte';
 	import * as T from '$lib/components/ui/table';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
 	import { History, Trash2 } from 'lucide-svelte';
+	import type { HistoryItem, BlocklistEntry, ImportEntry, StrikeEntry } from '$lib/types';
 
 	const toasts = getToasts();
 	const PAGE_SIZE = 50;
@@ -22,15 +26,6 @@
 	let activeTab = $state<ActiveTab>('lurking');
 
 	// --- Lurk History ---
-	interface HistoryItem {
-		id: number;
-		app_type: string;
-		instance_name: string;
-		media_title: string;
-		operation: string;
-		created_at: string;
-	}
-
 	let items = $state<HistoryItem[]>([]);
 	let total = $state(0);
 	let search = $state('');
@@ -40,48 +35,16 @@
 	let confirmDelete = $state<string | null>(null);
 
 	// --- Blocklist Log (Queue Cleaner) ---
-	interface BlocklistEntry {
-		id: number;
-		app_type: string;
-		instance_id: string;
-		download_id: string;
-		title: string;
-		reason: string;
-		blocklisted_at: string;
-	}
-
 	let blocklistItems = $state<BlocklistEntry[]>([]);
 	let blocklistApp = $state('');
 	let blocklistLoading = $state(false);
 
 	// --- Auto-Import Log ---
-	interface ImportEntry {
-		id: number;
-		app_type: string;
-		instance_id: string;
-		media_id: number;
-		media_title: string;
-		queue_item_id: number;
-		action: string;
-		reason: string;
-		created_at: string;
-	}
-
 	let importItems = $state<ImportEntry[]>([]);
 	let importApp = $state('');
 	let importLoading = $state(false);
 
 	// --- Strike Log ---
-	interface StrikeEntry {
-		id: number;
-		app_type: string;
-		instance_id: string;
-		download_id: string;
-		title: string;
-		reason: string;
-		struck_at: string;
-	}
-
 	let strikeItems = $state<StrikeEntry[]>([]);
 	let strikeApp = $state('');
 	let strikeLoading = $state(false);
@@ -258,7 +221,11 @@
 <svelte:head><title>History - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="History" />
+	<PageHeader title="History">
+		{#snippet actions()}
+			<HelpDrawer page="history" />
+		{/snippet}
+	</PageHeader>
 
 	<Tabs
 		tabs={[
@@ -277,21 +244,12 @@
 		{#if presentApps.length > 0}
 			<div class="flex flex-wrap gap-2">
 				{#each presentApps as app}
-					{#if confirmDelete === app}
-						<div class="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-1.5">
-							<span class="text-xs text-destructive">Delete all {appDisplayName(app)} history?</span>
-							<button onclick={() => deleteHistory(app)} class="text-xs font-medium text-destructive hover:text-destructive/80">Yes</button>
-							<button onclick={() => { confirmDelete = null; }} class="text-xs text-muted-foreground hover:text-foreground">No</button>
-						</div>
-					{:else}
-						<button
-							onclick={() => { confirmDelete = app; }}
-							class="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
-						>
-							<Trash2 class="w-3 h-3" />
+					<ConfirmAction active={confirmDelete === app} message="Delete all {appDisplayName(app)} history?" onconfirm={() => deleteHistory(app)} oncancel={() => { confirmDelete = null; }}>
+						<Button size="sm" variant="outline" class="h-auto px-2.5 py-1.5 text-xs" onclick={() => { confirmDelete = app; }}>
+							<Trash2 class="w-3 h-3 mr-1.5" />
 							<span class="{appColor(app)}">{appDisplayName(app)}</span>
-						</button>
-					{/if}
+						</Button>
+					</ConfirmAction>
 				{/each}
 			</div>
 		{/if}
@@ -421,3 +379,5 @@
 		{/if}
 	{/if}
 </div>
+
+<ScrollToTop />

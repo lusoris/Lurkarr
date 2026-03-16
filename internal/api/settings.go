@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/lusoris/lurkarr/internal/database"
@@ -14,13 +13,12 @@ type SettingsHandler struct {
 
 // HandleGetAppSettings handles GET /api/settings/{app}.
 func (h *SettingsHandler) HandleGetAppSettings(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	settings, err := h.DB.GetAppSettings(r.Context(), database.AppType(appType))
+	settings, err := h.DB.GetAppSettings(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load settings"))
 		return
@@ -31,19 +29,16 @@ func (h *SettingsHandler) HandleGetAppSettings(w http.ResponseWriter, r *http.Re
 
 // HandleUpdateAppSettings handles PUT /api/settings/{app}.
 func (h *SettingsHandler) HandleUpdateAppSettings(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var settings database.AppSettings
-	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	settings, ok := decodeJSON[database.AppSettings](w, r)
+	if !ok {
 		return
 	}
-	settings.AppType = database.AppType(appType)
+	settings.AppType = appType
 
 	// Input validation
 	if settings.HourlyCap < 0 {
@@ -88,10 +83,8 @@ func (h *SettingsHandler) HandleUpdateGeneralSettings(w http.ResponseWriter, r *
 		return
 	}
 
-	limitBody(w, r)
-	var update database.GeneralSettings
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	update, ok := decodeJSON[database.GeneralSettings](w, r)
+	if !ok {
 		return
 	}
 
@@ -111,8 +104,8 @@ func (h *SettingsHandler) HandleUpdateGeneralSettings(w http.ResponseWriter, r *
 		writeJSON(w, http.StatusBadRequest, errorResponse("command_wait values cannot be negative"))
 		return
 	}
-	if update.MinDownloadQueueSize < 0 {
-		writeJSON(w, http.StatusBadRequest, errorResponse("min_download_queue_size cannot be negative"))
+	if update.MaxDownloadQueueSize < 0 {
+		writeJSON(w, http.StatusBadRequest, errorResponse("max_download_queue_size cannot be negative"))
 		return
 	}
 	if update.AutoImportIntervalMinutes < 1 {

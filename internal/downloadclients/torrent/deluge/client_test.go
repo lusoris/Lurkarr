@@ -31,6 +31,10 @@ func newTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *C
 			}
 			return
 		}
+		if req.Method == "web.connected" {
+			json.NewEncoder(w).Encode(jsonRPCResponse{ID: req.ID, Result: json.RawMessage("true")})
+			return
+		}
 		// For non-auth methods, delegate to the handler after wrapping request in context.
 		// Store the parsed RPC request in a header for the handler to inspect.
 		r.Header.Set("X-RPC-Method", req.Method)
@@ -173,8 +177,8 @@ func TestDeleteTorrents(t *testing.T) {
 
 func TestGetVersion(t *testing.T) {
 	server, client := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-RPC-Method") != "daemon.info" {
-			t.Errorf("method = %q, want daemon.info", r.Header.Get("X-RPC-Method"))
+		if r.Header.Get("X-RPC-Method") != "daemon.get_version" {
+			t.Errorf("method = %q, want daemon.get_version", r.Header.Get("X-RPC-Method"))
 		}
 		json.NewEncoder(w).Encode(jsonRPCResponse{Result: json.RawMessage(`"2.1.1"`)})
 	})

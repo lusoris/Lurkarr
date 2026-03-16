@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/lib/utils';
+	import { Label } from './label';
 
 	interface Props {
 		value?: string | number;
@@ -23,9 +24,9 @@
 	}: Props = $props();
 </script>
 
-<label class={cn('block space-y-1.5', className)}>
+<div class={cn('block space-y-1.5', className)}>
 	{#if label}
-		<span class="text-sm font-medium text-foreground">{label}</span>
+		<Label>{label}</Label>
 	{/if}
 	<select
 		bind:value
@@ -43,4 +44,4 @@
 	{#if hint}
 		<p class="text-xs text-muted-foreground">{hint}</p>
 	{/if}
-</label>
+</div>

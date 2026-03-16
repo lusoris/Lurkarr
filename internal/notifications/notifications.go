@@ -18,6 +18,7 @@ import (
 type EventType string
 
 const (
+	EventLurkStarted      EventType = "lurk_started"
 	EventLurkCompleted    EventType = "lurk_completed"
 	EventQueueItemRemoved EventType = "queue_item_removed"
 	EventDownloadStuck    EventType = "download_stuck"
@@ -131,7 +132,7 @@ func (m *Manager) RegisterWithTemplates(pt ProviderType, p Provider, events []Ev
 	evSet := make(map[EventType]bool)
 	if events == nil {
 		// Subscribe to all events.
-		for _, e := range []EventType{EventLurkCompleted, EventQueueItemRemoved, EventDownloadStuck, EventSchedulerAction, EventError} {
+		for _, e := range []EventType{EventLurkStarted, EventLurkCompleted, EventQueueItemRemoved, EventDownloadStuck, EventSchedulerAction, EventError} {
 			evSet[e] = true
 		}
 	} else {

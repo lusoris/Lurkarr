@@ -188,6 +188,13 @@ func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// SABnzbd may return {"version":"x.y.z"} or just "x.y.z".
+	var obj struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(raw, &obj); err == nil && obj.Version != "" {
+		return obj.Version, nil
+	}
 	var v string
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return "", fmt.Errorf("decode version: %w", err)

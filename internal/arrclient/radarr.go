@@ -20,26 +20,12 @@ type RadarrMovie struct {
 
 // RadarrGetMissing fetches movies without files via the wanted/missing endpoint.
 func (c *Client) RadarrGetMissing(ctx context.Context) ([]RadarrMovie, error) {
-	var resp struct {
-		TotalRecords int           `json:"totalRecords"`
-		Records      []RadarrMovie `json:"records"`
-	}
-	if err := c.get(ctx, radarrAPI+"/wanted/missing?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("radarr get missing: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[RadarrMovie](ctx, c, radarrAPI, "missing", "title", "ascending", "radarr get missing")
 }
 
 // RadarrGetCutoffUnmet fetches movies that haven't met quality cutoff.
 func (c *Client) RadarrGetCutoffUnmet(ctx context.Context) ([]RadarrMovie, error) {
-	var resp struct {
-		TotalRecords int           `json:"totalRecords"`
-		Records      []RadarrMovie `json:"records"`
-	}
-	if err := c.get(ctx, radarrAPI+"/wanted/cutoff?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("radarr get cutoff unmet: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[RadarrMovie](ctx, c, radarrAPI, "cutoff", "title", "ascending", "radarr get cutoff unmet")
 }
 
 // RadarrSearchMovie triggers a search for a movie.
@@ -57,21 +43,21 @@ func (c *Client) RadarrSearchMovie(ctx context.Context, movieIDs []int) (*Comman
 
 // RadarrGetQueue returns the current download queue.
 func (c *Client) RadarrGetQueue(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, radarrAPI+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, radarrAPI+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("radarr get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // RadarrGetQueueEnriched returns the queue with embedded movie data.
 // Used for cross-arr sync to match by TMDB ID instead of title.
 func (c *Client) RadarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, radarrAPI+"/queue?pageSize=1000&includeMovie=true", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, radarrAPI+"/queue?includeMovie=true")
+	if err != nil {
 		return nil, fmt.Errorf("radarr get enriched queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // RadarrTestConnection tests the Radarr API connection.

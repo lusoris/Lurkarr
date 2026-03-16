@@ -1,7 +1,7 @@
 package api
 
 import (
-	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -44,33 +44,44 @@ func (h *ProwlarrHandler) HandleGetIndexerStats(w http.ResponseWriter, r *http.R
 }
 
 // HandleTestConnection tests the Prowlarr connection.
+// If a masked API key (starts with "****") or empty key is sent, the stored key is used instead.
 func (h *ProwlarrHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var body struct {
+	body, ok := decodeJSON[struct {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
+
+	// If key is empty or masked, resolve from stored settings.
+	if body.APIKey == "" || (len(body.APIKey) >= 4 && body.APIKey[:4] == "****") {
+		existing, err := h.DB.GetProwlarrSettings(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse("no stored prowlarr settings"))
+			return
+		}
+		body.APIKey = existing.APIKey
+		if body.URL == "" {
+			body.URL = existing.URL
+		}
+	}
+
 	if body.URL == "" || body.APIKey == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("url and api_key required"))
 		return
 	}
 
-	// SSRF protection
-	isPrivate, err := arrclient.IsPrivateIP(body.URL)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid URL"))
-		return
+	genSettings, genErr := h.DB.GetGeneralSettings(r.Context())
+	if genErr != nil {
+		slog.Warn("failed to load general settings, using defaults", "error", genErr)
 	}
-	if isPrivate {
-		writeJSON(w, http.StatusForbidden, errorResponse("private/internal URLs are not allowed"))
-		return
+	sslVerify := true
+	if genSettings != nil {
+		sslVerify = genSettings.SSLVerify
 	}
 
-	client := arrclient.NewClient(body.URL, body.APIKey, 15*time.Second, true)
+	client := arrclient.NewClient(body.URL, body.APIKey, 15*time.Second, sslVerify)
 	status, err := client.ProwlarrTestConnection(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, errorResponse(err.Error()))
@@ -87,5 +98,17 @@ func (h *ProwlarrHandler) getClient(r *http.Request) (*arrclient.Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	return arrclient.NewClient(settings.URL, settings.APIKey, time.Duration(settings.Timeout)*time.Second, true), nil
+	timeout := time.Duration(settings.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+	genSettings, genErr := h.DB.GetGeneralSettings(r.Context())
+	if genErr != nil {
+		slog.Warn("failed to load general settings, using defaults", "error", genErr)
+	}
+	sslVerify := true
+	if genSettings != nil {
+		sslVerify = genSettings.SSLVerify
+	}
+	return arrclient.NewClient(settings.URL, settings.APIKey, timeout, sslVerify), nil
 }

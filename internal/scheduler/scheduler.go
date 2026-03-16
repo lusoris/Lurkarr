@@ -29,11 +29,23 @@ type Store interface {
 	UpdateAppSettings(ctx context.Context, s *database.AppSettings) error
 }
 
+// LurkRunner can perform an on-demand lurk pass.
+type LurkRunner interface {
+	RunOnceForApp(ctx context.Context, appType database.AppType, mode string) error
+}
+
+// CleanRunner can perform an on-demand queue clean pass.
+type CleanRunner interface {
+	RunOnceForApp(ctx context.Context, appType database.AppType) error
+}
+
 // Scheduler manages cron-based scheduling via gocron/v2.
 type Scheduler struct {
 	db       Store
 	logger   *logging.Logger
 	notifier notifications.Notifier
+	lurker   LurkRunner
+	cleaner  CleanRunner
 	cron     gocron.Scheduler
 	mu       sync.Mutex
 }
@@ -56,6 +68,16 @@ func New(db Store, logger *logging.Logger) (*Scheduler, error) {
 // SetNotifier sets an optional notification manager.
 func (s *Scheduler) SetNotifier(n notifications.Notifier) {
 	s.notifier = n
+}
+
+// SetLurker sets the lurking engine for on-demand lurk runs.
+func (s *Scheduler) SetLurker(l LurkRunner) {
+	s.lurker = l
+}
+
+// SetCleaner sets the queue cleaner for on-demand clean runs.
+func (s *Scheduler) SetCleaner(c CleanRunner) {
+	s.cleaner = c
 }
 
 // Start loads schedules from DB and starts the cron scheduler.
@@ -147,7 +169,14 @@ func buildCronExpr(sched database.Schedule) string {
 
 func (s *Scheduler) executeSchedule(sched database.Schedule) {
 	log := s.logger.ForApp("system")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+	// Lurk and clean actions need longer timeouts than simple config changes.
+	timeout := 30 * time.Second
+	switch sched.Action {
+	case "lurk_missing", "lurk_upgrade", "lurk_all", "clean_queue":
+		timeout = 10 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	start := time.Now()
@@ -194,6 +223,14 @@ func (s *Scheduler) performAction(ctx context.Context, sched database.Schedule) 
 		return s.setAppEnabled(ctx, sched.AppType, false)
 	case "enable":
 		return s.setAppEnabled(ctx, sched.AppType, true)
+	case "lurk_missing":
+		return s.runLurk(ctx, sched.AppType, "missing")
+	case "lurk_upgrade":
+		return s.runLurk(ctx, sched.AppType, "upgrade")
+	case "lurk_all":
+		return s.runLurk(ctx, sched.AppType, "all")
+	case "clean_queue":
+		return s.runClean(ctx, sched.AppType)
 	default:
 		// api-{N} pattern — set hourly cap
 		var capVal int
@@ -202,6 +239,36 @@ func (s *Scheduler) performAction(ctx context.Context, sched database.Schedule) 
 		}
 		return fmt.Errorf("unknown action: %s", sched.Action)
 	}
+}
+
+func (s *Scheduler) runLurk(ctx context.Context, appType string, mode string) error {
+	if s.lurker == nil {
+		return fmt.Errorf("lurking engine not available")
+	}
+	if appType == "global" {
+		for _, at := range database.AllAppTypes() {
+			if err := s.lurker.RunOnceForApp(ctx, at, mode); err != nil {
+				slog.Warn("scheduled lurk failed for app type", "app_type", at, "error", err)
+			}
+		}
+		return nil
+	}
+	return s.lurker.RunOnceForApp(ctx, database.AppType(appType), mode)
+}
+
+func (s *Scheduler) runClean(ctx context.Context, appType string) error {
+	if s.cleaner == nil {
+		return fmt.Errorf("queue cleaner not available")
+	}
+	if appType == "global" {
+		for _, at := range database.AllAppTypes() {
+			if err := s.cleaner.RunOnceForApp(ctx, at); err != nil {
+				slog.Warn("scheduled clean failed for app type", "app_type", at, "error", err)
+			}
+		}
+		return nil
+	}
+	return s.cleaner.RunOnceForApp(ctx, database.AppType(appType))
 }
 
 func (s *Scheduler) setAppEnabled(ctx context.Context, appType string, enabled bool) error {

@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { getAuth } from '$lib/stores/auth.svelte';
+	import { base64urlToBuffer, bufferToBase64url } from '$lib/webauthn';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Separator from '$lib/components/ui/Separator.svelte';
-	import { Loader2, Fingerprint } from 'lucide-svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Loader2, Fingerprint, CircleAlert } from 'lucide-svelte';
 
 	const auth = getAuth();
 
@@ -84,23 +86,6 @@
 		window.location.href = '/api/auth/oidc/login';
 	}
 
-	function base64urlToBuffer(base64url: string): ArrayBuffer {
-		const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-		const pad = base64.length % 4;
-		const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
-		const binary = atob(padded);
-		const bytes = new Uint8Array(binary.length);
-		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-		return bytes.buffer;
-	}
-
-	function bufferToBase64url(buffer: ArrayBuffer): string {
-		const bytes = new Uint8Array(buffer);
-		let str = '';
-		for (const b of bytes) str += String.fromCharCode(b);
-		return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-	}
-
 	async function loginPasskey() {
 		error = '';
 		loading = true;
@@ -177,9 +162,10 @@
 
 			<form onsubmit={(e: Event) => { e.preventDefault(); submit(); }} class="space-y-4 border border-border bg-card rounded-xl p-6 shadow-lg">
 				{#if error}
-					<div class="rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
-						{error}
-					</div>
+					<Alert.Root variant="destructive">
+						<CircleAlert class="h-4 w-4" />
+						<Alert.Description>{error}</Alert.Description>
+					</Alert.Root>
 				{/if}
 
 				<Input bind:value={username} label="Username" placeholder="admin" />
@@ -188,10 +174,10 @@
 				{#if showTotp && !needsSetup}
 					{#if useRecovery}
 						<Input bind:value={recoveryCode} label="Recovery Code" placeholder="xxxx-xxxx" />
-						<button type="button" onclick={() => useRecovery = false} class="text-xs text-muted-foreground hover:text-foreground transition-colors">Use authenticator code instead</button>
+						<Button type="button" variant="link" class="h-auto p-0 text-xs text-muted-foreground" onclick={() => useRecovery = false}>Use authenticator code instead</Button>
 					{:else}
 						<Input bind:value={totp} label="2FA Code" placeholder="000000" />
-						<button type="button" onclick={() => useRecovery = true} class="text-xs text-muted-foreground hover:text-foreground transition-colors">Lost your authenticator? Use a recovery code</button>
+						<Button type="button" variant="link" class="h-auto p-0 text-xs text-muted-foreground" onclick={() => useRecovery = true}>Lost your authenticator? Use a recovery code</Button>
 					{/if}
 				{/if}
 

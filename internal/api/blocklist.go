@@ -1,11 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"regexp"
 
-	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/blocklist"
 	"github.com/lusoris/lurkarr/internal/database"
 )
@@ -32,9 +30,8 @@ func (h *BlocklistHandler) HandleListSources(w http.ResponseWriter, r *http.Requ
 
 // HandleGetSource handles GET /api/blocklist/sources/{id}.
 func (h *BlocklistHandler) HandleGetSource(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid source id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -49,10 +46,8 @@ func (h *BlocklistHandler) HandleGetSource(w http.ResponseWriter, r *http.Reques
 
 // HandleCreateSource handles POST /api/blocklist/sources.
 func (h *BlocklistHandler) HandleCreateSource(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var s database.BlocklistSource
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	s, ok := decodeJSON[database.BlocklistSource](w, r)
+	if !ok {
 		return
 	}
 
@@ -76,16 +71,13 @@ func (h *BlocklistHandler) HandleCreateSource(w http.ResponseWriter, r *http.Req
 
 // HandleUpdateSource handles PUT /api/blocklist/sources/{id}.
 func (h *BlocklistHandler) HandleUpdateSource(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid source id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var s database.BlocklistSource
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	s, ok := decodeJSON[database.BlocklistSource](w, r)
+	if !ok {
 		return
 	}
 	s.ID = id
@@ -110,9 +102,8 @@ func (h *BlocklistHandler) HandleUpdateSource(w http.ResponseWriter, r *http.Req
 
 // HandleDeleteSource handles DELETE /api/blocklist/sources/{id}.
 func (h *BlocklistHandler) HandleDeleteSource(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid source id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -154,10 +145,8 @@ var validPatternTypes = map[string]bool{
 
 // HandleCreateRule handles POST /api/blocklist/rules.
 func (h *BlocklistHandler) HandleCreateRule(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var rule database.BlocklistRule
-	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	rule, ok := decodeJSON[database.BlocklistRule](w, r)
+	if !ok {
 		return
 	}
 
@@ -190,9 +179,8 @@ func (h *BlocklistHandler) HandleCreateRule(w http.ResponseWriter, r *http.Reque
 
 // HandleDeleteRule handles DELETE /api/blocklist/rules/{id}.
 func (h *BlocklistHandler) HandleDeleteRule(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid rule id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 

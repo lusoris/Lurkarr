@@ -16,16 +16,20 @@ servers:
 tags:
   - name: Auth
     description: Authentication and session management
+  - name: Passkeys
+    description: WebAuthn passkey management
+  - name: Sessions
+    description: Session management
   - name: User
     description: User profile management
+  - name: Admin
+    description: Admin user management
   - name: Instances
     description: App instance CRUD
   - name: Settings
     description: General and per-app settings
   - name: History
     description: Lurk history
-  - name: Logs
-    description: Log querying and real-time streaming
   - name: Stats
     description: Lurk statistics and hourly caps
   - name: State
@@ -38,12 +42,20 @@ tags:
     description: SABnzbd download client
   - name: Queue
     description: Queue cleaner, scoring, download clients
+  - name: DownloadClients
+    description: Download client instances
   - name: Blocklist
     description: Blocklist sources and rules
   - name: Notifications
     description: Notification providers
   - name: Seerr
     description: Seerr integration
+  - name: Activity
+    description: Activity feed
+  - name: OIDC
+    description: OpenID Connect settings
+  - name: InstanceGroups
+    description: Cross-instance group management
   - name: System
     description: Health and metrics
 
@@ -96,6 +108,22 @@ paths:
           $ref: '#/components/responses/StatusOk'
 
   /api/auth/setup:
+    get:
+      operationId: setupCheck
+      tags: [Auth]
+      summary: Check if setup is needed
+      description: Returns whether initial setup (first user creation) is required.
+      responses:
+        '200':
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  needs_setup:
+                    type: boolean
+
     post:
       operationId: setup
       tags: [Auth]
@@ -131,7 +159,7 @@ paths:
       operationId: enable2FA
       tags: [Auth]
       summary: Enable 2FA
-      description: Generate TOTP secret and QR code for the current user.
+      description: Generate TOTP secret, QR code, and recovery codes for the current user.
       security:
         - cookieAuth: []
       responses:
@@ -190,6 +218,31 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/auth/2fa/recovery-codes:
+    post:
+      operationId: regenerateRecoveryCodes
+      tags: [Auth]
+      summary: Regenerate recovery codes
+      description: Generate new recovery codes for 2FA. Requires 2FA to be enabled.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: New recovery codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recovery_codes:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/auth/oidc/info:
     get:
       operationId: getOIDCInfo
@@ -234,6 +287,223 @@ paths:
       responses:
         '302':
           description: Redirect to application after successful authentication
+
+  /api/auth/passkey/info:
+    get:
+      operationId: getPasskeyInfo
+      tags: [Passkeys]
+      summary: Get passkey login availability
+      description: Returns whether passkey login is available (any credentials registered).
+      responses:
+        '200':
+          description: Passkey info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passkey_available:
+                    type: boolean
+
+  /api/auth/passkey/login/begin:
+    post:
+      operationId: beginPasskeyLogin
+      tags: [Passkeys]
+      summary: Begin passkey login
+      description: Returns WebAuthn credential assertion options.
+      responses:
+        '200':
+          description: WebAuthn assertion options
+          content:
+            application/json:
+              schema:
+                type: object
+                description: WebAuthn CredentialAssertion options
+
+  /api/auth/passkey/login/finish:
+    post:
+      operationId: finishPasskeyLogin
+      tags: [Passkeys]
+      summary: Finish passkey login
+      description: Validates the WebAuthn assertion and creates a session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: WebAuthn assertion response from browser
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Passkeys ──────────────────────────────────────────────────────────
+  /api/passkeys:
+    get:
+      operationId: listPasskeys
+      tags: [Passkeys]
+      summary: List registered passkeys
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Registered passkeys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebAuthnCredential'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/passkeys/register/begin:
+    post:
+      operationId: beginPasskeyRegistration
+      tags: [Passkeys]
+      summary: Begin passkey registration
+      description: Returns WebAuthn credential creation options.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: WebAuthn creation options
+          content:
+            application/json:
+              schema:
+                type: object
+                description: WebAuthn CredentialCreation options
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/passkeys/register/finish:
+    post:
+      operationId: finishPasskeyRegistration
+      tags: [Passkeys]
+      summary: Finish passkey registration
+      description: Validates the WebAuthn attestation and stores the credential.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: query
+          description: Optional friendly name for the passkey
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: WebAuthn attestation response from browser
+      responses:
+        '201':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/passkeys/{id}:
+    delete:
+      operationId: deletePasskey
+      tags: [Passkeys]
+      summary: Delete a passkey
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/passkeys/{id}/rename:
+    post:
+      operationId: renamePasskey
+      tags: [Passkeys]
+      summary: Rename a passkey
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Sessions ──────────────────────────────────────────────────────────
+  /api/sessions:
+    get:
+      operationId: listSessions
+      tags: [Sessions]
+      summary: List active sessions
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      operationId: revokeAllSessions
+      tags: [Sessions]
+      summary: Revoke all other sessions
+      description: Revokes all sessions except the current one.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/sessions/{id}:
+    delete:
+      operationId: revokeSession
+      tags: [Sessions]
+      summary: Revoke a specific session
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   # ── User ──────────────────────────────────────────────────────────────
   /api/user:
@@ -305,7 +575,149 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  # ── Admin ─────────────────────────────────────────────────────────────
+  /api/admin/users:
+    get:
+      operationId: listUsers
+      tags: [Admin]
+      summary: List all users
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: All users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      operationId: createUser
+      tags: [Admin]
+      summary: Create a new user
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                is_admin:
+                  type: boolean
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+                  is_admin:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/admin/users/{id}:
+    delete:
+      operationId: deleteUser
+      tags: [Admin]
+      summary: Delete a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/admin/users/{id}/reset-password:
+    post:
+      operationId: resetUserPassword
+      tags: [Admin]
+      summary: Reset a user's password
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/admin/users/{id}/toggle-admin:
+    post:
+      operationId: toggleAdmin
+      tags: [Admin]
+      summary: Toggle admin status
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_admin]
+              properties:
+                is_admin:
+                  type: boolean
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   # ── Instances ─────────────────────────────────────────────────────────
+  /api/instances:
+    get:
+      operationId: listAllInstances
+      tags: [Instances]
+      summary: List all instances grouped by app type
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Instances grouped by app type (API keys masked)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AppInstance'
+
   /api/instances/{app}:
     get:
       operationId: listInstances
@@ -385,6 +797,33 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instances/{id}/health:
+    get:
+      operationId: healthCheckInstance
+      tags: [Instances]
+      summary: Health check an instance
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Instance health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, offline]
+                  app:
+                    type: string
+                  version:
+                    type: string
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -554,47 +993,6 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  # ── Logs ──────────────────────────────────────────────────────────────
-  /api/logs:
-    get:
-      operationId: getLogs
-      tags: [Logs]
-      summary: Query logs
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: app
-          in: query
-          schema:
-            type: string
-        - name: level
-          in: query
-          schema:
-            type: string
-            enum: [debug, info, warn, error]
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 500
-            default: 100
-        - name: before
-          in: query
-          description: Cursor — log entry ID to paginate before
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: Log entries
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LogEntry'
-
   # ── Stats ─────────────────────────────────────────────────────────────
   /api/stats:
     get:
@@ -688,6 +1086,37 @@ paths:
           $ref: '#/components/responses/StatusOk'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # ── Activity ──────────────────────────────────────────────────────────
+  /api/activity:
+    get:
+      operationId: getActivity
+      tags: [Activity]
+      summary: Get activity feed
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActivityEvent'
+                  total:
+                    type: integer
 
   # ── Schedules ─────────────────────────────────────────────────────────
   /api/schedules:
@@ -907,6 +1336,466 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── Bazarr ────────────────────────────────────────────────────────────
+  /api/bazarr/settings:
+    get:
+      operationId: getBazarrSettings
+      tags: [Bazarr]
+      summary: Get Bazarr settings
+      description: API key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Bazarr settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BazarrSettings'
+
+    put:
+      operationId: updateBazarrSettings
+      tags: [Bazarr]
+      summary: Update Bazarr settings
+      description: Send masked API key to preserve existing value.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BazarrSettings'
+      responses:
+        '200':
+          description: Updated settings (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BazarrSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/bazarr/test:
+    post:
+      operationId: testBazarrConnection
+      tags: [Bazarr]
+      summary: Test Bazarr connection
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestURLAPIKeyRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/bazarr/wanted:
+    get:
+      operationId: getBazarrWanted
+      tags: [Bazarr]
+      summary: Get missing subtitles
+      description: Returns episodes and movies missing subtitles from Bazarr.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Wanted subtitle summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodes_total:
+                    type: integer
+                  movies_total:
+                    type: integer
+                  episodes:
+                    type: array
+                    items:
+                      type: object
+                  movies:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/bazarr/health:
+    get:
+      operationId: getBazarrHealth
+      tags: [Bazarr]
+      summary: Get Bazarr health checks
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Health check items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    object:
+                      type: string
+                    issue:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/bazarr/history:
+    get:
+      operationId: getBazarrHistory
+      tags: [Bazarr]
+      summary: Get subtitle download history
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Subtitle history for episodes and movies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodes_total:
+                    type: integer
+                  movies_total:
+                    type: integer
+                  episodes:
+                    type: array
+                    items:
+                      type: object
+                  movies:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── Kapowarr ──────────────────────────────────────────────────────────
+  /api/kapowarr/settings:
+    get:
+      operationId: getKapowarrSettings
+      tags: [Kapowarr]
+      summary: Get Kapowarr settings
+      description: API key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Kapowarr settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KapowarrSettings'
+
+    put:
+      operationId: updateKapowarrSettings
+      tags: [Kapowarr]
+      summary: Update Kapowarr settings
+      description: Send masked API key to preserve existing value.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KapowarrSettings'
+      responses:
+        '200':
+          description: Updated settings (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KapowarrSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/kapowarr/test:
+    post:
+      operationId: testKapowarrConnection
+      tags: [Kapowarr]
+      summary: Test Kapowarr connection
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestURLAPIKeyRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/kapowarr/stats:
+    get:
+      operationId: getKapowarrStats
+      tags: [Kapowarr]
+      summary: Get library statistics
+      description: Returns volume and issue counts from Kapowarr.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Volume statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  monitored:
+                    type: integer
+                  downloaded:
+                    type: integer
+                  total_issues:
+                    type: integer
+                  downloaded_issues:
+                    type: integer
+                  missing_issues:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/kapowarr/queue:
+    get:
+      operationId: getKapowarrQueue
+      tags: [Kapowarr]
+      summary: Get download queue
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Active downloads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    volume_id:
+                      type: integer
+                    status:
+                      type: string
+                    size:
+                      type: integer
+                      format: int64
+                    progress:
+                      type: number
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/kapowarr/tasks:
+    get:
+      operationId: getKapowarrTasks
+      tags: [Kapowarr]
+      summary: Get running tasks
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Task queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    action:
+                      type: string
+                    volume_id:
+                      type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── Shoko ─────────────────────────────────────────────────────────────
+  /api/shoko/settings:
+    get:
+      operationId: getShokoSettings
+      tags: [Shoko]
+      summary: Get Shoko settings
+      description: API key is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Shoko settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShokoSettings'
+
+    put:
+      operationId: updateShokoSettings
+      tags: [Shoko]
+      summary: Update Shoko settings
+      description: Send masked API key to preserve existing value.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShokoSettings'
+      responses:
+        '200':
+          description: Updated settings (API key masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShokoSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/shoko/test:
+    post:
+      operationId: testShokoConnection
+      tags: [Shoko]
+      summary: Test Shoko connection
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestURLAPIKeyRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/shoko/stats:
+    get:
+      operationId: getShokoStats
+      tags: [Shoko]
+      summary: Get collection statistics
+      description: Returns series, episode, and file counts from Shoko.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Collection statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  FileCount:
+                    type: integer
+                  FileSize:
+                    type: integer
+                    format: int64
+                  SeriesCount:
+                    type: integer
+                  WatchedEpisodes:
+                    type: integer
+                  MissingEpisodes:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/shoko/series-summary:
+    get:
+      operationId: getShokoSeriesSummary
+      tags: [Shoko]
+      summary: Get series type breakdown
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Series summary by type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Series:
+                    type: integer
+                  Movie:
+                    type: integer
+                  OVA:
+                    type: integer
+                  Special:
+                    type: integer
+                  Web:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '502':
           $ref: '#/components/responses/BadGateway'
 
@@ -1189,6 +2078,27 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/queue/strikes/{app}:
+    get:
+      operationId: getStrikeLog
+      tags: [Queue]
+      summary: Get strike log for an app
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Strike log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QueueStrike'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   /api/queue/imports/{app}:
     get:
       operationId: getAutoImportLog
@@ -1254,6 +2164,278 @@ paths:
                 $ref: '#/components/schemas/DownloadClientSettings'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /api/queue/seeding-groups:
+    get:
+      operationId: listSeedingRuleGroups
+      tags: [Queue]
+      summary: List seeding rule groups
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Seeding rule groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeedingRuleGroup'
+
+    post:
+      operationId: createSeedingRuleGroup
+      tags: [Queue]
+      summary: Create a seeding rule group
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeedingRuleGroup'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeedingRuleGroup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/queue/seeding-groups/{id}:
+    put:
+      operationId: updateSeedingRuleGroup
+      tags: [Queue]
+      summary: Update a seeding rule group
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeedingRuleGroup'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      operationId: deleteSeedingRuleGroup
+      tags: [Queue]
+      summary: Delete a seeding rule group
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Download Clients ──────────────────────────────────────────────────
+  /api/download-clients:
+    get:
+      operationId: listDownloadClients
+      tags: [DownloadClients]
+      summary: List all download client instances
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Download client instances (secrets masked)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DownloadClientInstance'
+
+    post:
+      operationId: createDownloadClient
+      tags: [DownloadClients]
+      summary: Create a download client
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadClientInstance'
+      responses:
+        '201':
+          description: Client created (secrets masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadClientInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/download-clients/test:
+    post:
+      operationId: testDownloadClient
+      tags: [DownloadClients]
+      summary: Test download client connection
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_type, url]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                client_type:
+                  $ref: '#/components/schemas/DownloadClientType'
+                url:
+                  type: string
+                api_key:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/download-clients/{id}:
+    put:
+      operationId: updateDownloadClient
+      tags: [DownloadClients]
+      summary: Update a download client
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadClientInstance'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      operationId: deleteDownloadClient
+      tags: [DownloadClients]
+      summary: Delete a download client
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/download-clients/{id}/health:
+    get:
+      operationId: healthCheckDownloadClient
+      tags: [DownloadClients]
+      summary: Health check a download client
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Client health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, offline]
+                  client_type:
+                    type: string
+                  version:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/download-clients/{id}/status:
+    get:
+      operationId: getDownloadClientStatus
+      tags: [DownloadClients]
+      summary: Get download client status
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Client status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/download-clients/{id}/items:
+    get:
+      operationId: getDownloadClientItems
+      tags: [DownloadClients]
+      summary: Get download client items
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Download items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DownloadItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
 
   # ── Blocklist ─────────────────────────────────────────────────────────
   /api/blocklist/sources:
@@ -1526,6 +2708,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorWithDetails'
 
+  /api/notifications/history:
+    get:
+      operationId: getNotificationHistory
+      tags: [Notifications]
+      summary: Get notification history
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Notification history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationHistory'
+
   # ── Seerr ─────────────────────────────────────────────────────────────
   /api/seerr/settings:
     get:
@@ -1630,7 +2829,46 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Request count (pass-through from Seerr API)
+          description: Request counts by status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestCount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/seerr/requests/{id}/reassign:
+    post:
+      operationId: reassignSeerrRequest
+      tags: [Seerr]
+      summary: Reassign a Seerr request
+      description: Move a request to a different server/profile/root folder.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                server_id:
+                  type: integer
+                profile_id:
+                  type: integer
+                root_folder:
+                  type: string
+      responses:
+        '200':
+          description: Reassigned request
           content:
             application/json:
               schema:
@@ -1639,6 +2877,335 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '502':
           $ref: '#/components/responses/BadGateway'
+
+  /api/seerr/scan-duplicates:
+    post:
+      operationId: scanSeerrDuplicates
+      tags: [Seerr]
+      summary: Scan for duplicate Seerr requests
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Duplicate scan results
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ── OIDC Settings ─────────────────────────────────────────────────────
+  /api/oidc/settings:
+    get:
+      operationId: getOIDCSettings
+      tags: [OIDC]
+      summary: Get OIDC settings
+      description: Client secret is masked in the response.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OIDC settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OIDCSettings'
+
+    put:
+      operationId: updateOIDCSettings
+      tags: [OIDC]
+      summary: Update OIDC settings
+      description: Send masked client_secret to preserve existing value.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OIDCSettings'
+      responses:
+        '200':
+          description: Updated settings (client_secret masked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OIDCSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Instance Groups ───────────────────────────────────────────────────
+  /api/instance-groups/{app}:
+    get:
+      operationId: listInstanceGroups
+      tags: [InstanceGroups]
+      summary: List instance groups for an app type
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      responses:
+        '200':
+          description: Instance groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstanceGroup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      operationId: createInstanceGroup
+      tags: [InstanceGroups]
+      summary: Create an instance group
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AppTypePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceGroup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instance-groups/by-id/{id}:
+    get:
+      operationId: getInstanceGroup
+      tags: [InstanceGroups]
+      summary: Get an instance group with members
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Instance group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceGroup'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateInstanceGroup
+      tags: [InstanceGroups]
+      summary: Update an instance group
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                mode:
+                  type: string
+                  enum: [quality_hierarchy, overlap_detect, split_season]
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      operationId: deleteInstanceGroup
+      tags: [InstanceGroups]
+      summary: Delete an instance group
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instance-groups/by-id/{id}/members:
+    put:
+      operationId: setGroupMembers
+      tags: [InstanceGroups]
+      summary: Set instance group members
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [members]
+              properties:
+                members:
+                  type: array
+                  items:
+                    type: object
+                    required: [instance_id]
+                    properties:
+                      instance_id:
+                        type: string
+                        format: uuid
+                      quality_rank:
+                        type: integer
+                      is_independent:
+                        type: boolean
+      responses:
+        '200':
+          description: Updated group with members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceGroup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instance-groups/by-id/{id}/overlaps:
+    get:
+      operationId: listGroupOverlaps
+      tags: [InstanceGroups]
+      summary: List cross-instance media overlaps
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Overlapping media
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CrossInstanceMedia'
+
+  /api/instance-groups/by-id/{id}/season-rules:
+    get:
+      operationId: listSeasonRules
+      tags: [InstanceGroups]
+      summary: List split season rules
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Season rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SplitSeasonRule'
+
+    post:
+      operationId: createSeasonRule
+      tags: [InstanceGroups]
+      summary: Create a split season rule
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_id, title, instance_id, season_from]
+              properties:
+                external_id:
+                  type: string
+                title:
+                  type: string
+                instance_id:
+                  type: string
+                  format: uuid
+                season_from:
+                  type: integer
+                season_to:
+                  type: integer
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitSeasonRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instance-groups/by-id/{id}/season-rules/{ruleId}:
+    delete:
+      operationId: deleteSeasonRule
+      tags: [InstanceGroups]
+      summary: Delete a split season rule
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/instance-groups/actions:
+    get:
+      operationId: listGroupActions
+      tags: [InstanceGroups]
+      summary: List cross-instance actions
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Cross-instance actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CrossInstanceAction'
 
   # ── System ────────────────────────────────────────────────────────────
   /healthz:
@@ -1696,17 +3263,6 @@ paths:
             text/plain:
               schema:
                 type: string
-
-  # ── WebSocket ─────────────────────────────────────────────────────────
-  /ws/logs:
-    get:
-      operationId: streamLogs
-      tags: [Logs]
-      summary: Real-time log stream
-      description: WebSocket endpoint for real-time log streaming. Requires session cookie auth.
-      responses:
-        '101':
-          description: WebSocket upgrade
 
 # ═══════════════════════════════════════════════════════════════════════
 components:
@@ -1784,11 +3340,11 @@ components:
 
     PatternType:
       type: string
-      enum: [release_group, title_contains, title_regex, indexer]
+      enum: [release_group, title_contains, title_regex, indexer, file_pattern]
 
     DownloadClientType:
       type: string
-      enum: [qbittorrent, transmission, deluge, sabnzbd, nzbget]
+      enum: [qbittorrent, transmission, deluge, rtorrent, utorrent, sabnzbd, nzbget]
 
     # ── Error ───────────────────────────────────────────────────────────
     Error:
@@ -1817,6 +3373,8 @@ components:
         password:
           type: string
         totp_code:
+          type: string
+        recovery_code:
           type: string
 
     LoginResponse:
@@ -1853,6 +3411,10 @@ components:
           type: string
         qr_base64:
           type: string
+        recovery_codes:
+          type: array
+          items:
+            type: string
 
     # ── User ────────────────────────────────────────────────────────────
     User:
@@ -1886,6 +3448,60 @@ components:
           type: string
         has_2fa:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        auth_provider:
+          type: string
+        is_admin:
+          type: boolean
+        has_2fa:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Sessions ────────────────────────────────────────────────────────
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+        current:
+          type: boolean
+
+    # ── Passkeys ────────────────────────────────────────────────────────
+    WebAuthnCredential:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
         created_at:
           type: string
           format: date-time
@@ -1990,7 +3606,10 @@ components:
         command_wait_attempts:
           type: integer
           minimum: 0
-        min_download_queue_size:
+        max_download_queue_size:
+          type: integer
+          minimum: 0
+        auto_import_interval_minutes:
           type: integer
           minimum: 0
 
@@ -2023,6 +3642,33 @@ components:
           type: boolean
         debug_mode:
           type: boolean
+
+    OIDCSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        issuer_url:
+          type: string
+        client_id:
+          type: string
+        client_secret:
+          type: string
+          description: Masked in responses
+        redirect_url:
+          type: string
+        scopes:
+          type: string
+        auto_create:
+          type: boolean
+        admin_group:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     # ── History ─────────────────────────────────────────────────────────
     LurkHistory:
@@ -2059,20 +3705,24 @@ components:
         total:
           type: integer
 
-    # ── Logs ────────────────────────────────────────────────────────────
-    LogEntry:
+    # ── Activity ────────────────────────────────────────────────────────
+    ActivityEvent:
       type: object
       properties:
         id:
-          type: integer
-          format: int64
+          type: string
+        source:
+          type: string
+          description: "Event source: lurk, cross_instance, blocklist, auto_import, schedule, strike, notification"
         app_type:
           type: string
-        level:
+        title:
           type: string
-        message:
+        action:
           type: string
-        created_at:
+        detail:
+          type: string
+        timestamp:
           type: string
           format: date-time
 
@@ -2194,6 +3844,72 @@ components:
           type: string
           format: date-time
 
+    # ── Bazarr ──────────────────────────────────────────────────────────
+    BazarrSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ── Kapowarr ──────────────────────────────────────────────────────────
+    KapowarrSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ── Shoko ─────────────────────────────────────────────────────────────
+    ShokoSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
     # ── SABnzbd ─────────────────────────────────────────────────────────
     SABnzbdSettings:
       type: object
@@ -2282,6 +3998,136 @@ components:
           type: boolean
         cross_arr_sync:
           type: boolean
+        dry_run:
+          type: boolean
+        protected_tags:
+          type: string
+        search_on_remove:
+          type: boolean
+        ignored_indexers:
+          type: string
+        bandwidth_limit_bytes_per_sec:
+          type: integer
+          format: int64
+        max_strikes_stalled:
+          type: integer
+        max_strikes_slow:
+          type: integer
+        max_strikes_metadata:
+          type: integer
+        max_strikes_paused:
+          type: integer
+        ignore_above_bytes:
+          type: integer
+          format: int64
+        tag_instead_of_delete:
+          type: boolean
+        obsolete_tag_label:
+          type: string
+        failed_import_patterns:
+          type: string
+        strike_queued:
+          type: boolean
+        max_strikes_queued:
+          type: integer
+        search_cooldown_hours:
+          type: integer
+        max_searches_per_run:
+          type: integer
+        max_search_failures:
+          type: integer
+        deletion_detection_enabled:
+          type: boolean
+        unmonitored_cleanup_enabled:
+          type: boolean
+        unregistered_enabled:
+          type: boolean
+        max_strikes_unregistered:
+          type: integer
+        recheck_paused_enabled:
+          type: boolean
+        recycle_bin_enabled:
+          type: boolean
+        recycle_bin_path:
+          type: string
+        blocklist_stalled:
+          type: boolean
+        blocklist_slow:
+          type: boolean
+        blocklist_metadata:
+          type: boolean
+        blocklist_duplicate:
+          type: boolean
+        blocklist_unregistered:
+          type: boolean
+        ignored_download_clients:
+          type: string
+        ignored_release_groups:
+          type: string
+        mismatch_enabled:
+          type: boolean
+        max_strikes_mismatch:
+          type: integer
+        blocklist_mismatch:
+          type: boolean
+        keep_archives:
+          type: boolean
+        public_tracker_list:
+          type: string
+
+    QueueStrike:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        instance_id:
+          type: string
+          format: uuid
+        download_id:
+          type: string
+        title:
+          type: string
+        reason:
+          type: string
+        struck_at:
+          type: string
+          format: date-time
+
+    SeedingRuleGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        priority:
+          type: integer
+        match_type:
+          type: string
+          enum: [tracker, category, tag]
+        match_pattern:
+          type: string
+        max_ratio:
+          type: number
+          format: double
+        max_hours:
+          type: integer
+        seeding_mode:
+          type: string
+          enum: [and, or]
+        skip_removal:
+          type: boolean
+        delete_files:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     ScoringProfile:
       type: object
@@ -2387,6 +4233,103 @@ components:
         timeout:
           type: integer
 
+    # ── Download Clients ────────────────────────────────────────────────
+    DownloadClientInstance:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        client_type:
+          $ref: '#/components/schemas/DownloadClientType'
+        url:
+          type: string
+        api_key:
+          type: string
+          description: Masked in responses
+        username:
+          type: string
+        password:
+          type: string
+          description: Masked in responses
+        category:
+          type: string
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ClientStatus:
+      type: object
+      properties:
+        version:
+          type: string
+        download_speed:
+          type: integer
+          format: int64
+        upload_speed:
+          type: integer
+          format: int64
+        paused:
+          type: boolean
+        item_count:
+          type: integer
+
+    DownloadItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        total_size:
+          type: integer
+          format: int64
+        remaining_size:
+          type: integer
+          format: int64
+        progress:
+          type: number
+          format: double
+        download_speed:
+          type: integer
+          format: int64
+        upload_speed:
+          type: integer
+          format: int64
+        eta:
+          type: integer
+          format: int64
+        category:
+          type: string
+        save_path:
+          type: string
+        ratio:
+          type: number
+          format: double
+        seeding_time:
+          type: integer
+          format: int64
+        completed_at:
+          type: integer
+          format: int64
+        added_at:
+          type: integer
+          format: int64
+        tags:
+          type: array
+          items:
+            type: string
+        tracker_url:
+          type: string
+
     # ── Blocklist ───────────────────────────────────────────────────────
     BlocklistSource:
       type: object
@@ -2462,6 +4405,41 @@ components:
           type: string
           format: date-time
 
+    NotificationHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider_id:
+          type: string
+          format: uuid
+          nullable: true
+        provider_type:
+          type: string
+        provider_name:
+          type: string
+        event_type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        app_type:
+          type: string
+        instance:
+          type: string
+        status:
+          type: string
+          enum: [sent, failed]
+        error:
+          type: string
+        duration_ms:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
     # ── Seerr ───────────────────────────────────────────────────────────
     SeerrSettings:
       type: object
@@ -2480,6 +4458,10 @@ components:
           type: integer
         auto_approve:
           type: boolean
+        cleanup_enabled:
+          type: boolean
+        cleanup_after_days:
+          type: integer
         created_at:
           type: string
           format: date-time
@@ -2501,3 +4483,159 @@ components:
           type: integer
         auto_approve:
           type: boolean
+        cleanup_enabled:
+          type: boolean
+        cleanup_after_days:
+          type: integer
+
+    RequestCount:
+      type: object
+      properties:
+        total:
+          type: integer
+        movie:
+          type: integer
+        tv:
+          type: integer
+        pending:
+          type: integer
+        approved:
+          type: integer
+        declined:
+          type: integer
+        processing:
+          type: integer
+        available:
+          type: integer
+
+    # ── Instance Groups ─────────────────────────────────────────────────
+    InstanceGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        app_type:
+          $ref: '#/components/schemas/AppType'
+        name:
+          type: string
+        mode:
+          type: string
+          enum: [quality_hierarchy, overlap_detect, split_season]
+        created_at:
+          type: string
+          format: date-time
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstanceGroupMember'
+
+    InstanceGroupMember:
+      type: object
+      properties:
+        group_id:
+          type: string
+          format: uuid
+        instance_id:
+          type: string
+          format: uuid
+        instance_name:
+          type: string
+        quality_rank:
+          type: integer
+        is_independent:
+          type: boolean
+
+    CrossInstanceMedia:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_id:
+          type: string
+          format: uuid
+        external_id:
+          type: string
+        title:
+          type: string
+        detected_at:
+          type: string
+          format: date-time
+        presence:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrossInstancePresence'
+
+    CrossInstancePresence:
+      type: object
+      properties:
+        media_id:
+          type: string
+          format: uuid
+        instance_id:
+          type: string
+          format: uuid
+        instance_name:
+          type: string
+        monitored:
+          type: boolean
+        has_file:
+          type: boolean
+
+    CrossInstanceAction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_id:
+          type: string
+          format: uuid
+        external_id:
+          type: string
+        title:
+          type: string
+        action:
+          type: string
+        reason:
+          type: string
+        seerr_request_id:
+          type: integer
+          nullable: true
+        source_instance_id:
+          type: string
+          format: uuid
+          nullable: true
+        target_instance_id:
+          type: string
+          format: uuid
+          nullable: true
+        executed_at:
+          type: string
+          format: date-time
+
+    SplitSeasonRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_id:
+          type: string
+          format: uuid
+        external_id:
+          type: string
+        title:
+          type: string
+        instance_id:
+          type: string
+          format: uuid
+        season_from:
+          type: integer
+        season_to:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time

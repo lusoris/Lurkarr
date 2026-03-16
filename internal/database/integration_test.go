@@ -451,7 +451,7 @@ func TestGeneralSettings(t *testing.T) {
 		StatefulResetHours:   24,
 		CommandWaitDelay:     5,
 		CommandWaitAttempts:  3,
-		MinDownloadQueueSize: 10,
+		MaxDownloadQueueSize: 10,
 	}
 	if err := db.UpsertGeneralSettings(ctx, s); err != nil {
 		t.Fatalf("upsert general settings: %v", err)
@@ -464,8 +464,8 @@ func TestGeneralSettings(t *testing.T) {
 	if got.APITimeout != 30 {
 		t.Errorf("api_timeout = %d, want 30", got.APITimeout)
 	}
-	if got.MinDownloadQueueSize != 10 {
-		t.Errorf("min_download_queue_size = %d, want 10", got.MinDownloadQueueSize)
+	if got.MaxDownloadQueueSize != 10 {
+		t.Errorf("max_download_queue_size = %d, want 10", got.MaxDownloadQueueSize)
 	}
 
 	// Upsert (update).

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -55,6 +56,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 				Timestamp: it.CreatedAt,
 			})
 		}
+	} else {
+		slog.Warn("activity: failed to load lurk history", "error", err)
 	}
 
 	// 2. Cross-instance actions.
@@ -69,6 +72,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 				Timestamp: it.ExecutedAt,
 			})
 		}
+	} else {
+		slog.Warn("activity: failed to load cross-instance actions", "error", err)
 	}
 
 	// 3. Blocklist log (all app types).
@@ -85,6 +90,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 					Timestamp: it.BlocklistedAt,
 				})
 			}
+		} else {
+			slog.Warn("activity: failed to load blocklist log", "app_type", app, "error", err)
 		}
 	}
 
@@ -102,6 +109,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 					Timestamp: it.CreatedAt,
 				})
 			}
+		} else {
+			slog.Warn("activity: failed to load auto-import log", "app_type", app, "error", err)
 		}
 	}
 
@@ -121,6 +130,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 				Timestamp: it.ExecutedAt,
 			})
 		}
+	} else {
+		slog.Warn("activity: failed to load schedule executions", "error", err)
 	}
 
 	// 6. Strike log (all app types).
@@ -137,6 +148,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 					Timestamp: it.StruckAt,
 				})
 			}
+		} else {
+			slog.Warn("activity: failed to load strike log", "app_type", app, "error", err)
 		}
 	}
 
@@ -157,6 +170,8 @@ func (h *ActivityHandler) HandleGetActivity(w http.ResponseWriter, r *http.Reque
 				Timestamp: it.CreatedAt,
 			})
 		}
+	} else {
+		slog.Warn("activity: failed to load notification history", "error", err)
 	}
 
 	// Sort all events by timestamp descending, then truncate.

@@ -75,7 +75,7 @@ func TestSonarrLurkerSearch(t *testing.T) {
 
 func TestSonarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 3})
+		json.NewEncoder(w).Encode(map[string]any{"totalRecords": 3, "records": make([]arrclient.QueueRecord, 3)})
 	})
 
 	h := LurkerFor(database.AppSonarr)
@@ -137,7 +137,7 @@ func TestRadarrLurkerSearch(t *testing.T) {
 
 func TestRadarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 5})
+		json.NewEncoder(w).Encode(map[string]any{"totalRecords": 5, "records": make([]arrclient.QueueRecord, 5)})
 	})
 
 	h := LurkerFor(database.AppRadarr)
@@ -199,7 +199,7 @@ func TestLidarrLurkerSearch(t *testing.T) {
 
 func TestLidarrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 1})
+		json.NewEncoder(w).Encode(map[string]any{"totalRecords": 1, "records": make([]arrclient.QueueRecord, 1)})
 	})
 
 	h := LurkerFor(database.AppLidarr)
@@ -325,7 +325,7 @@ func TestWhisparrLurkerSearch(t *testing.T) {
 
 func TestWhisparrLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 2})
+		json.NewEncoder(w).Encode(map[string]any{"totalRecords": 2, "records": make([]arrclient.QueueRecord, 2)})
 	})
 
 	h := LurkerFor(database.AppWhisparr)
@@ -386,7 +386,7 @@ func TestErosLurkerSearch(t *testing.T) {
 
 func TestErosLurkerGetQueue(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(arrclient.QueueResponse{TotalRecords: 4})
+		json.NewEncoder(w).Encode(map[string]any{"totalRecords": 4, "records": make([]arrclient.QueueRecord, 4)})
 	})
 
 	h := LurkerFor(database.AppEros)

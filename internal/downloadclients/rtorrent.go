@@ -3,7 +3,7 @@ package downloadclient
 import (
 	"context"
 	"fmt"
-	"time"
+	"log/slog"
 
 	gort "github.com/autobrr/go-rtorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/rtorrent"
@@ -30,7 +30,10 @@ func (a *RTorrentAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) 
 		if err != nil {
 			return nil, fmt.Errorf("get status for %s: %w", t.Hash, err)
 		}
-		active, _ := a.client.IsActive(ctx, t)
+		active, err := a.client.IsActive(ctx, t)
+		if err != nil {
+			slog.Warn("rtorrent: failed to check active state", "hash", t.Hash, "error", err)
+		}
 
 		items = append(items, DownloadItem{
 			ID:            t.Hash,
@@ -57,13 +60,7 @@ func (a *RTorrentAdapter) GetHistory(ctx context.Context) ([]DownloadItem, error
 	if err != nil {
 		return nil, err
 	}
-	var completed []DownloadItem
-	for _, item := range items {
-		if item.Progress >= 1.0 {
-			completed = append(completed, item)
-		}
-	}
-	return completed, nil
+	return filterCompleted(items), nil
 }
 
 func rtorrentStatusString(t gort.Torrent, s gort.Status, active bool) string {
@@ -192,12 +189,4 @@ func (a *RTorrentAdapter) TestConnection(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return name, nil
-}
-
-// SeedingTime calculates seeding time for a torrent.
-func rtorrentSeedingTime(t gort.Torrent) int64 {
-	if t.Finished.IsZero() {
-		return 0
-	}
-	return int64(time.Since(t.Finished).Seconds())
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -34,7 +35,10 @@ func (h *StateHandler) HandleGetState(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		for _, inst := range instances {
-			lastReset, _ := h.DB.GetLastReset(r.Context(), at, inst.ID)
+			lastReset, resetErr := h.DB.GetLastReset(r.Context(), at, inst.ID)
+			if resetErr != nil {
+				slog.Warn("failed to get last reset", "app_type", at, "instance", inst.ID, "error", resetErr)
+			}
 			result = append(result, map[string]any{
 				"app_type":    at,
 				"instance_id": inst.ID,
@@ -42,6 +46,9 @@ func (h *StateHandler) HandleGetState(w http.ResponseWriter, r *http.Request) {
 				"last_reset":  lastReset,
 			})
 		}
+	}
+	if result == nil {
+		result = []map[string]any{}
 	}
 
 	writeJSON(w, http.StatusOK, result)

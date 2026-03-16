@@ -137,17 +137,24 @@ func (h *OIDCHandler) Init(ctx context.Context) error {
 	return nil
 }
 
+// jsonError writes a JSON error response with the correct Content-Type header.
+func jsonError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	fmt.Fprintf(w, `{"error":%q}`, msg)
+}
+
 // HandleLogin redirects the user to the OIDC provider's authorization endpoint.
 func (h *OIDCHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if err := h.Init(r.Context()); err != nil {
 		slog.Error("OIDC provider initialization failed", "error", err)
-		http.Error(w, `{"error":"oidc provider unavailable"}`, http.StatusServiceUnavailable)
+		jsonError(w, "oidc provider unavailable", http.StatusServiceUnavailable)
 		return
 	}
 
 	state, err := generateState()
 	if err != nil {
-		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -163,14 +170,14 @@ func (h *OIDCHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if err := h.Init(r.Context()); err != nil {
 		slog.Error("OIDC provider initialization failed", "error", err)
-		http.Error(w, `{"error":"oidc provider unavailable"}`, http.StatusServiceUnavailable)
+		jsonError(w, "oidc provider unavailable", http.StatusServiceUnavailable)
 		return
 	}
 
 	// Validate state parameter.
 	state := r.URL.Query().Get("state")
 	if !h.consumeState(state) {
-		http.Error(w, `{"error":"invalid or expired state"}`, http.StatusBadRequest)
+		jsonError(w, "invalid or expired state", http.StatusBadRequest)
 		return
 	}
 
@@ -178,13 +185,13 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if errParam := r.URL.Query().Get("error"); errParam != "" {
 		desc := r.URL.Query().Get("error_description")
 		slog.Warn("OIDC provider returned error", "error", errParam, "description", desc) //nolint:gosec // G706
-		http.Error(w, fmt.Sprintf(`{"error":"oidc: %s"}`, errParam), http.StatusUnauthorized)
+		jsonError(w, "oidc: "+errParam, http.StatusUnauthorized)
 		return
 	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		http.Error(w, `{"error":"missing authorization code"}`, http.StatusBadRequest)
+		jsonError(w, "missing authorization code", http.StatusBadRequest)
 		return
 	}
 
@@ -192,21 +199,21 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	token, err := h.oauth2Config.Exchange(r.Context(), code, oauth2.S256ChallengeOption(state))
 	if err != nil {
 		slog.Error("OIDC token exchange failed", "error", err)
-		http.Error(w, `{"error":"token exchange failed"}`, http.StatusUnauthorized)
+		jsonError(w, "token exchange failed", http.StatusUnauthorized)
 		return
 	}
 
 	// Extract and verify ID token.
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		http.Error(w, `{"error":"no id_token in response"}`, http.StatusUnauthorized)
+		jsonError(w, "no id_token in response", http.StatusUnauthorized)
 		return
 	}
 
 	idToken, err := h.verifier.Verify(r.Context(), rawIDToken)
 	if err != nil {
 		slog.Error("OIDC ID token verification failed", "error", err)
-		http.Error(w, `{"error":"invalid id_token"}`, http.StatusUnauthorized)
+		jsonError(w, "invalid id_token", http.StatusUnauthorized)
 		return
 	}
 
@@ -220,7 +227,7 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		slog.Error("OIDC claims extraction failed", "error", err)
-		http.Error(w, `{"error":"failed to parse claims"}`, http.StatusInternalServerError)
+		jsonError(w, "failed to parse claims", http.StatusInternalServerError)
 		return
 	}
 
@@ -237,7 +244,7 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	user, err := h.DB.GetOrCreateExternalUser(r.Context(), "oidc", claims.Subject, username)
 	if err != nil {
 		slog.Error("OIDC user lookup/creation failed", "error", err, "sub", claims.Subject) //nolint:gosec // G706
-		http.Error(w, `{"error":"user creation failed"}`, http.StatusInternalServerError)
+		jsonError(w, "user creation failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -257,7 +264,7 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	// Create session.
 	if err := h.Auth.SetSessionCookie(r.Context(), w, r, user.ID); err != nil {
 		slog.Error("OIDC session creation failed", "error", err)
-		http.Error(w, `{"error":"session creation failed"}`, http.StatusInternalServerError)
+		jsonError(w, "session creation failed", http.StatusInternalServerError)
 		return
 	}
 

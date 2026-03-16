@@ -23,26 +23,12 @@ type LidarrAlbum struct {
 
 // LidarrGetMissing fetches albums without all tracks.
 func (c *Client) LidarrGetMissing(ctx context.Context) ([]LidarrAlbum, error) {
-	var resp struct {
-		TotalRecords int           `json:"totalRecords"`
-		Records      []LidarrAlbum `json:"records"`
-	}
-	if err := c.get(ctx, lidarrAPI+"/wanted/missing?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("lidarr get missing: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[LidarrAlbum](ctx, c, lidarrAPI, "missing", "title", "ascending", "lidarr get missing")
 }
 
 // LidarrGetCutoffUnmet fetches albums that haven't met quality cutoff.
 func (c *Client) LidarrGetCutoffUnmet(ctx context.Context) ([]LidarrAlbum, error) {
-	var resp struct {
-		TotalRecords int           `json:"totalRecords"`
-		Records      []LidarrAlbum `json:"records"`
-	}
-	if err := c.get(ctx, lidarrAPI+"/wanted/cutoff?sortKey=title&sortDirection=ascending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("lidarr get cutoff unmet: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[LidarrAlbum](ctx, c, lidarrAPI, "cutoff", "title", "ascending", "lidarr get cutoff unmet")
 }
 
 // LidarrSearchAlbum triggers a search for albums.
@@ -60,20 +46,20 @@ func (c *Client) LidarrSearchAlbum(ctx context.Context, albumIDs []int) (*Comman
 
 // LidarrGetQueue returns the current download queue.
 func (c *Client) LidarrGetQueue(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, lidarrAPI+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, lidarrAPI+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("lidarr get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // LidarrGetQueueEnriched returns the queue with embedded album data.
 func (c *Client) LidarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, lidarrAPI+"/queue?pageSize=1000&includeAlbum=true", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, lidarrAPI+"/queue?includeAlbum=true")
+	if err != nil {
 		return nil, fmt.Errorf("lidarr get enriched queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // LidarrTestConnection tests the Lidarr API connection.

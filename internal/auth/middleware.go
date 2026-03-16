@@ -72,7 +72,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 				remoteIP := extractRemoteIP(r)
 				if !isTrustedProxy(m.TrustedProxies, remoteIP) {
 					slog.Warn("proxy auth header from untrusted IP", "ip", remoteIP, "headers", m.ProxyHeaders) //nolint:gosec // G706
-					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+					jsonError(w, "unauthorized", http.StatusUnauthorized)
 					return
 				}
 				user, err := m.DB.GetUserByUsername(r.Context(), username)
@@ -81,25 +81,25 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 					randomPass, genErr := GenerateSecretKey(32)
 					if genErr != nil {
 						slog.Error("failed to generate password for proxy user", "error", genErr)
-						http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+						jsonError(w, "internal server error", http.StatusInternalServerError)
 						return
 					}
 					hash, hashErr := HashPassword(randomPass)
 					if hashErr != nil {
 						slog.Error("failed to hash password for proxy user", "error", hashErr)
-						http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+						jsonError(w, "internal server error", http.StatusInternalServerError)
 						return
 					}
 					user, err = m.DB.CreateUser(r.Context(), username, hash)
 					if err != nil {
 						slog.Error("failed to auto-create proxy user", "error", err, "username", username) //nolint:gosec // G706
-						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+						jsonError(w, "unauthorized", http.StatusUnauthorized)
 						return
 					}
 					slog.Info("auto-created user from proxy auth", "username", username) //nolint:gosec // G706
 				} else if err != nil {
 					slog.Warn("proxy auth bypass user not found", "username", username) //nolint:gosec // G706
-					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+					jsonError(w, "unauthorized", http.StatusUnauthorized)
 					return
 				}
 				ctx := context.WithValue(r.Context(), userContextKey, user)
@@ -110,25 +110,25 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		sessionID, err := uuid.Parse(cookie.Value)
 		if err != nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		session, err := m.DB.GetSession(r.Context(), sessionID)
 		if err != nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		user, err := m.DB.GetUserByID(r.Context(), session.UserID)
 		if err != nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 

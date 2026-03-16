@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/qbittorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/rtorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/transmission"
+	"github.com/lusoris/lurkarr/internal/downloadclients/torrent/utorrent"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/nzbget"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 )
@@ -26,6 +26,7 @@ var validClientTypes = map[string]bool{
 	"transmission": true,
 	"deluge":       true,
 	"rtorrent":     true,
+	"utorrent":     true,
 	"sabnzbd":      true,
 	"nzbget":       true,
 }
@@ -49,8 +50,7 @@ func (h *DownloadClientHandler) HandleList(w http.ResponseWriter, r *http.Reques
 
 // HandleCreateDownloadClient handles POST /api/download-clients.
 func (h *DownloadClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Name       string `json:"name"`
 		ClientType string `json:"client_type"`
 		URL        string `json:"url"`
@@ -59,9 +59,8 @@ func (h *DownloadClientHandler) HandleCreate(w http.ResponseWriter, r *http.Requ
 		Password   string `json:"password"`
 		Category   string `json:"category"`
 		Timeout    int    `json:"timeout"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 	if req.Name == "" || req.URL == "" {
@@ -102,14 +101,12 @@ func (h *DownloadClientHandler) HandleCreate(w http.ResponseWriter, r *http.Requ
 
 // HandleUpdateDownloadClient handles PUT /api/download-clients/{id}.
 func (h *DownloadClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Name       string `json:"name"`
 		ClientType string `json:"client_type"`
 		URL        string `json:"url"`
@@ -119,9 +116,8 @@ func (h *DownloadClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Requ
 		Category   string `json:"category"`
 		Enabled    bool   `json:"enabled"`
 		Timeout    int    `json:"timeout"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -172,9 +168,8 @@ func (h *DownloadClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Requ
 
 // HandleDeleteDownloadClient handles DELETE /api/download-clients/{id}.
 func (h *DownloadClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 	if err := h.DB.DeleteDownloadClientInstance(r.Context(), id); err != nil {
@@ -188,17 +183,15 @@ func (h *DownloadClientHandler) HandleDelete(w http.ResponseWriter, r *http.Requ
 // When editing an existing client, the frontend sends the client ID so the
 // backend can fall back to stored credentials for empty/masked fields.
 func (h *DownloadClientHandler) HandleTest(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		ID         string `json:"id"`
 		ClientType string `json:"client_type"`
 		URL        string `json:"url"`
 		APIKey     string `json:"api_key"`
 		Username   string `json:"username"`
 		Password   string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -251,9 +244,8 @@ func (h *DownloadClientHandler) HandleTest(w http.ResponseWriter, r *http.Reques
 
 // HandleHealthCheckDownloadClient handles GET /api/download-clients/{id}/health.
 func (h *DownloadClientHandler) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -284,9 +276,8 @@ func (h *DownloadClientHandler) HandleHealthCheck(w http.ResponseWriter, r *http
 
 // HandleStatus handles GET /api/download-clients/{id}/status.
 func (h *DownloadClientHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -317,9 +308,8 @@ func (h *DownloadClientHandler) HandleStatus(w http.ResponseWriter, r *http.Requ
 
 // HandleItems handles GET /api/download-clients/{id}/items.
 func (h *DownloadClientHandler) HandleItems(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid id"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -363,6 +353,8 @@ func buildClient(clientType, url, apiKey, username, password string, timeout tim
 		return downloadclient.NewNZBGetAdapter(nzbget.NewClient(url, username, password, timeout))
 	case downloadclient.TypeRTorrent:
 		return downloadclient.NewRTorrentAdapter(rtorrent.NewClient(url, username, password, timeout))
+	case downloadclient.TypeUTorrent:
+		return downloadclient.NewUTorrentAdapter(utorrent.NewClient(url, username, password, timeout))
 	default:
 		return nil
 	}

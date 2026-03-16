@@ -9,43 +9,106 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// queryOne executes a query that returns a single row and scans it into T using struct field position.
+// This eliminates manual .Scan() calls for types already compatible with RowToStructByPos.
+func queryOne[T any](ctx context.Context, db *DB, sql string, args ...any) (*T, error) {
+	rows, err := db.Pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	v, err := pgx.CollectOneRow(rows, pgx.RowToStructByPos[T])
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
 // --- Users ---
 
 func (db *DB) CreateUser(ctx context.Context, username, passwordHash string) (*User, error) {
-	var u User
-	err := db.Pool.QueryRow(ctx,
+	u, err := queryOne[User](ctx, db,
 		`INSERT INTO users (username, password) VALUES ($1, $2)
 		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until`,
 		username, passwordHash,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
-	return &u, nil
+	return u, nil
+}
+
+// SetupFirstUser atomically creates the first admin user and initial general
+// settings inside a single transaction, ensuring the system is never left in a
+// half-initialised state.
+func (db *DB) SetupFirstUser(ctx context.Context, username, passwordHash string, settings *GeneralSettings) (*User, error) {
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("setup begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	rows, err := tx.Query(ctx,
+		`INSERT INTO users (username, password) VALUES ($1, $2)
+		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until`,
+		username, passwordHash,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("setup create user: %w", err)
+	}
+	user, err := pgx.CollectOneRow(rows, pgx.RowToStructByPos[User])
+	if err != nil {
+		return nil, fmt.Errorf("setup scan user: %w", err)
+	}
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO general_settings (id, secret_key, proxy_auth_bypass, ssl_verify, api_timeout,
+		    stateful_reset_hours, command_wait_delay, command_wait_attempts, max_download_queue_size,
+		    auto_import_interval_minutes)
+		 VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 ON CONFLICT (id) DO UPDATE SET
+		    secret_key = EXCLUDED.secret_key,
+		    proxy_auth_bypass = EXCLUDED.proxy_auth_bypass,
+		    ssl_verify = EXCLUDED.ssl_verify,
+		    api_timeout = EXCLUDED.api_timeout,
+		    stateful_reset_hours = EXCLUDED.stateful_reset_hours,
+		    command_wait_delay = EXCLUDED.command_wait_delay,
+		    command_wait_attempts = EXCLUDED.command_wait_attempts,
+		    max_download_queue_size = EXCLUDED.max_download_queue_size,
+		    auto_import_interval_minutes = EXCLUDED.auto_import_interval_minutes`,
+		settings.SecretKey, settings.ProxyAuthBypass, settings.SSLVerify, settings.APITimeout,
+		settings.StatefulResetHours, settings.CommandWaitDelay, settings.CommandWaitAttempts,
+		settings.MaxDownloadQueueSize, settings.AutoImportIntervalMinutes,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("setup upsert settings: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("setup commit: %w", err)
+	}
+	return &user, nil
 }
 
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	var u User
-	err := db.Pool.QueryRow(ctx,
+	u, err := queryOne[User](ctx, db,
 		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get user by username: %w", err)
 	}
-	return &u, nil
+	return u, nil
 }
 
 func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
-	var u User
-	err := db.Pool.QueryRow(ctx,
+	u, err := queryOne[User](ctx, db,
 		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
-	return &u, nil
+	return u, nil
 }
 
 func (db *DB) UpdateUsername(ctx context.Context, id uuid.UUID, username string) error {
@@ -114,36 +177,21 @@ func (db *DB) ResetFailedLogins(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetOrCreateExternalUser finds a user by auth_provider + external_id, or creates one.
+// Uses INSERT ... ON CONFLICT DO UPDATE for atomic upsert, avoiding race conditions
+// when two concurrent OIDC logins arrive for the same provider+external_id.
 func (db *DB) GetOrCreateExternalUser(ctx context.Context, provider, externalID, username string) (*User, error) {
-	var u User
-	err := db.Pool.QueryRow(ctx,
-		`SELECT id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until
-		 FROM users WHERE auth_provider = $1 AND external_id = $2`,
-		provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
-	if err == nil {
-		// Update username if changed at the provider.
-		if u.Username != username {
-			_, _ = db.Pool.Exec(ctx,
-				`UPDATE users SET username = $1, updated_at = now() WHERE id = $2`,
-				username, u.ID,
-			)
-			u.Username = username
-		}
-		return &u, nil
-	}
-
-	// Create user — external users get a placeholder password (cannot login locally).
-	err = db.Pool.QueryRow(ctx,
+	u, err := queryOne[User](ctx, db,
 		`INSERT INTO users (username, password, auth_provider, external_id)
 		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (auth_provider, external_id) DO UPDATE
+		   SET username = EXCLUDED.username, updated_at = now()
 		 RETURNING id, username, password, totp_secret, recovery_codes, auth_provider, external_id, is_admin, created_at, updated_at, failed_login_attempts, locked_until`,
 		username, "!oidc-no-local-password", provider, externalID,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.TOTPSecret, &u.RecoveryCodes, &u.AuthProvider, &u.ExternalID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.FailedLoginAttempts, &u.LockedUntil)
+	)
 	if err != nil {
-		return nil, fmt.Errorf("create external user: %w", err)
+		return nil, fmt.Errorf("upsert external user: %w", err)
 	}
-	return &u, nil
+	return u, nil
 }
 
 // --- Sessions ---
@@ -153,28 +201,26 @@ func (db *DB) CreateSession(ctx context.Context, userID uuid.UUID, duration time
 }
 
 func (db *DB) CreateSessionWithMeta(ctx context.Context, userID uuid.UUID, duration time.Duration, ipAddress, userAgent string) (*Session, error) {
-	var s Session
-	err := db.Pool.QueryRow(ctx,
+	s, err := queryOne[Session](ctx, db,
 		`INSERT INTO sessions (user_id, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4)
 		 RETURNING id, user_id, expires_at, created_at, ip_address, user_agent`,
 		userID, time.Now().Add(duration), ipAddress, userAgent,
-	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
-	return &s, nil
+	return s, nil
 }
 
 func (db *DB) GetSession(ctx context.Context, id uuid.UUID) (*Session, error) {
-	var s Session
-	err := db.Pool.QueryRow(ctx,
+	s, err := queryOne[Session](ctx, db,
 		`SELECT id, user_id, expires_at, created_at, ip_address, user_agent FROM sessions WHERE id = $1 AND expires_at > now()`,
 		id,
-	).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
-	return &s, nil
+	return s, nil
 }
 
 func (db *DB) DeleteSession(ctx context.Context, id uuid.UUID) error {
@@ -258,31 +304,40 @@ func (db *DB) ListInstances(ctx context.Context, appType AppType) ([]AppInstance
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[AppInstance])
 }
 
-func (db *DB) GetInstance(ctx context.Context, id uuid.UUID) (*AppInstance, error) {
-	var i AppInstance
-	err := db.Pool.QueryRow(ctx,
+func (db *DB) ListAllInstances(ctx context.Context) ([]AppInstance, error) {
+	rows, err := db.Pool.Query(ctx,
 		`SELECT id, app_type, name, api_url, api_key, enabled, created_at
-		 FROM app_instances WHERE id = $1`,
-		id,
-	).Scan(&i.ID, &i.AppType, &i.Name, &i.APIURL, &i.APIKey, &i.Enabled, &i.CreatedAt)
+		 FROM app_instances ORDER BY app_type, name`,
+	)
 	if err != nil {
 		return nil, err
 	}
-	return &i, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[AppInstance])
+}
+
+func (db *DB) GetInstance(ctx context.Context, id uuid.UUID) (*AppInstance, error) {
+	i, err := queryOne[AppInstance](ctx, db,
+		`SELECT id, app_type, name, api_url, api_key, enabled, created_at
+		 FROM app_instances WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return i, nil
 }
 
 func (db *DB) CreateInstance(ctx context.Context, appType AppType, name, apiURL, apiKey string) (*AppInstance, error) {
-	var i AppInstance
-	err := db.Pool.QueryRow(ctx,
+	i, err := queryOne[AppInstance](ctx, db,
 		`INSERT INTO app_instances (app_type, name, api_url, api_key)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, app_type, name, api_url, api_key, enabled, created_at`,
 		string(appType), name, apiURL, apiKey,
-	).Scan(&i.ID, &i.AppType, &i.Name, &i.APIURL, &i.APIKey, &i.Enabled, &i.CreatedAt)
+	)
 	if err != nil {
 		return nil, err
 	}
-	return &i, nil
+	return i, nil
 }
 
 func (db *DB) UpdateInstance(ctx context.Context, id uuid.UUID, name, apiURL, apiKey string, enabled bool) error {
@@ -350,11 +405,11 @@ func (db *DB) GetGeneralSettings(ctx context.Context) (*GeneralSettings, error) 
 	err := db.Pool.QueryRow(ctx,
 		`SELECT secret_key, proxy_auth_bypass, ssl_verify, api_timeout,
 		        stateful_reset_hours, command_wait_delay, command_wait_attempts,
-		        min_download_queue_size, auto_import_interval_minutes
+		        max_download_queue_size, auto_import_interval_minutes
 		 FROM general_settings WHERE id = 1`,
 	).Scan(&s.SecretKey, &s.ProxyAuthBypass, &s.SSLVerify, &s.APITimeout,
 		&s.StatefulResetHours, &s.CommandWaitDelay, &s.CommandWaitAttempts,
-		&s.MinDownloadQueueSize, &s.AutoImportIntervalMinutes)
+		&s.MaxDownloadQueueSize, &s.AutoImportIntervalMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +419,7 @@ func (db *DB) GetGeneralSettings(ctx context.Context) (*GeneralSettings, error) 
 func (db *DB) UpsertGeneralSettings(ctx context.Context, s *GeneralSettings) error {
 	_, err := db.Pool.Exec(ctx,
 		`INSERT INTO general_settings (id, secret_key, proxy_auth_bypass, ssl_verify, api_timeout,
-		    stateful_reset_hours, command_wait_delay, command_wait_attempts, min_download_queue_size,
+		    stateful_reset_hours, command_wait_delay, command_wait_attempts, max_download_queue_size,
 		    auto_import_interval_minutes)
 		 VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 ON CONFLICT (id) DO UPDATE SET
@@ -375,11 +430,11 @@ func (db *DB) UpsertGeneralSettings(ctx context.Context, s *GeneralSettings) err
 		    stateful_reset_hours = EXCLUDED.stateful_reset_hours,
 		    command_wait_delay = EXCLUDED.command_wait_delay,
 		    command_wait_attempts = EXCLUDED.command_wait_attempts,
-		    min_download_queue_size = EXCLUDED.min_download_queue_size,
+		    max_download_queue_size = EXCLUDED.max_download_queue_size,
 		    auto_import_interval_minutes = EXCLUDED.auto_import_interval_minutes`,
 		s.SecretKey, s.ProxyAuthBypass, s.SSLVerify, s.APITimeout,
 		s.StatefulResetHours, s.CommandWaitDelay, s.CommandWaitAttempts,
-		s.MinDownloadQueueSize, s.AutoImportIntervalMinutes,
+		s.MaxDownloadQueueSize, s.AutoImportIntervalMinutes,
 	)
 	return err
 }
@@ -602,18 +657,13 @@ func (db *DB) ListLurkHistory(ctx context.Context, q HistoryQuery) ([]LurkHistor
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
 
-	var results []LurkHistory
-	for rows.Next() {
-		var h LurkHistory
-		if err := rows.Scan(&h.ID, &h.AppType, &h.InstanceID, &h.InstanceName, &h.MediaID, &h.MediaTitle, &h.Operation, &h.CreatedAt); err != nil {
-			return nil, 0, err
-		}
-		results = append(results, h)
+	results, err := pgx.CollectRows(rows, pgx.RowToStructByPos[LurkHistory])
+	if err != nil {
+		return nil, 0, err
 	}
 
-	return results, total, rows.Err()
+	return results, total, nil
 }
 
 func (db *DB) DeleteHistory(ctx context.Context, appType AppType) error {
@@ -711,17 +761,7 @@ func (db *DB) ListSchedules(ctx context.Context) ([]Schedule, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var result []Schedule
-	for rows.Next() {
-		var s Schedule
-		if err := rows.Scan(&s.ID, &s.AppType, &s.Action, &s.Days, &s.Hour, &s.Minute, &s.Enabled, &s.CreatedAt); err != nil {
-			return nil, err
-		}
-		result = append(result, s)
-	}
-	return result, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[Schedule])
 }
 
 func (db *DB) CreateSchedule(ctx context.Context, s *Schedule) error {
@@ -762,17 +802,7 @@ func (db *DB) ListScheduleExecutions(ctx context.Context, limit int) ([]Schedule
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var result []ScheduleExecution
-	for rows.Next() {
-		var e ScheduleExecution
-		if err := rows.Scan(&e.ID, &e.ScheduleID, &e.ExecutedAt, &e.Result); err != nil {
-			return nil, err
-		}
-		result = append(result, e)
-	}
-	return result, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[ScheduleExecution])
 }
 
 // --- Logs ---
@@ -844,17 +874,7 @@ func (db *DB) QueryLogs(ctx context.Context, q LogQuery) ([]LogEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var results []LogEntry
-	for rows.Next() {
-		var e LogEntry
-		if err := rows.Scan(&e.ID, &e.AppType, &e.Level, &e.Message, &e.CreatedAt); err != nil {
-			return nil, err
-		}
-		results = append(results, e)
-	}
-	return results, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[LogEntry])
 }
 
 func (db *DB) PruneLogs(ctx context.Context, retentionDays int) (int64, error) {
@@ -886,17 +906,7 @@ func (db *DB) ListWebAuthnCredentials(ctx context.Context, userID uuid.UUID) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var creds []WebAuthnCredential
-	for rows.Next() {
-		var c WebAuthnCredential
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Name, &c.CredentialID, &c.PublicKey,
-			&c.AttestationType, &c.Transport, &c.AAGUID, &c.SignCount, &c.CreatedAt); err != nil {
-			return nil, err
-		}
-		creds = append(creds, c)
-	}
-	return creds, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[WebAuthnCredential])
 }
 
 func (db *DB) GetWebAuthnCredentialByID(ctx context.Context, credID []byte) (*WebAuthnCredential, error) {
@@ -974,25 +984,23 @@ func (db *DB) SetCSRFKey(ctx context.Context, key string) error {
 
 // CreateInstanceGroup creates a new instance group for the given app type.
 func (db *DB) CreateInstanceGroup(ctx context.Context, appType AppType, name string) (*InstanceGroup, error) {
-	var g InstanceGroup
-	err := db.Pool.QueryRow(ctx,
+	g, err := queryOne[InstanceGroup](ctx, db,
 		`INSERT INTO instance_groups (app_type, name) VALUES ($1, $2)
 		 RETURNING id, app_type, name, mode, created_at`,
 		appType, name,
-	).Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create instance group: %w", err)
 	}
-	return &g, nil
+	return g, nil
 }
 
 // GetInstanceGroup returns a single instance group by ID with its members.
 func (db *DB) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*InstanceGroup, error) {
-	var g InstanceGroup
-	err := db.Pool.QueryRow(ctx,
+	g, err := queryOne[InstanceGroup](ctx, db,
 		`SELECT id, app_type, name, mode, created_at FROM instance_groups WHERE id = $1`,
 		id,
-	).Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get instance group: %w", err)
 	}
@@ -1006,16 +1014,11 @@ func (db *DB) GetInstanceGroup(ctx context.Context, id uuid.UUID) (*InstanceGrou
 	if err != nil {
 		return nil, fmt.Errorf("get instance group members: %w", err)
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var m InstanceGroupMember
-		if err := rows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank, &m.IsIndependent); err != nil {
-			return nil, fmt.Errorf("scan instance group member: %w", err)
-		}
-		g.Members = append(g.Members, m)
+	g.Members, err = pgx.CollectRows(rows, pgx.RowToStructByPos[InstanceGroupMember])
+	if err != nil {
+		return nil, fmt.Errorf("scan instance group member: %w", err)
 	}
-	return &g, nil
+	return g, nil
 }
 
 // ListInstanceGroups returns all groups for a given app type with members.
@@ -1026,15 +1029,9 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 	if err != nil {
 		return nil, fmt.Errorf("list instance groups: %w", err)
 	}
-	defer rows.Close()
-
-	var groups []InstanceGroup
-	for rows.Next() {
-		var g InstanceGroup
-		if err := rows.Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan instance group: %w", err)
-		}
-		groups = append(groups, g)
+	groups, err := pgx.CollectRows(rows, pgx.RowToStructByPos[InstanceGroup])
+	if err != nil {
+		return nil, fmt.Errorf("scan instance groups: %w", err)
 	}
 
 	// Load members for each group in a single query
@@ -1055,13 +1052,11 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 		if err != nil {
 			return nil, fmt.Errorf("list instance group members: %w", err)
 		}
-		defer mRows.Close()
-
-		for mRows.Next() {
-			var m InstanceGroupMember
-			if err := mRows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank, &m.IsIndependent); err != nil {
-				return nil, fmt.Errorf("scan instance group member: %w", err)
-			}
+		members, err := pgx.CollectRows(mRows, pgx.RowToStructByPos[InstanceGroupMember])
+		if err != nil {
+			return nil, fmt.Errorf("scan instance group member: %w", err)
+		}
+		for _, m := range members {
 			if g, ok := groupMap[m.GroupID]; ok {
 				g.Members = append(g.Members, m)
 			}
@@ -1197,15 +1192,9 @@ func (db *DB) ListCrossInstanceMedia(ctx context.Context, groupID uuid.UUID) ([]
 	if err != nil {
 		return nil, fmt.Errorf("list cross instance media: %w", err)
 	}
-	defer rows.Close()
-
-	var items []CrossInstanceMedia
-	for rows.Next() {
-		var m CrossInstanceMedia
-		if err := rows.Scan(&m.ID, &m.GroupID, &m.ExternalID, &m.Title, &m.DetectedAt); err != nil {
-			return nil, fmt.Errorf("scan cross instance media: %w", err)
-		}
-		items = append(items, m)
+	items, err := pgx.CollectRows(rows, pgx.RowToStructByPos[CrossInstanceMedia])
+	if err != nil {
+		return nil, fmt.Errorf("scan cross instance media: %w", err)
 	}
 
 	// Load presence for all items
@@ -1358,18 +1347,7 @@ func (db *DB) ListCrossInstanceActions(ctx context.Context, limit int) ([]CrossI
 	if err != nil {
 		return nil, fmt.Errorf("list cross instance actions: %w", err)
 	}
-	defer rows.Close()
-
-	var actions []CrossInstanceAction
-	for rows.Next() {
-		var a CrossInstanceAction
-		if err := rows.Scan(&a.ID, &a.GroupID, &a.ExternalID, &a.Title, &a.Action, &a.Reason,
-			&a.SeerrRequestID, &a.SourceInstanceID, &a.TargetInstanceID, &a.ExecutedAt); err != nil {
-			return nil, fmt.Errorf("scan cross instance action: %w", err)
-		}
-		actions = append(actions, a)
-	}
-	return actions, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[CrossInstanceAction])
 }
 
 // --- Split Season Rules ---
@@ -1382,18 +1360,7 @@ func (db *DB) ListSplitSeasonRules(ctx context.Context, groupID uuid.UUID) ([]Sp
 	if err != nil {
 		return nil, fmt.Errorf("list split season rules: %w", err)
 	}
-	defer rows.Close()
-
-	var rules []SplitSeasonRule
-	for rows.Next() {
-		var r SplitSeasonRule
-		if err := rows.Scan(&r.ID, &r.GroupID, &r.ExternalID, &r.Title, &r.InstanceID,
-			&r.SeasonFrom, &r.SeasonTo, &r.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan split season rule: %w", err)
-		}
-		rules = append(rules, r)
-	}
-	return rules, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[SplitSeasonRule])
 }
 
 // CreateSplitSeasonRule inserts a new split-season rule.

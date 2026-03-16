@@ -104,8 +104,13 @@ func TestManagerUnregister(t *testing.T) {
 func TestDiscordSend(t *testing.T) {
 	var received map[string]any
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &received)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal("read body:", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatal("unmarshal body:", err)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer ts.Close()
@@ -168,7 +173,10 @@ func TestDiscordTest(t *testing.T) {
 func TestTelegramSend(t *testing.T) {
 	var received string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal("read body:", err)
+		}
 		received = string(body)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -247,8 +255,13 @@ func TestGotifySend(t *testing.T) {
 		if r.Header.Get("X-Gotify-Key") != "testtoken" {
 			t.Error("missing or wrong Gotify token")
 		}
-		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &received)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal("read body:", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatal("unmarshal body:", err)
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -329,8 +342,13 @@ func TestNtfyErrorStatus(t *testing.T) {
 func TestAppriseSend(t *testing.T) {
 	var received map[string]any
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &received)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal("read body:", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatal("unmarshal body:", err)
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -376,8 +394,13 @@ func TestWebhookSend(t *testing.T) {
 		if r.Header.Get("X-Custom") != "value" {
 			t.Error("missing custom header")
 		}
-		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &received)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal("read body:", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatal("unmarshal body:", err)
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()

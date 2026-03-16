@@ -1,7 +1,7 @@
 package api
 
 import (
-	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,15 +15,32 @@ type AppsHandler struct {
 	DB Store
 }
 
+// HandleListAllInstances handles GET /api/instances (no app filter).
+func (h *AppsHandler) HandleListAllInstances(w http.ResponseWriter, r *http.Request) {
+	all, err := h.DB.ListAllInstances(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list instances"))
+		return
+	}
+	if all == nil {
+		all = []database.AppInstance{}
+	}
+	grouped := make(map[string][]database.AppInstance)
+	for i := range all {
+		all[i].APIKey = all[i].MaskedAPIKey()
+		grouped[string(all[i].AppType)] = append(grouped[string(all[i].AppType)], all[i])
+	}
+	writeJSON(w, http.StatusOK, grouped)
+}
+
 // HandleListInstances handles GET /api/instances/{app}.
 func (h *AppsHandler) HandleListInstances(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	instances, err := h.DB.ListInstances(r.Context(), database.AppType(appType))
+	instances, err := h.DB.ListInstances(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list instances"))
 		return
@@ -42,19 +59,20 @@ func (h *AppsHandler) HandleListInstances(w http.ResponseWriter, r *http.Request
 
 // HandleCreateInstance handles POST /api/instances/{app}.
 func (h *AppsHandler) HandleCreateInstance(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Name   string `json:"name"`
 		APIURL string `json:"api_url"`
 		APIKey string `json:"api_key"`
+	}](w, r)
+	if !ok {
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.APIURL == "" || req.APIKey == "" {
+	if req.Name == "" || req.APIURL == "" || req.APIKey == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("name, api_url, and api_key required"))
 		return
 	}
@@ -64,7 +82,7 @@ func (h *AppsHandler) HandleCreateInstance(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	inst, err := h.DB.CreateInstance(r.Context(), database.AppType(appType), req.Name, req.APIURL, req.APIKey)
+	inst, err := h.DB.CreateInstance(r.Context(), appType, req.Name, req.APIURL, req.APIKey)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create instance"))
 		return
@@ -76,21 +94,18 @@ func (h *AppsHandler) HandleCreateInstance(w http.ResponseWriter, r *http.Reques
 
 // HandleUpdateInstance handles PUT /api/instances/{id}.
 func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid instance ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Name    string `json:"name"`
 		APIURL  string `json:"api_url"`
 		APIKey  string `json:"api_key"`
 		Enabled bool   `json:"enabled"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -119,9 +134,8 @@ func (h *AppsHandler) HandleUpdateInstance(w http.ResponseWriter, r *http.Reques
 
 // HandleDeleteInstance handles DELETE /api/instances/{id}.
 func (h *AppsHandler) HandleDeleteInstance(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid instance ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -136,9 +150,8 @@ func (h *AppsHandler) HandleDeleteInstance(w http.ResponseWriter, r *http.Reques
 // HandleHealthCheckInstance handles GET /api/instances/{id}/health.
 // It tests the connection to a stored instance using its saved credentials.
 func (h *AppsHandler) HandleHealthCheckInstance(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid instance ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -182,15 +195,13 @@ func (h *AppsHandler) HandleHealthCheckInstance(w http.ResponseWriter, r *http.R
 // When editing an existing instance, the frontend sends the instance ID so the
 // backend can fall back to stored credentials for empty/masked API keys.
 func (h *AppsHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		ID      string `json:"id"`
 		APIURL  string `json:"api_url"`
 		APIKey  string `json:"api_key"`
 		AppType string `json:"app_type"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -225,7 +236,10 @@ func (h *AppsHandler) HandleTestConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	genSettings, _ := h.DB.GetGeneralSettings(r.Context())
+	genSettings, genErr := h.DB.GetGeneralSettings(r.Context())
+	if genErr != nil {
+		slog.Warn("failed to load general settings, using defaults", "error", genErr)
+	}
 	sslVerify := true
 	if genSettings != nil {
 		sslVerify = genSettings.SSLVerify

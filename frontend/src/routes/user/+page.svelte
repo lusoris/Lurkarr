@@ -1,33 +1,26 @@
 <script lang="ts">
 	import { api } from '$lib/api';
+	import { base64urlToBuffer, bufferToBase64url } from '$lib/webauthn';
+	import ScrollToTop from '$lib/components/ScrollToTop.svelte';
+	import { ShieldCheck, Plus, Fingerprint, Pencil } from 'lucide-svelte';
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
+	import Badge from '$lib/components/ui/Badge.svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 
 	const toasts = getToasts();
+	import type { LurkarrUser, UserSession, Passkey } from '$lib/types';
 
-	interface User {
-		id: string;
-		username: string;
-		has_2fa: boolean;
-		is_admin: boolean;
-		auth_provider: string;
-		created_at: string;
-	}
-
-	interface Session {
-		id: string;
-		created_at: string;
-		expires_at: string;
-		ip_address: string;
-		user_agent: string;
-		current: boolean;
-	}
-
-	let user = $state<User | null>(null);
-	let sessions = $state<Session[]>([]);
+	let user = $state<LurkarrUser | null>(null);
+	let sessions = $state<UserSession[]>([]);
 	let newUsername = $state('');
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -46,17 +39,15 @@
 	let confirmRevokeAll = $state(false);
 
 	// Passkey state
-	interface Passkey {
-		id: string;
-		name: string;
-		created_at: string;
-	}
 	let passkeys = $state<Passkey[]>([]);
 	let passkeyRegistering = $state(false);
 	let passkeyEnabled = $state(false);
 	let confirmDeletePasskey = $state<string | null>(null);
 	let renamingPasskey = $state<string | null>(null);
 	let renameValue = $state('');
+	let pendingPasskeyCredential = $state<any>(null);
+	let passkeyNameInput = $state('');
+	let showPasskeyNameModal = $state(false);
 
 	async function checkPasskeySupport() {
 		try {
@@ -73,23 +64,6 @@
 		try {
 			passkeys = await api.get<Passkey[]>('/passkeys');
 		} catch { /* handled */ }
-	}
-
-	function bufferToBase64url(buffer: ArrayBuffer): string {
-		const bytes = new Uint8Array(buffer);
-		let str = '';
-		for (const b of bytes) str += String.fromCharCode(b);
-		return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-	}
-
-	function base64urlToBuffer(base64url: string): ArrayBuffer {
-		const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-		const pad = base64.length % 4;
-		const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
-		const binary = atob(padded);
-		const bytes = new Uint8Array(binary.length);
-		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-		return bytes.buffer;
 	}
 
 	async function registerPasskey() {
@@ -109,9 +83,22 @@
 			const credential = await navigator.credentials.create({ publicKey: options.publicKey }) as PublicKeyCredential;
 			if (!credential) throw new Error('Registration cancelled');
 
-			const response = credential.response as AuthenticatorAttestationResponse;
+			pendingPasskeyCredential = credential;
+			passkeyNameInput = '';
+			showPasskeyNameModal = true;
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Passkey registration failed');
+			passkeyRegistering = false;
+		}
+	}
 
-			const name = prompt('Name this passkey (e.g. "MacBook Touch ID")') || 'Passkey';
+	async function finishPasskeyRegistration() {
+		const credential = pendingPasskeyCredential;
+		if (!credential) return;
+		const name = passkeyNameInput.trim() || 'Passkey';
+		showPasskeyNameModal = false;
+		try {
+			const response = credential.response as AuthenticatorAttestationResponse;
 
 			const body = {
 				id: bufferToBase64url(credential.rawId),
@@ -176,14 +163,14 @@
 
 	async function load() {
 		try {
-			user = await api.get<User>('/user');
+			user = await api.get<LurkarrUser>('/user');
 			newUsername = user?.username ?? '';
 		} catch { /* handled */ }
 	}
 
 	async function loadSessions() {
 		try {
-			sessions = await api.get<Session[]>('/sessions');
+			sessions = await api.get<UserSession[]>('/sessions');
 		} catch { /* handled */ }
 	}
 
@@ -314,12 +301,16 @@
 <svelte:head><title>Profile - Lurkarr</title></svelte:head>
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold text-foreground">Profile</h1>
+	<PageHeader title="Profile" description="Manage your account, security, and active sessions.">
+		{#snippet actions()}
+			<HelpDrawer page="user" />
+		{/snippet}
+	</PageHeader>
 
 	{#if user}
 		<!-- Username -->
 		<Card>
-			<h2 class="text-lg font-semibold text-foreground mb-4">Username</h2>
+			<h3 class="text-sm font-semibold text-foreground mb-3">Username</h3>
 			<div class="space-y-3">
 				<Input bind:value={newUsername} label="Username" />
 				<Button onclick={updateUsername} loading={saving}>Update Username</Button>
@@ -328,7 +319,7 @@
 
 		<!-- Password -->
 		<Card>
-			<h2 class="text-lg font-semibold text-foreground mb-4">Change Password</h2>
+			<h3 class="text-sm font-semibold text-foreground mb-3">Change Password</h3>
 			<div class="space-y-3">
 				<Input bind:value={currentPassword} type="password" label="Current Password" />
 				<Input bind:value={newPassword} type="password" label="New Password" />
@@ -338,27 +329,21 @@
 
 		<!-- Two-Factor Authentication -->
 		<Card>
-			<h2 class="text-lg font-semibold text-foreground mb-4">Two-Factor Authentication</h2>
+			<h3 class="text-sm font-semibold text-foreground mb-3">Two-Factor Authentication</h3>
 			{#if user.has_2fa}
 				<div class="space-y-3">
 					<div class="flex items-center gap-2">
-						<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+						<Badge variant="success" class="rounded-full px-2.5 py-1">
+						<ShieldCheck class="w-3.5 h-3.5 mr-1" />
 							Enabled
-						</span>
+						</Badge>
 					</div>
 					<p class="text-sm text-muted-foreground">Your account is protected with TOTP two-factor authentication.</p>
 					<div class="flex gap-2">
 						<Button variant="secondary" onclick={regenerateCodes} loading={saving}>Regenerate Recovery Codes</Button>
-						{#if confirmDisable2FA}
-							<span class="flex items-center gap-2 text-xs">
-								<span class="text-muted-foreground">Disable 2FA?</span>
-								<button onclick={disable2FA} class="rounded px-2 py-1 bg-red-600 text-white text-xs hover:bg-red-500">Yes</button>
-								<button onclick={() => confirmDisable2FA = false} class="rounded px-2 py-1 bg-secondary text-muted-foreground text-xs hover:bg-muted">No</button>
-							</span>
-						{:else}
+						<ConfirmAction active={confirmDisable2FA} message="Disable 2FA?" onconfirm={disable2FA} oncancel={() => confirmDisable2FA = false}>
 							<Button variant="danger" onclick={() => confirmDisable2FA = true} loading={saving}>Disable 2FA</Button>
-						{/if}
+						</ConfirmAction>
 					</div>
 				</div>
 			{:else}
@@ -373,9 +358,9 @@
 		{#if passkeyEnabled}
 			<Card>
 				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-lg font-semibold text-foreground">Passkeys</h2>
+					<h3 class="text-sm font-semibold text-foreground">Passkeys</h3>
 					<Button size="sm" onclick={registerPasskey} loading={passkeyRegistering}>
-						<svg class="w-4 h-4 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+					<Plus class="w-4 h-4 mr-1 inline" />
 						Add Passkey
 					</Button>
 				</div>
@@ -385,32 +370,27 @@
 						{#each passkeys as pk}
 							<div class="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
 								<div class="min-w-0 flex items-center gap-3">
-									<svg class="w-5 h-5 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a48.667 48.667 0 00-1.298 8.568M5.742 6.364L3 4.5M5.742 6.364l2.121 2.121m0 0A7.465 7.465 0 0110.5 7.5c1.56 0 3.03.476 4.243 1.293M7.864 8.485l2.121 2.121m0 0a7.465 7.465 0 014.53-1.606c.896 0 1.76.157 2.56.442M10 10.5l2.121 2.121M12.121 12.621A48.578 48.578 0 0120.25 18.4M12.121 12.621L10.5 14.242"/></svg>
+								<Fingerprint class="w-5 h-5 text-muted-foreground shrink-0" />
 									<div>
 										{#if renamingPasskey === pk.id}
 											<form onsubmit={(e: Event) => { e.preventDefault(); renamePasskey(pk.id); }} class="flex items-center gap-2">
-<input bind:value={renameValue} class="bg-secondary border border-border rounded px-2 py-1 text-sm text-foreground w-40" />
-													<button type="submit" class="text-xs text-primary hover:text-primary/80">Save</button>
-													<button type="button" onclick={() => renamingPasskey = null} class="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+														<Input bind:value={renameValue} class="w-40" />
+														<Button type="submit" size="sm" variant="link" class="h-auto p-0 text-xs">Save</Button>
+														<Button type="button" size="sm" variant="ghost" class="h-auto p-0 text-xs" onclick={() => renamingPasskey = null}>Cancel</Button>
 											</form>
 										{:else}
 											<span class="text-sm font-medium text-foreground">{pk.name}</span>
-											<button onclick={() => { renamingPasskey = pk.id; renameValue = pk.name; }} class="ml-2 text-xs text-muted-foreground hover:text-foreground" title="Rename">
-												<svg class="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"/></svg>
-											</button>
+												<Button size="sm" variant="ghost" class="ml-2 h-auto p-0" onclick={() => { renamingPasskey = pk.id; renameValue = pk.name; }}>
+											<Pencil class="w-3 h-3 inline" />
+											</Button>
 										{/if}
 										<p class="text-xs text-muted-foreground mt-0.5">Added {formatDate(pk.created_at)}</p>
 									</div>
 								</div>
 								<div class="shrink-0">
-									{#if confirmDeletePasskey === pk.id}
-										<span class="flex items-center gap-1">
-											<button onclick={() => deletePasskey(pk.id)} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
-											<button onclick={() => confirmDeletePasskey = null} class="rounded px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] hover:bg-muted">No</button>
-										</span>
-									{:else}
-										<Button variant="ghost" size="sm" onclick={() => confirmDeletePasskey = pk.id}>Delete</Button>
-									{/if}
+								<ConfirmAction active={confirmDeletePasskey === pk.id} onconfirm={() => deletePasskey(pk.id)} oncancel={() => confirmDeletePasskey = null}>
+									<Button variant="ghost" size="sm" onclick={() => confirmDeletePasskey = pk.id}>Delete</Button>
+								</ConfirmAction>
 								</div>
 							</div>
 						{/each}
@@ -424,17 +404,11 @@
 		<!-- Active Sessions -->
 		<Card>
 			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-lg font-semibold text-foreground">Active Sessions</h2>
+				<h3 class="text-sm font-semibold text-foreground">Active Sessions</h3>
 				{#if sessions.length > 1}
-					{#if confirmRevokeAll}
-						<span class="flex items-center gap-2 text-xs">
-						<span class="text-muted-foreground">Revoke all?</span>
-						<button onclick={() => { revokeAllSessions(); confirmRevokeAll = false; }} class="rounded px-2 py-1 bg-red-600 text-white text-xs hover:bg-red-500">Yes</button>
-						<button onclick={() => confirmRevokeAll = false} class="rounded px-2 py-1 bg-secondary text-muted-foreground text-xs hover:bg-muted">No</button>
-						</span>
-					{:else}
+					<ConfirmAction active={confirmRevokeAll} message="Revoke all?" onconfirm={() => { revokeAllSessions(); confirmRevokeAll = false; }} oncancel={() => confirmRevokeAll = false}>
 						<Button variant="danger" size="sm" onclick={() => confirmRevokeAll = true}>Revoke All Others</Button>
-					{/if}
+					</ConfirmAction>
 				{/if}
 			</div>
 			{#if sessions.length > 0}
@@ -453,14 +427,9 @@
 								</p>
 							</div>
 							{#if !s.current}
-								{#if confirmRevokeSession === s.id}
-									<span class="flex items-center gap-1 shrink-0">
-										<button onclick={() => { revokeSession(s.id); confirmRevokeSession = null; }} class="rounded px-1.5 py-0.5 bg-red-600 text-white text-[10px] hover:bg-red-500">Yes</button>
-										<button onclick={() => confirmRevokeSession = null} class="rounded px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] hover:bg-muted">No</button>
-									</span>
-								{:else}
+								<ConfirmAction active={confirmRevokeSession === s.id} onconfirm={() => { revokeSession(s.id); confirmRevokeSession = null; }} oncancel={() => confirmRevokeSession = null}>
 									<Button variant="ghost" size="sm" onclick={() => confirmRevokeSession = s.id}>Revoke</Button>
-								{/if}
+								</ConfirmAction>
 							{/if}
 						</div>
 					{/each}
@@ -479,13 +448,20 @@
 			</p>
 		</Card>
 	{:else}
-		<div class="space-y-6">
-			{#each Array(4) as _}
-				<div class="h-32 rounded-xl bg-muted/50 animate-pulse"></div>
-			{/each}
-		</div>
+		<Skeleton rows={4} height="h-32" />
 	{/if}
 </div>
+
+<!-- Passkey Name Modal -->
+<Modal open={showPasskeyNameModal} title="Name Your Passkey" onclose={() => { showPasskeyNameModal = false; passkeyRegistering = false; }}>
+	<form onsubmit={(e: Event) => { e.preventDefault(); finishPasskeyRegistration(); }} class="space-y-4">
+		<Input bind:value={passkeyNameInput} label="Passkey Name" placeholder="e.g. MacBook Touch ID" />
+		<div class="flex justify-end gap-2">
+			<Button variant="secondary" onclick={() => { showPasskeyNameModal = false; passkeyRegistering = false; }}>Cancel</Button>
+			<Button type="submit">Save</Button>
+		</div>
+	</form>
+</Modal>
 
 <!-- TOTP Setup Modal -->
 <Modal open={showTOTPSetup} title="Set Up Two-Factor Authentication" onclose={() => showTOTPSetup = false}>
@@ -493,13 +469,15 @@
 		<p class="text-sm text-muted-foreground">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc):</p>
 		{#if totpQR}
 			<div class="flex justify-center">
-				<img src="data:image/png;base64,{totpQR}" alt="TOTP QR Code" class="w-48 h-48 rounded-lg bg-white p-2" />
+				<img src="data:image/jpeg;base64,{totpQR}" alt="TOTP QR Code" class="w-48 h-48 rounded-lg bg-white p-2" />
 			</div>
 		{/if}
-		<details class="text-xs">
-			<summary class="text-muted-foreground cursor-pointer hover:text-foreground">Can't scan? Enter manually</summary>
-			<code class="block mt-2 p-2 rounded bg-muted text-foreground break-all select-all">{totpSecret}</code>
-		</details>
+		<Collapsible.Root class="text-xs">
+			<Collapsible.Trigger class="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">Can't scan? Enter manually</Collapsible.Trigger>
+			<Collapsible.Content>
+				<code class="block mt-2 p-2 rounded bg-muted text-foreground break-all select-all">{totpSecret}</code>
+			</Collapsible.Content>
+		</Collapsible.Root>
 		<Input bind:value={totpCode} label="Verification Code" placeholder="Enter 6-digit code" />
 		<div class="flex gap-2">
 			<Button onclick={verify2FA} loading={saving}>Verify &amp; Enable</Button>
@@ -511,10 +489,10 @@
 <!-- Recovery Codes Modal -->
 <Modal open={showRecoveryCodes} title="Recovery Codes" onclose={() => showRecoveryCodes = false}>
 	<div class="space-y-4">
-		<div class="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-			<p class="text-sm text-yellow-300">Save these codes somewhere safe. Each code can only be used once. If you lose your authenticator, these are the only way to access your account.</p>
-		</div>
-		<div class="grid grid-cols-2 gap-2">
+		<Alert.Root variant="warning">
+			<Alert.Description>Save these codes somewhere safe. Each code can only be used once. If you lose your authenticator, these are the only way to access your account.</Alert.Description>
+		</Alert.Root>
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 			{#each recoveryCodes as code}
 				<code class="block p-2 rounded bg-muted text-foreground text-center text-sm font-mono select-all">{code}</code>
 			{/each}
@@ -522,3 +500,5 @@
 		<Button onclick={() => showRecoveryCodes = false}>I've Saved These Codes</Button>
 	</div>
 </Modal>
+
+<ScrollToTop />

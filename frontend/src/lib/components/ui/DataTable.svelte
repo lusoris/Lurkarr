@@ -13,8 +13,11 @@
 <script lang="ts" generics="T">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/lib/utils';
-	import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-svelte';
 	import * as Table from './table';
+	import * as Pagination from './pagination';
+	import { Input as ShadcnInput } from './input';
+	import Button from './Button.svelte';
 
 	interface Props {
 		data: T[];
@@ -124,14 +127,11 @@
 	{#if searchable || toolbar}
 		<div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
 			{#if searchable}
-				<input
+				<ShadcnInput
 					type="text"
 					placeholder={searchPlaceholder}
 					bind:value={search}
-					class={cn(
-						'border-input bg-background placeholder:text-muted-foreground flex h-9 w-full sm:max-w-xs rounded-md border px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow]',
-						'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]'
-					)}
+					class="w-full sm:max-w-xs"
 				/>
 			{/if}
 			{#if toolbar}
@@ -147,22 +147,24 @@
 					{#each columns as col}
 						<Table.Head class={cn(col.headerClass)}>
 							{#if col.sortable}
-								<button
+								<Button
 									type="button"
-									class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+									variant="ghost"
+									size="sm"
+									class="h-auto -ml-2 px-2 py-1 font-medium"
 									onclick={() => toggleSort(col.key)}
 								>
 									{col.header}
 									{#if sortKey === col.key}
 										{#if sortDir === 'asc'}
-											<ArrowUp class="h-3 w-3" />
+											<ArrowUp class="h-3 w-3 ml-1" />
 										{:else}
-											<ArrowDown class="h-3 w-3" />
+											<ArrowDown class="h-3 w-3 ml-1" />
 										{/if}
 									{:else}
-										<ArrowUpDown class="h-3 w-3 opacity-30" />
+										<ArrowUpDown class="h-3 w-3 ml-1 opacity-30" />
 									{/if}
-								</button>
+								</Button>
 							{:else}
 								{col.header}
 							{/if}
@@ -188,17 +190,29 @@
 		<div class="flex items-center justify-between text-sm text-muted-foreground">
 			<span>{totalCount.toLocaleString()} {noun}</span>
 			{#if totalPages > 1}
-				<div class="flex items-center gap-2">
-					<button type="button" disabled={page <= 1} onclick={() => page--}
-						class="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed">
-						<ChevronLeft class="h-4 w-4" />
-					</button>
-					<span>Page {page} of {totalPages}</span>
-					<button type="button" disabled={page >= totalPages} onclick={() => page++}
-						class="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed">
-						<ChevronRight class="h-4 w-4" />
-					</button>
-				</div>
+				<Pagination.Root count={totalCount} perPage={pageSize} bind:page siblingCount={1}>
+					{#snippet children({ pages })}
+						<Pagination.Content>
+							<Pagination.Item>
+								<Pagination.Previous />
+							</Pagination.Item>
+							{#each pages as p (p.key)}
+								{#if p.type === 'ellipsis'}
+									<Pagination.Item>
+										<Pagination.Ellipsis />
+									</Pagination.Item>
+								{:else}
+									<Pagination.Item>
+										<Pagination.Link page={p} isActive={page === p.value} />
+									</Pagination.Item>
+								{/if}
+							{/each}
+							<Pagination.Item>
+								<Pagination.Next />
+							</Pagination.Item>
+						</Pagination.Content>
+					{/snippet}
+				</Pagination.Root>
 			{/if}
 		</div>
 	{/if}

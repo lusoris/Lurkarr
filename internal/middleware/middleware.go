@@ -26,6 +26,7 @@ func Recovery(next http.Handler) http.Handler {
 					"stack", string(debug.Stack()),
 					"path", r.URL.Path,
 				)
+				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 			}
 		}()

@@ -144,6 +144,21 @@ func (mr *MockStoreMockRecorder) CreateSchedule(ctx, s any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSchedule", reflect.TypeOf((*MockStore)(nil).CreateSchedule), ctx, s)
 }
 
+// CreateSeedingRuleGroup mocks base method.
+func (m *MockStore) CreateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) (*database.SeedingRuleGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSeedingRuleGroup", ctx, g)
+	ret0, _ := ret[0].(*database.SeedingRuleGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSeedingRuleGroup indicates an expected call of CreateSeedingRuleGroup.
+func (mr *MockStoreMockRecorder) CreateSeedingRuleGroup(ctx, g any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).CreateSeedingRuleGroup), ctx, g)
+}
+
 // CreateSplitSeasonRule mocks base method.
 func (m *MockStore) CreateSplitSeasonRule(ctx context.Context, r database.SplitSeasonRule) (*database.SplitSeasonRule, error) {
 	m.ctrl.T.Helper()
@@ -314,6 +329,20 @@ func (mr *MockStoreMockRecorder) DeleteSchedule(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSchedule", reflect.TypeOf((*MockStore)(nil).DeleteSchedule), ctx, id)
 }
 
+// DeleteSeedingRuleGroup mocks base method.
+func (m *MockStore) DeleteSeedingRuleGroup(ctx context.Context, id int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSeedingRuleGroup", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSeedingRuleGroup indicates an expected call of DeleteSeedingRuleGroup.
+func (mr *MockStoreMockRecorder) DeleteSeedingRuleGroup(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).DeleteSeedingRuleGroup), ctx, id)
+}
+
 // DeleteSession mocks base method.
 func (m *MockStore) DeleteSession(ctx context.Context, id uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -471,21 +500,6 @@ func (m *MockStore) GetBlocklistLog(ctx context.Context, appType database.AppTyp
 func (mr *MockStoreMockRecorder) GetBlocklistLog(ctx, appType, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlocklistLog", reflect.TypeOf((*MockStore)(nil).GetBlocklistLog), ctx, appType, limit)
-}
-
-// GetStrikeLog mocks base method.
-func (m *MockStore) GetStrikeLog(ctx context.Context, appType database.AppType, limit int) ([]database.QueueStrike, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStrikeLog", ctx, appType, limit)
-	ret0, _ := ret[0].([]database.QueueStrike)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetStrikeLog indicates an expected call of GetStrikeLog.
-func (mr *MockStoreMockRecorder) GetStrikeLog(ctx, appType, limit any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStrikeLog", reflect.TypeOf((*MockStore)(nil).GetStrikeLog), ctx, appType, limit)
 }
 
 // GetBlocklistSource mocks base method.
@@ -653,6 +667,51 @@ func (mr *MockStoreMockRecorder) GetProwlarrSettings(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProwlarrSettings", reflect.TypeOf((*MockStore)(nil).GetProwlarrSettings), ctx)
 }
 
+// GetBazarrSettings mocks base method.
+func (m *MockStore) GetBazarrSettings(ctx context.Context) (*database.BazarrSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBazarrSettings", ctx)
+	ret0, _ := ret[0].(*database.BazarrSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBazarrSettings indicates an expected call of GetBazarrSettings.
+func (mr *MockStoreMockRecorder) GetBazarrSettings(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBazarrSettings", reflect.TypeOf((*MockStore)(nil).GetBazarrSettings), ctx)
+}
+
+// GetKapowarrSettings mocks base method.
+func (m *MockStore) GetKapowarrSettings(ctx context.Context) (*database.KapowarrSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetKapowarrSettings", ctx)
+	ret0, _ := ret[0].(*database.KapowarrSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetKapowarrSettings indicates an expected call of GetKapowarrSettings.
+func (mr *MockStoreMockRecorder) GetKapowarrSettings(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKapowarrSettings", reflect.TypeOf((*MockStore)(nil).GetKapowarrSettings), ctx)
+}
+
+// GetShokoSettings mocks base method.
+func (m *MockStore) GetShokoSettings(ctx context.Context) (*database.ShokoSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShokoSettings", ctx)
+	ret0, _ := ret[0].(*database.ShokoSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetShokoSettings indicates an expected call of GetShokoSettings.
+func (mr *MockStoreMockRecorder) GetShokoSettings(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShokoSettings", reflect.TypeOf((*MockStore)(nil).GetShokoSettings), ctx)
+}
+
 // GetQueueCleanerSettings mocks base method.
 func (m *MockStore) GetQueueCleanerSettings(ctx context.Context, appType database.AppType) (*database.QueueCleanerSettings, error) {
 	m.ctrl.T.Helper()
@@ -713,6 +772,21 @@ func (mr *MockStoreMockRecorder) GetSeerrSettings(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSeerrSettings", reflect.TypeOf((*MockStore)(nil).GetSeerrSettings), ctx)
 }
 
+// GetStrikeLog mocks base method.
+func (m *MockStore) GetStrikeLog(ctx context.Context, appType database.AppType, limit int) ([]database.QueueStrike, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStrikeLog", ctx, appType, limit)
+	ret0, _ := ret[0].([]database.QueueStrike)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStrikeLog indicates an expected call of GetStrikeLog.
+func (mr *MockStoreMockRecorder) GetStrikeLog(ctx, appType, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStrikeLog", reflect.TypeOf((*MockStore)(nil).GetStrikeLog), ctx, appType, limit)
+}
+
 // GetUserByID mocks base method.
 func (m *MockStore) GetUserByID(ctx context.Context, id uuid.UUID) (*database.User, error) {
 	m.ctrl.T.Helper()
@@ -770,6 +844,35 @@ func (m *MockStore) IncrementFailedLogins(ctx context.Context, id uuid.UUID, max
 func (mr *MockStoreMockRecorder) IncrementFailedLogins(ctx, id, maxAttempts, lockDuration any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementFailedLogins", reflect.TypeOf((*MockStore)(nil).IncrementFailedLogins), ctx, id, maxAttempts, lockDuration)
+}
+
+// InsertNotificationHistory mocks base method.
+func (m *MockStore) InsertNotificationHistory(ctx context.Context, h *database.NotificationHistory) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertNotificationHistory", ctx, h)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertNotificationHistory indicates an expected call of InsertNotificationHistory.
+func (mr *MockStoreMockRecorder) InsertNotificationHistory(ctx, h any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertNotificationHistory", reflect.TypeOf((*MockStore)(nil).InsertNotificationHistory), ctx, h)
+}
+
+// ListAllInstances mocks base method.
+func (m *MockStore) ListAllInstances(ctx context.Context) ([]database.AppInstance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAllInstances", ctx)
+	ret0, _ := ret[0].([]database.AppInstance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAllInstances indicates an expected call of ListAllInstances.
+func (mr *MockStoreMockRecorder) ListAllInstances(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllInstances", reflect.TypeOf((*MockStore)(nil).ListAllInstances), ctx)
 }
 
 // ListBlocklistRules mocks base method.
@@ -923,20 +1026,6 @@ func (mr *MockStoreMockRecorder) ListLurkHistory(ctx, q any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLurkHistory", reflect.TypeOf((*MockStore)(nil).ListLurkHistory), ctx, q)
 }
 
-// InsertNotificationHistory mocks base method.
-func (m *MockStore) InsertNotificationHistory(ctx context.Context, h *database.NotificationHistory) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertNotificationHistory", ctx, h)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// InsertNotificationHistory indicates an expected call of InsertNotificationHistory.
-func (mr *MockStoreMockRecorder) InsertNotificationHistory(ctx, h any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertNotificationHistory", reflect.TypeOf((*MockStore)(nil).InsertNotificationHistory), ctx, h)
-}
-
 // ListNotificationHistory mocks base method.
 func (m *MockStore) ListNotificationHistory(ctx context.Context, limit int) ([]database.NotificationHistory, error) {
 	m.ctrl.T.Helper()
@@ -995,6 +1084,21 @@ func (m *MockStore) ListSchedules(ctx context.Context) ([]database.Schedule, err
 func (mr *MockStoreMockRecorder) ListSchedules(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSchedules", reflect.TypeOf((*MockStore)(nil).ListSchedules), ctx)
+}
+
+// ListSeedingRuleGroups mocks base method.
+func (m *MockStore) ListSeedingRuleGroups(ctx context.Context) ([]database.SeedingRuleGroup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSeedingRuleGroups", ctx)
+	ret0, _ := ret[0].([]database.SeedingRuleGroup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSeedingRuleGroups indicates an expected call of ListSeedingRuleGroups.
+func (mr *MockStoreMockRecorder) ListSeedingRuleGroups(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSeedingRuleGroups", reflect.TypeOf((*MockStore)(nil).ListSeedingRuleGroups), ctx)
 }
 
 // ListSplitSeasonRules mocks base method.
@@ -1155,6 +1259,21 @@ func (mr *MockStoreMockRecorder) SetTOTPSecret(ctx, id, secret any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTOTPSecret", reflect.TypeOf((*MockStore)(nil).SetTOTPSecret), ctx, id, secret)
 }
 
+// SetupFirstUser mocks base method.
+func (m *MockStore) SetupFirstUser(ctx context.Context, username, passwordHash string, settings *database.GeneralSettings) (*database.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetupFirstUser", ctx, username, passwordHash, settings)
+	ret0, _ := ret[0].(*database.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetupFirstUser indicates an expected call of SetupFirstUser.
+func (mr *MockStoreMockRecorder) SetupFirstUser(ctx, username, passwordHash, settings any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupFirstUser", reflect.TypeOf((*MockStore)(nil).SetupFirstUser), ctx, username, passwordHash, settings)
+}
+
 // UpdateAppSettings mocks base method.
 func (m *MockStore) UpdateAppSettings(ctx context.Context, s *database.AppSettings) error {
 	m.ctrl.T.Helper()
@@ -1309,6 +1428,48 @@ func (mr *MockStoreMockRecorder) UpdateProwlarrSettings(ctx, s any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProwlarrSettings", reflect.TypeOf((*MockStore)(nil).UpdateProwlarrSettings), ctx, s)
 }
 
+// UpdateBazarrSettings mocks base method.
+func (m *MockStore) UpdateBazarrSettings(ctx context.Context, s *database.BazarrSettings) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBazarrSettings", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateBazarrSettings indicates an expected call of UpdateBazarrSettings.
+func (mr *MockStoreMockRecorder) UpdateBazarrSettings(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBazarrSettings", reflect.TypeOf((*MockStore)(nil).UpdateBazarrSettings), ctx, s)
+}
+
+// UpdateKapowarrSettings mocks base method.
+func (m *MockStore) UpdateKapowarrSettings(ctx context.Context, s *database.KapowarrSettings) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKapowarrSettings", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateKapowarrSettings indicates an expected call of UpdateKapowarrSettings.
+func (mr *MockStoreMockRecorder) UpdateKapowarrSettings(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKapowarrSettings", reflect.TypeOf((*MockStore)(nil).UpdateKapowarrSettings), ctx, s)
+}
+
+// UpdateShokoSettings mocks base method.
+func (m *MockStore) UpdateShokoSettings(ctx context.Context, s *database.ShokoSettings) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateShokoSettings", ctx, s)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateShokoSettings indicates an expected call of UpdateShokoSettings.
+func (mr *MockStoreMockRecorder) UpdateShokoSettings(ctx, s any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateShokoSettings", reflect.TypeOf((*MockStore)(nil).UpdateShokoSettings), ctx, s)
+}
+
 // UpdateQueueCleanerSettings mocks base method.
 func (m *MockStore) UpdateQueueCleanerSettings(ctx context.Context, s *database.QueueCleanerSettings) error {
 	m.ctrl.T.Helper()
@@ -1363,6 +1524,20 @@ func (m *MockStore) UpdateScoringProfile(ctx context.Context, p *database.Scorin
 func (mr *MockStoreMockRecorder) UpdateScoringProfile(ctx, p any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateScoringProfile", reflect.TypeOf((*MockStore)(nil).UpdateScoringProfile), ctx, p)
+}
+
+// UpdateSeedingRuleGroup mocks base method.
+func (m *MockStore) UpdateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSeedingRuleGroup", ctx, g)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateSeedingRuleGroup indicates an expected call of UpdateSeedingRuleGroup.
+func (mr *MockStoreMockRecorder) UpdateSeedingRuleGroup(ctx, g any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).UpdateSeedingRuleGroup), ctx, g)
 }
 
 // UpdateSeerrSettings mocks base method.
@@ -1448,62 +1623,4 @@ func (m *MockStore) UserCount(ctx context.Context) (int, error) {
 func (mr *MockStoreMockRecorder) UserCount(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserCount", reflect.TypeOf((*MockStore)(nil).UserCount), ctx)
-}
-
-// ListSeedingRuleGroups mocks base method.
-func (m *MockStore) ListSeedingRuleGroups(ctx context.Context) ([]database.SeedingRuleGroup, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListSeedingRuleGroups", ctx)
-	ret0, _ := ret[0].([]database.SeedingRuleGroup)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListSeedingRuleGroups indicates an expected call of ListSeedingRuleGroups.
-func (mr *MockStoreMockRecorder) ListSeedingRuleGroups(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSeedingRuleGroups", reflect.TypeOf((*MockStore)(nil).ListSeedingRuleGroups), ctx)
-}
-
-// CreateSeedingRuleGroup mocks base method.
-func (m *MockStore) CreateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) (*database.SeedingRuleGroup, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateSeedingRuleGroup", ctx, g)
-	ret0, _ := ret[0].(*database.SeedingRuleGroup)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateSeedingRuleGroup indicates an expected call of CreateSeedingRuleGroup.
-func (mr *MockStoreMockRecorder) CreateSeedingRuleGroup(ctx, g any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).CreateSeedingRuleGroup), ctx, g)
-}
-
-// UpdateSeedingRuleGroup mocks base method.
-func (m *MockStore) UpdateSeedingRuleGroup(ctx context.Context, g *database.SeedingRuleGroup) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateSeedingRuleGroup", ctx, g)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateSeedingRuleGroup indicates an expected call of UpdateSeedingRuleGroup.
-func (mr *MockStoreMockRecorder) UpdateSeedingRuleGroup(ctx, g any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).UpdateSeedingRuleGroup), ctx, g)
-}
-
-// DeleteSeedingRuleGroup mocks base method.
-func (m *MockStore) DeleteSeedingRuleGroup(ctx context.Context, id int) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteSeedingRuleGroup", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteSeedingRuleGroup indicates an expected call of DeleteSeedingRuleGroup.
-func (mr *MockStoreMockRecorder) DeleteSeedingRuleGroup(ctx, id any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSeedingRuleGroup", reflect.TypeOf((*MockStore)(nil).DeleteSeedingRuleGroup), ctx, id)
 }

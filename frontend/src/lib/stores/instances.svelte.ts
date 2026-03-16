@@ -1,32 +1,25 @@
 import { api } from '$lib/api';
-import { appTypes, type AppType } from '$lib';
+import { type AppType } from '$lib';
+import type { AppInstance } from '$lib/types';
 
-export interface AppInstance {
-	id: string;
-	app_type: string;
-	name: string;
-	enabled: boolean;
-}
+export type { AppInstance };
 
 let cache = $state<Record<string, AppInstance[]>>({});
 let selectedApp = $state<string>('sonarr');
 let selectedInstance = $state<string>('');
 let fetching = $state(false);
+let fetched = false;
 
-async function fetchInstances() {
+async function fetchInstances(force = false) {
 	if (fetching) return;
+	if (fetched && !force) return;
 	fetching = true;
-	const result: Record<string, AppInstance[]> = {};
-	await Promise.all(
-		appTypes.map(async (app) => {
-			try {
-				result[app] = await api.get<AppInstance[]>(`/instances/${app}`);
-			} catch {
-				result[app] = [];
-			}
-		})
-	);
-	cache = result;
+	try {
+		cache = await api.get<Record<string, AppInstance[]>>('/instances');
+	} catch {
+		cache = {};
+	}
+	fetched = true;
 	fetching = false;
 }
 
@@ -53,6 +46,9 @@ export function getInstances() {
 
 		/** Fetch all instances (call once on app init or layout mount). */
 		fetch: fetchInstances,
+
+		/** Force-refetch instances (after CRUD mutations). */
+		refetch: () => fetchInstances(true),
 
 		/** Resolve instance name by ID from cache. */
 		instanceName(instanceId: string): string {

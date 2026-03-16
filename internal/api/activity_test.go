@@ -14,30 +14,29 @@ import (
 )
 
 func TestActivityFeed_MergesAndSorts(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
+	te := newTestEnv(t)
 
 	now := time.Now()
 
-	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return([]database.LurkHistory{
+	te.Store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return([]database.LurkHistory{
 		{ID: 1, AppType: "radarr", MediaTitle: "Movie A", Operation: "searched", InstanceName: "radarr-1", CreatedAt: now.Add(-1 * time.Minute)},
 		{ID: 2, AppType: "sonarr", MediaTitle: "Show B", Operation: "upgraded", InstanceName: "sonarr-1", CreatedAt: now.Add(-5 * time.Minute)},
 	}, 2, nil)
 
-	store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return([]database.CrossInstanceAction{
+	te.Store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return([]database.CrossInstanceAction{
 		{ID: uuid.New(), Title: "Decline dup", Action: "decline", Reason: "already in 4K", ExecutedAt: now.Add(-2 * time.Minute)},
 	}, nil)
 
 	// Blocklist + auto-import: return empty for all app types.
-	store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().ListNotificationHistory(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().ListNotificationHistory(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
-	store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
+	te.Store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
 
-	h := &ActivityHandler{DB: store}
-	w := httptest.NewRecorder()
+	h := &ActivityHandler{DB: te.Store}
+	w := te.recorder()
 	r := httptest.NewRequest("GET", "/api/activity?limit=10", http.NoBody)
 
 	h.HandleGetActivity(w, r)
@@ -69,19 +68,18 @@ func TestActivityFeed_MergesAndSorts(t *testing.T) {
 }
 
 func TestActivityFeed_DefaultLimit(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
+	te := newTestEnv(t)
 
-	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return(nil, 0, nil)
-	store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return(nil, nil)
-	store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().ListNotificationHistory(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
+	te.Store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return(nil, 0, nil)
+	te.Store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return(nil, nil)
+	te.Store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().ListNotificationHistory(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
 
-	h := &ActivityHandler{DB: store}
-	w := httptest.NewRecorder()
+	h := &ActivityHandler{DB: te.Store}
+	w := te.recorder()
 	r := httptest.NewRequest("GET", "/api/activity", http.NoBody)
 
 	h.HandleGetActivity(w, r)
@@ -102,8 +100,7 @@ func TestActivityFeed_DefaultLimit(t *testing.T) {
 }
 
 func TestActivityFeed_LimitTruncation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	store := NewMockStore(ctrl)
+	te := newTestEnv(t)
 
 	now := time.Now()
 	// Generate more items than requested limit.
@@ -115,16 +112,16 @@ func TestActivityFeed_LimitTruncation(t *testing.T) {
 		}
 	}
 
-	store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return(history, 5, nil)
-	store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return(nil, nil)
-	store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().ListNotificationHistory(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
+	te.Store.EXPECT().ListLurkHistory(gomock.Any(), gomock.Any()).Return(history, 5, nil)
+	te.Store.EXPECT().ListCrossInstanceActions(gomock.Any(), gomock.Any()).Return(nil, nil)
+	te.Store.EXPECT().GetBlocklistLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetAutoImportLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().GetStrikeLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().ListNotificationHistory(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	te.Store.EXPECT().ListScheduleExecutions(gomock.Any(), gomock.Any()).Return(nil, nil)
 
-	h := &ActivityHandler{DB: store}
-	w := httptest.NewRecorder()
+	h := &ActivityHandler{DB: te.Store}
+	w := te.recorder()
 	r := httptest.NewRequest("GET", "/api/activity?limit=3", http.NoBody)
 
 	h.HandleGetActivity(w, r)

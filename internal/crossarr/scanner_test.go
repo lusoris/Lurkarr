@@ -13,13 +13,13 @@ import (
 // --- mockStore ---
 
 type mockStore struct {
-	groups       map[database.AppType][]database.InstanceGroup
-	instances    map[uuid.UUID]*database.AppInstance
+	groups        map[database.AppType][]database.InstanceGroup
+	instances     map[uuid.UUID]*database.AppInstance
 	upsertedMedia []database.CrossInstanceMedia
-	upsertErr    error
-	presenceMap  map[uuid.UUID][]database.CrossInstancePresence
-	presenceErr  error
-	deleted      []uuid.UUID
+	upsertErr     error
+	presenceMap   map[uuid.UUID][]database.CrossInstancePresence
+	presenceErr   error
+	deleted       []uuid.UUID
 }
 
 func newMockStore() *mockStore {

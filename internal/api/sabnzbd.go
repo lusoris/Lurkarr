@@ -1,11 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
-	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
 )
 
@@ -89,28 +87,28 @@ func (h *SABnzbdHandler) HandleResume(w http.ResponseWriter, r *http.Request) {
 
 // HandleTestConnection tests the SABnzbd connection.
 func (h *SABnzbdHandler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var body struct {
+	body, ok := decodeJSON[struct {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
+	}
+	if body.URL == "" || body.APIKey == "" || (len(body.APIKey) >= 4 && body.APIKey[:4] == "****") {
+		existing, err := h.DB.GetSABnzbdSettings(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse("url and api_key required"))
+			return
+		}
+		if body.APIKey == "" || (len(body.APIKey) >= 4 && body.APIKey[:4] == "****") {
+			body.APIKey = existing.APIKey
+		}
+		if body.URL == "" {
+			body.URL = existing.URL
+		}
 	}
 	if body.URL == "" || body.APIKey == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("url and api_key required"))
-		return
-	}
-
-	// SSRF protection
-	isPrivate, err := arrclient.IsPrivateIP(body.URL)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid URL"))
-		return
-	}
-	if isPrivate {
-		writeJSON(w, http.StatusForbidden, errorResponse("private/internal URLs are not allowed"))
 		return
 	}
 

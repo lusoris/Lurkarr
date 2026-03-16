@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -16,13 +15,12 @@ type InstanceGroupsHandler struct {
 
 // HandleListGroups returns all groups for a given app type.
 func (h *InstanceGroupsHandler) HandleListGroups(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	groups, err := h.DB.ListInstanceGroups(r.Context(), database.AppType(appType))
+	groups, err := h.DB.ListInstanceGroups(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list instance groups"))
 		return
@@ -35,22 +33,23 @@ func (h *InstanceGroupsHandler) HandleListGroups(w http.ResponseWriter, r *http.
 
 // HandleCreateGroup creates a new instance group.
 func (h *InstanceGroupsHandler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Name string `json:"name"`
+	}](w, r)
+	if !ok {
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+	if req.Name == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("name is required"))
 		return
 	}
 
-	group, err := h.DB.CreateInstanceGroup(r.Context(), database.AppType(appType), req.Name)
+	group, err := h.DB.CreateInstanceGroup(r.Context(), appType, req.Name)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create instance group"))
 		return
@@ -60,9 +59,8 @@ func (h *InstanceGroupsHandler) HandleCreateGroup(w http.ResponseWriter, r *http
 
 // HandleGetGroup returns a single group with its members.
 func (h *InstanceGroupsHandler) HandleGetGroup(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -76,19 +74,16 @@ func (h *InstanceGroupsHandler) HandleGetGroup(w http.ResponseWriter, r *http.Re
 
 // HandleUpdateGroup updates an instance group's name and/or mode.
 func (h *InstanceGroupsHandler) HandleUpdateGroup(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Name string `json:"name"`
 		Mode string `json:"mode"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -115,9 +110,8 @@ func (h *InstanceGroupsHandler) HandleUpdateGroup(w http.ResponseWriter, r *http
 
 // HandleDeleteGroup deletes an instance group and its member associations.
 func (h *InstanceGroupsHandler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -130,22 +124,19 @@ func (h *InstanceGroupsHandler) HandleDeleteGroup(w http.ResponseWriter, r *http
 
 // HandleSetMembers replaces all members of a group.
 func (h *InstanceGroupsHandler) HandleSetMembers(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var req struct {
+	req, ok := decodeJSON[struct {
 		Members []struct {
 			InstanceID    uuid.UUID `json:"instance_id"`
 			QualityRank   int       `json:"quality_rank"`
 			IsIndependent bool      `json:"is_independent"`
 		} `json:"members"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -183,9 +174,8 @@ func (h *InstanceGroupsHandler) HandleSetMembers(w http.ResponseWriter, r *http.
 
 // HandleListOverlaps returns all detected media overlaps for a group.
 func (h *InstanceGroupsHandler) HandleListOverlaps(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -221,9 +211,8 @@ func (h *InstanceGroupsHandler) HandleListActions(w http.ResponseWriter, r *http
 
 // HandleListSeasonRules returns split-season rules for a group.
 func (h *InstanceGroupsHandler) HandleListSeasonRules(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 	rules, err := h.DB.ListSplitSeasonRules(r.Context(), id)
@@ -239,21 +228,18 @@ func (h *InstanceGroupsHandler) HandleListSeasonRules(w http.ResponseWriter, r *
 
 // HandleCreateSeasonRule creates a split-season rule for a group.
 func (h *InstanceGroupsHandler) HandleCreateSeasonRule(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	groupID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid group ID"))
+	groupID, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
-	var req struct {
+	req, ok := decodeJSON[struct {
 		ExternalID string    `json:"external_id"`
 		Title      string    `json:"title"`
 		InstanceID uuid.UUID `json:"instance_id"`
 		SeasonFrom int       `json:"season_from"`
 		SeasonTo   *int      `json:"season_to"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	}](w, r)
+	if !ok {
 		return
 	}
 	if req.ExternalID == "" || req.InstanceID == uuid.Nil || req.SeasonFrom < 1 {
@@ -282,9 +268,8 @@ func (h *InstanceGroupsHandler) HandleCreateSeasonRule(w http.ResponseWriter, r 
 
 // HandleDeleteSeasonRule deletes a split-season rule.
 func (h *InstanceGroupsHandler) HandleDeleteSeasonRule(w http.ResponseWriter, r *http.Request) {
-	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid rule ID"))
+	ruleID, ok := parseUUID(w, r, "ruleId")
+	if !ok {
 		return
 	}
 	if err := h.DB.DeleteSplitSeasonRule(r.Context(), ruleID); err != nil {

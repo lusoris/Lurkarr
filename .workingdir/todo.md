@@ -1,385 +1,333 @@
-# Lurkarr v2 — Master Todo
+# Lurkarr — Active TODO
 
-> Last updated: 2026-03-12
-> State: All phases complete. All lint + gosec issues resolved. ADRs written.
-> Priority order: Remaining cleanup items
+## Phase 1: Dev Stack Overhaul ✅
 
----
+### 1.1 Multi-Instance Arr Apps ✅
+- [x] Add second Sonarr instance (`sonarr-anime` — for anime profile testing)
+- [x] Add second Radarr instance (`radarr-4k` — for quality hierarchy dedup testing)
+- [x] Add Whisparr v2 instance (hotio `whisparr:v2`, port 6968)
+- [x] Verify both Whisparr v2 + v3 are selectable in Lurkarr UI
 
-## ✅ COMPLETED — Phase 0: Foundation
+### 1.2 Missing Services ✅
+- [x] Add Jellyfin (hotio, port 8097 — 8096 conflicts with host)
+- [x] Add rTorrent + ruTorrent (crazymax image, XMLRPC on 8000, web on 8484)
+- [x] ~~Configure Seerr → Jellyfin connection~~ → moved to Phase 7.2
 
-- [x] otter/v2 L1 cache (W-TinyLFU, 30s TTL settings cache)
-- [x] golang.org/x/time/rate for rate limiting
-- [x] Import paths fixed (lusoris/lurkarr)
-- [x] Goroutine leak fixed (context.WithCancel)
-- [x] CSRF key via crypto/rand
-- [x] Settings cache eliminates DB reads per lurk cycle
+### 1.3 Dev Stack Cleanup ✅
+- [x] Organize volumes with clear naming
+- [x] Add shared media library structure (/data/media/tv, /data/media/movies, etc.)
+- [x] Comment/document every service in docker-compose.dev.yml
+- [x] Ensure all services use hotio images where available (per convention)
+- [x] YAML anchors (x-common) for shared env
 
-## ✅ COMPLETED — Phase 1: Security Hardening
-
-- [x] MaxBytesReader (1MB) on all 18 endpoints
-- [x] Rate limiting on /api/auth/login (5/min/IP)
-- [x] SSRF protection on all test-connection endpoints (apps, Prowlarr, SABnzbd)
-- [x] Session rotation after login
-- [x] CORS Vary: Origin header
-- [x] RequestID in context + helper
-- [x] slog attributes preserved
-- [x] WebSocket ping/pong heartbeat (30s)
-- [x] hourly_caps cleanup (7 day retention)
-- [x] Input validation on settings
-- [x] Secure cookie flag configurable
-- [x] InsecureSkipVerify conditional on sslVerify setting
-
-## ✅ COMPLETED — Phase 2: Interface-Based Lurking Engine
-
-- [x] ArrLurker interface (GetMissing, GetUpgrades, Search, GetQueue)
-- [x] 6 lurkers: sonarr, radarr, lidarr, readarr, whisparr, eros
-- [x] LurkerFor(appType) registry
-- [x] Exponential backoff on arr API errors
-- [x] MinDownloadQueueSize enforcement
-- [x] Radarr /api/v3/wanted/missing paginated
-
-## ✅ COMPLETED — Phase 3: Multi-Arr Instance Manager (Backend)
-
-- [x] DB multi-instance support (app_instances table)
-- [x] Per-instance stats tracking
-- [x] Instance-level hourly caps
-- [x] Migration 003: instance-aware lurk_stats + hourly_caps
-
-## ✅ COMPLETED — Phase 4: Queue Score Deduplication
-
-- [x] ScoringProfile struct + DB table + queries
-- [x] Release name parser (codec, resolution, source, audio, group)
-- [x] FindDuplicates() engine
-- [x] Strategy: "keep highest score" / "keep first adequate"
-- [x] Per-instance queue monitoring loop
-- [x] API endpoints for scoring profiles CRUD
-- [x] Migration 004: queue management tables
-
-## ✅ COMPLETED — Phase 5: Smart Auto-Import (Stuck Downloads)
-
-- [x] Detect importPending items
-- [x] Parse import failure reasons
-- [x] Score comparison via GetManualImport
-- [x] auto_import_log tracking
-
-## ✅ COMPLETED — Phase 6: Queue Cleaner (Cleanuparr-style)
-
-- [x] Strike system (stalled/slow/failed, configurable thresholds)
-- [x] Stalled detection (per privacy type, metadata stuck)
-- [x] Slow detection (SABnzbd-aware, speed from timeleft, ignore above size)
-- [x] Failed import cleanup (pattern matching, auto-remove + blocklist)
-- [x] Migration 005: cleaner enhancements
-
-## ✅ COMPLETED — Download Clients (6 integrated)
-
-- [x] SABnzbd (downloadclients/usenet/sabnzbd/) — full queue/history/settings
-- [x] NZBGet (downloadclients/usenet/nzbget/) — XML-RPC
-- [x] qBittorrent (downloadclients/torrent/qbittorrent/) — pause/resume/delete with rules
-- [x] Transmission (downloadclients/torrent/transmission/) — RPC protocol
-- [x] Deluge (downloadclients/torrent/deluge/) — web UI client
-- [x] Generic abstraction (downloadclients/) — common Client interface + adapters
-
-## ✅ COMPLETED — Notifications (8 providers)
-
-- [x] Discord (embed webhooks)
-- [x] Telegram (Bot API, HTML)
-- [x] Pushover (priority + device)
-- [x] Gotify (self-hosted)
-- [x] Ntfy (ntfy.sh / self-hosted)
-- [x] Apprise (proxy server)
-- [x] Email (SMTP)
-- [x] Webhook (raw HTTP POST)
-- [x] Async manager with per-provider event subscription
-- [x] Migration 006: notification_providers
-
-## ✅ COMPLETED — Seerr Integration
-
-- [x] Client (requests, media, users, counts)
-- [x] SyncEngine with auto-approval loop
-- [x] API: settings CRUD, test connection, requests listing
-- [x] Migration 007: seerr_settings
-
-## ✅ COMPLETED — Monitoring (Prometheus)
-
-- [x] Prometheus metrics package (internal/metrics/)
-- [x] /metrics endpoint via promhttp.Handler
-- [x] Metrics: lurk (searches, missing, upgrades, duration, errors)
-- [x] Metrics: queue_cleaner (items_removed, strikes, blocklist, duration)
-- [x] Metrics: download_client (queue_size, speed, paused)
-- [x] Metrics: scheduler (executions, duration, errors)
-- [x] Metrics: http (requests, duration, response_size, rate_limit_hits)
-- [x] Metrics: autoimport (runs, errors)
-- [x] deploy/docker-compose.monitoring.yml (Prometheus + Loki + Grafana)
-- [x] Prometheus scrape config (deploy/prometheus.yml)
-- [x] Loki config (deploy/loki.yml)
-- [x] ServiceMonitor Helm template
-
-## ✅ COMPLETED — Logging (Backend)
-
-- [x] slog JSON handler (configurable level via LOG_LEVEL env)
-- [x] Ring buffer (10,000 entries) + async DB flush (500ms/100-item batches)
-- [x] WebSocket broadcast for real-time streaming
-- [x] Per-app logging
-- [x] /api/logs + /ws/logs endpoints
-- [ ] **REMOVE** frontend /logs page (replace with Grafana/Loki log exploration)
-- [ ] Evaluate: simplify to stdout slog + Loki only (remove DB log storage + WS broadcast if Loki covers it)
-
-## ✅ COMPLETED — CI/CD & Infrastructure
-
-- [x] ci.yml — Go tests with race + coverage, PostgreSQL svc
-- [x] docker.yml — Build + push dev images to GHCR
-- [x] release.yml — Multi-platform binaries + Docker + Helm
-- [x] helm.yml — Lint + package + push Helm chart to GHCR OCI
-- [x] security.yml — SAST/dependabot
-- [x] Helm chart (v0.1.0) with PostgreSQL dep, ServiceMonitor, ingress
-- [x] Dockerfile (multi-stage: node → go → scratch)
-- [x] release-please-config.json
-
-## ✅ COMPLETED — Testing Infrastructure
-
-- [x] go.uber.org/mock v0.6.0
-- [x] 12 mockgen directives (//go:generate) across packages
-- [x] 47+ test files with unit + integration tests
-- [x] Race detection + coverage in CI
-- [x] Test files for every client (qbit, transmission, deluge, nzbget, seerr)
-
-## ✅ COMPLETED — DB Migrations (goose, single consolidated)
-
-- [x] 001_initial.sql — all tables in one clean migration:
-  - Users, sessions, app_instances, app_settings, general_settings
-  - Lurking engine: processed_items, state_resets, lurk_history, lurk_stats, hourly_caps
-  - Scheduling: schedules, schedule_executions
-  - Logging: logs
-  - Prowlarr & SABnzbd settings
-  - Queue cleaner: settings, strikes, auto_import_log, scoring_profiles, blocklist_log
-  - Notifications: notification_providers
-  - Seerr: seerr_settings
-  - Seed data for all app types
+### 1.4 Seed Data & Test Fixtures ✅
+- [x] Create `dev/seed.sh` — API-driven setup script (all instances, DL clients, Prowlarr, media)
+- [x] Fix sample media add — wrong TVDB IDs, qualityProfileId, JSON whitespace
+- [x] Fix pagination mock bug in lurking tests (QueueResponse without records → infinite loop)
+- [x] ~~Create test data for queue cleaner~~ → moved to Phase 7.2
+- [x] ~~Create test data for dedup~~ → moved to Phase 7.2
 
 ---
 
-# 🔨 IN PROGRESS / TODO
+## Phase 2: New App Integrations
 
-## Phase 16: Code Audit Fixes ⚡ CRITICAL — DO FIRST
+### 2.1 Bazarr (Subtitle Management) → Phase 7.3
+- [x] Add bazarr service to dev stack ✅ (already in docker-compose.dev.yml)
+- [x] ~~Remaining Bazarr work~~ → moved to Phase 7.3
 
-> **STATUS: IN PROGRESS** — Dependency bumps done, build fixed. Critical bugs and dead code identified.
-
-### 16.0 Dependency Maintenance (DONE)
-- [x] Bump go directive 1.25.8 → 1.26.1 (matches installed toolchain)
-- [x] Bump indirect deps: boombuler/barcode, prometheus/common, prometheus/procfs, x/image, x/sync, x/sys, x/text, yaml/v2
-- [x] Fix build breakage: `totp.go` — `bytes.Buffer` → `nopCloseBuffer` for `io.WriteCloser` compat with go-qrcode/writer/standard v1.3.0
-- [x] All direct deps already at latest (no action needed)
-- [x] govulncheck: 0 called vulns. 1 imported vuln (gorilla/csrf GO-2025-3884 TrustedOrigins — NOT used by Lurkarr, no fix available)
-- [x] No deprecated direct deps. 1 deprecated indirect (golang/protobuf — transitive via goose, no action needed)
-
-### 16.1 Critical Bugs
-- [x] **🔴 Notifications are a no-op** — Fixed: created `internal/notifications/build.go` with `BuildProvider()` + `LoadProviders()`. Providers loaded from DB at startup in main.go; `syncManager()` reloads after CRUD. Tests in `build_test.go`.
-- [x] **🔴 `isPrivateTracker()` always returns false** — Fixed: added `IndexerFlags` field to `QueueRecord` (parsed from arr API), private tracker detection now uses flags + known-public-tracker fallback list.
-- [x] **🟡 API key length panic** — Fixed: added `len >= 4` guard before slicing in prowlarr_settings.go and sabnzbd_settings.go (matching apps.go pattern).
-- [x] **🟡 `writeJSON` silently swallows encoding errors** — Fixed: now logs `slog.Error` on encode failure.
-- [x] **🟡 `limitBody` passes nil ResponseWriter** — Fixed: signature changed to `limitBody(w, r)`, all 21 call sites updated.
-
-### 16.2 Data Race
-- [x] **🔴 Data race in logging Hub.Broadcast vs Hub.HandleWebSocket** — Fixed: added `sync.RWMutex` to `wsClient` for filter fields. All 22 tests pass with `-race`.
-
-### 16.3 Dead Code / Unused Packages
-- [x] **`internal/cache`** — Removed. Was otter-backed W-TinyLFU cache implemented + tested but never wired in. Deleted since otter/v2 is used directly where needed.
-- [x] **`internal/downloadclients`** — Now wired into queue cleaner (Phase 7 seeding rules). getTorrentClient() factory creates adapters from DB settings.
-- [ ] `deluge.AddTorrentByURL` / `transmission.AddTorrentByURL` — exported but never called (future use)
-- [x] `downloadclient/sabnzbd.RemoveItem` — Fixed: uses native `DeleteQueueItem` (mode=queue&name=delete)
-
-### 16.4 Overlapping / Duplicate Code
-- [x] **Whisparr v2 rewritten, Eros v3 fixed** — Whisparr v2: movie-based→Sonarr-based series/episode model (WhisparrEpisode, wanted/missing, EpisodeSearch). Eros v3: removed non-existent cutoff endpoint, added ItemType field ("movie"|"scene"), documented client-side filtering. Full API reference in docs/research/api-reference-arr-stack.md.
-- [x] **Prowlarr in AllAppTypes() wastes goroutines** — Fixed: lurking engine now skips app types with no registered lurker (matches cleaner/importer pattern).
-- [x] SABnzbd: Added `DeleteQueueItem` to native client, fixed adapter `RemoveItem` stub. API handler + cleaner pattern (load settings → create client) is correct for settings that can change at runtime — no further consolidation needed.
-
-### 16.5 Swallowed Errors in Background Services
-- [x] `lurking/engine.go`: Fixed 6 swallowed errors → `slog.Warn` on failure
-- [x] `queuecleaner/cleaner.go`: Fixed 4 swallowed errors → `slog.Warn` on failure
-- [x] `autoimport/importer.go`: Fixed 2 swallowed errors → `slog.Warn` on failure
-- [x] `cmd/lurkarr/main.go`: Fixed 7 swallowed errors (prune + maintenance) → `slog.Warn` on failure
-
-### 16.6 Minor Improvements
-- [x] Maintenance goroutine in main.go — already uses parent `ctx` correctly (no change needed)
-- [x] Seerr sync description — fixed misleading "triggers searches" docstring to "monitors status and auto-approves"
-
-## Phase 7: Download Cleaner (Advanced)
-
-### ✅ Seeding Rules (Torrent Clients) — DONE
-- [x] DownloadItem extended with Ratio, SeedingTime, CompletedAt, AddedAt
-- [x] qBittorrent, Transmission, Deluge adapters populate seeding fields
-- [x] Deluge native client: seeding_time added to defaultFields
-- [x] Migration 002: seeding columns on queue_cleaner_settings + download_client_settings table
-- [x] QueueCleanerSettings model with 6 seeding fields (enabled, max_ratio, max_hours, mode, delete_files, skip_private)
-- [x] DownloadClientSettings model + CRUD queries + API endpoints (GET/PUT /api/queue/download-client/{app})
-- [x] cleanSeeding() phase 4 in queue cleaner: torrent client factory, download ID matching, ratio/time enforcement, and/or mode, skip-private
-- [x] seedingLimitReached() with 14 table-driven tests
-- [x] Delete source files option (SeedingDeleteFiles)
-
-### ✅ Orphan Detection (All Download Clients) — DONE
-- [x] GetHistory() added to downloadclient.Client interface
-- [x] GetHistory implemented in all 5 adapters (qBit/Transmission/Deluge filter completed; SABnzbd/NZBGet call native GetHistory)
-- [x] getTorrentClient → getDownloadClient with SABnzbd + NZBGet support
-- [x] cleanOrphans(): aggregates queue records across all *arr instances, cross-refs with download client items+history
-- [x] Grace period (orphan_grace_minutes), excluded categories (orphan_excluded_categories), delete files option
-- [x] Migration 002 extended with 4 orphan columns
-- [x] 12 tests: parseExcludedCategories + orphan detection logic
-
-### ✅ Hardlink & Cross-Seed — DONE
-- [x] Hardlink detection (don't remove if hardlinked) — commit `23aba87`
-- [x] Cross-seed awareness (detect cross-seeded torrents by content hash match) — commit `39f62c8`
-
-## ✅ COMPLETED — Phase 8: Blocklist System
-
-- [x] Community blocklist sync (configurable list URLs, HTTP ETag conditional fetch) — commit `7f7f2ae`
-- [x] Block known bad release groups / patterns (4 pattern types: release_group, title_contains, title_regex, indexer)
-- [x] Remove matching downloads from queue (phase 0 in cleaner, before dedup)
-- [x] Blocklist API: 8 REST endpoints for sources + rules CRUD
-- [x] Migration 003: blocklist_sources + blocklist_rules tables
-- [x] 12 blocklist tests (matcher + parser)
-- [x] Cross-Arr blocklist sync (propagate across instances of same type) — commit `453b0b6`
-
-## ✅ COMPLETED — Phase 9a: Authentication & Reverse Proxy Support
-
-> All items complete: OIDC login, proxy auth hardening, reverse proxy support, CSRF audit, group mapping, docs.
-
-### OIDC / SSO Support
-- [x] OIDC provider configuration (issuer URL, client ID, client secret, scopes)
-- [x] OIDC login flow (authorization code + PKCE)
-- [x] Token validation + refresh (ID token → local session mapping)
-- [x] Auto-create local user on first OIDC login (optional, configurable)
-- [x] Group/role claim mapping (e.g., admin group → Lurkarr admin) — commit `b2a608a`
-- [x] Support multiple providers (Authentik, Keycloak, Authelia, Dex, Google, etc.) — implementation is provider-agnostic via standard OIDC discovery; simultaneous multi-provider deferred
-- [x] `/api/auth/oidc/callback` endpoint
-- [x] Frontend login page: "Sign in with SSO" button alongside local login
-- [x] DB migration for OIDC fields (auth_provider, external_id on users table)
-- [x] Migration 004: is_admin column on users table
-
-### Proxy Authentication Hardening
-- [x] Trusted proxy IP allowlist (`TRUSTED_PROXIES` env — CIDR ranges, default: private ranges only)
-- [x] Reject proxy auth headers from untrusted source IPs
-- [x] Support multiple proxy header formats (comma-separated PROXY_HEADER env) — commit `b2a608a`
-- [x] Auto-create user on first proxy auth if not exists (configurable)
-- [x] Proxy auth + CSRF interaction audit — CSRF correctly enforced even with proxy auth; fixed missing frontend CSRF token handling
-- [x] Log warning when proxy auth enabled without trusted proxy config
-
-### Reverse Proxy Support
-- [x] Base path / sub-path support (`BASE_PATH` env, e.g. `/lurkarr/`) — prefix all routes + static assets
-- [x] Trusted proxy config for `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP` (rate limiter validates source IP)
-- [x] Respect `X-Forwarded-Proto` for secure cookie decisions
-- [x] WebSocket origin patterns configurable via AllowedOrigins — commit `b2a608a`
-- [x] Health check endpoint (`/api/health`) bypasses auth — for load balancer probes
-- [x] Document reverse proxy configs (Traefik, Caddy, nginx, HAProxy) in README or docs/ — covered in README rewrite
-
-## Phase 9b: Uber FX Dependency Injection ⚡ PRIORITY — DO BEFORE FEATURE WORK
-
-> **STATUS: COMPLETE** — fx.New() app lifecycle with modules, providers, and lifecycle hooks
-
-- [x] Add go.uber.org/fx dependency
-- [x] Define fx.Module per package (config, database, logging, notifications, scheduler, server, services, maintenance)
-- [x] Refactor main.go from manual wiring to fx.New() app lifecycle
-- [x] Use fx.Provide / fx.Invoke for service startup
-- [x] Add fx.Lifecycle hooks for graceful shutdown (replaces manual defer chains + signal handling)
-- [x] Health check integration (existing /api/health endpoint, fx handles signal-based shutdown)
-
-## ✅ COMPLETED — Phase 10: Grafana Dashboards (Professional)
-
-> **STATUS: COMPLETE** — 3 dashboards: enhanced overview (lurkarr.json), system/runtime (lurkarr-system.json), logs (lurkarr-logs.json)
-
-- [x] Lurking Dashboard — per-app/instance search rates, missing/upgrade trends, error rate %, duration histograms (p50/p95/p99)
-- [x] Queue Cleaner Dashboard — strikes issued, items removed, blocklist additions, cleaner run duration (p95)
-- [x] Download Clients Dashboard — queue sizes, speeds (up/down), paused states, per-client comparison
-- [x] Auto-Import Dashboard — import runs by app type, errors by app type + instance
-- [x] Scheduler Dashboard — task executions, durations (p95), errors by task type
-- [x] HTTP/API Dashboard — request rates, latencies (p50/p95/p99), error rate %, rate limit hits, top endpoints, response sizes
-- [x] Notifications Dashboard — send counts, per-provider success/failure rates, delivery latency (lurkarr-notifications.json)
-- [x] System Overview Dashboard — Go runtime metrics (goroutines, heap, RSS, GC pause, alloc rate, FDs, CPU, threads, uptime)
-- [x] Loki Log Dashboard — structured log exploration, volume by level, error aggregation, component breakdown, text search
-- [ ] Arr Stack Overview Dashboard — Sonarr/Radarr/Lidarr/etc health (BLOCKED: requires scraping arr /api endpoints directly)
-- [x] Dashboard variables — $app_type + $instance pickers on overview, $level + $search on logs, $DS_PROMETHEUS datasource selector
-
-## ✅ COMPLETED — Phase 11: OpenAPI Spec
-
-- [x] Write openapi.yaml spec for full Lurkarr API (68 endpoints, 40+ schemas)
-- [x] Spec covers all routes: auth, user, instances, settings, history, logs, stats, state, schedules, prowlarr, sabnzbd, queue, blocklist, notifications, seerr, health, metrics, websocket
-- [x] Embedded via internal/openapi package (go:embed)
-
-## ✅ COMPLETED — Phase 12: Scalar API Documentation
-
-- [x] Serve OpenAPI spec at /api/spec (YAML, cacheable)
-- [x] Add Scalar HTML page at /api/docs (interactive API reference via CDN)
-- [x] Zero-config: reads embedded openapi.yaml, base path aware
-
-## ✅ COMPLETED — Phase 13: Coder Development Environment
-
-> **STATUS: COMPLETE** — Terraform template in deploy/coder/main.tf
-> **Coder instance:** https://code.dev.cauda.dev (K8s-based)
-
-- [x] Create Coder template (Terraform-based, K8s provisioner) for Lurkarr development
-- [x] Include: Go toolchain, Node.js, PostgreSQL sidecar, Docker-in-Docker
-- [x] Pre-install VS Code extensions (Go, Svelte, Tailwind, GitLens)
-- [x] Auto-clone repo from GitHub (already linked)
-- [x] Include monitoring stack (Prometheus + Grafana) in dev environment — Grafana app exposed on :3000
-- [x] Environment variables + secrets management
-- [ ] Onboard project on Coder instance (https://code.dev.cauda.dev) — manual step
-- [x] Document template usage in README
-
-## ✅ COMPLETED — Phase 14: Frontend Gaps
-
-- [x] Instance management UI (add/remove/name per app type) — Phase 3 backend done
-- [x] Notifications settings page (provider CRUD, event config, test send) — commit `f87b101`
-- [x] Seerr settings page (URL, API key, sync config) — commit `f87b101`
-- [x] Download clients settings page (all 6 clients) — commit `f87b101`
-- [x] Mobile-responsive sidebar (hamburger menu, slide-in drawer) — commit `f87b101`
-- [x] Svelte transitions (fly toasts, fade/scale modals) — commit `f87b101`
-- [x] Responsive grids, scrollable tabs, stacking layouts — commit `f87b101`
-- [x] Monitoring/Grafana embed or link page — monitoring page with health, endpoints, Grafana dashboard info
-- [x] Auto-import config UI (enable/disable per instance, score threshold) — auto-import fields visible in queue cleaner settings; per-instance control deferred (needs backend)
-- [x] Cross-instance dedup detection settings — scoring profile tab + cross_arr_sync toggle in cleaner settings
-- [x] Download client settings tab in Queue Management page
-- [x] Seeding rules, orphan cleanup, hardlink protection, cross-seed settings in Queue Cleaner tab
-
-## ✅ COMPLETED — Phase 15: Documentation & Research
-
-- [x] Technology stack overview (docs/research/tech-stack.md)
-- [x] Uber FX deep dive + migration plan (docs/research/uber-fx.md)
-- [x] Testing & gomock patterns (docs/research/testing-gomock.md)
-- [x] Prometheus metrics & Grafana dashboards (docs/research/prometheus-grafana.md)
-- [x] Coder template reference (docs/research/coder-template.md)
-- [x] Arr stack + download client APIs (docs/research/api-reference-arr-stack.md)
-- [x] OpenAPI + ogen + Scalar (docs/research/openapi-ogen-scalar.md)
-- [x] Go security hardening (docs/research/security-hardening.md)
-- [x] Go best practices (docs/research/go-best-practices.md)
-- [x] SvelteKit 5 + TailwindCSS v4 (docs/research/sveltekit-tailwind.md)
-- [x] PostgreSQL + pgx + goose (docs/research/database-pgx-goose.md)
-- [x] User-facing documentation (README.md — comprehensive rewrite with all features, env vars, deployment, reverse proxy, OIDC, monitoring)
-- [x] Architecture decision records (ADRs) — 8 ADRs in docs/adr/
+### 2.2 Kapowarr / Stash → Phase 7.4
+- [x] ~~Research tasks~~ → moved to Phase 7.4
 
 ---
 
-## Package Decisions
+## Phase 3: Frontend Unification ✅
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `github.com/maypok86/otter/v2` | v2.3.0 | L1 cache (W-TinyLFU) |
-| `golang.org/x/time/rate` | latest | Rate limiting |
-| `go.uber.org/mock` | v0.6.0 | Mock generation for tests |
-| `github.com/prometheus/client_golang` | v1.23.2 | Prometheus metrics |
-| `github.com/go-co-op/gocron/v2` | v2.19.1 | Task scheduling |
-| `github.com/jackc/pgx/v5` | v5.8.0 | PostgreSQL driver |
-| `github.com/pressly/goose/v3` | v3.27.0 | DB migrations |
-| `github.com/coder/websocket` | v1.8.14 | WebSocket (logs, real-time) |
-| `github.com/gorilla/csrf` | v1.7.3 | CSRF protection |
-| `github.com/pquerna/otp` | v1.5.0 | TOTP 2FA |
-| `go.uber.org/fx` | TBD | Dependency injection (Phase 9b) |
-| `github.com/coreos/go-oidc/v3` | TBD | OIDC token verification (Phase 9a) |
-| `golang.org/x/oauth2` | TBD | OAuth2 authorization code flow (Phase 9a) |
-| `github.com/ogen-go/ogen` | TBD | OpenAPI codegen (Phase 11) |
-| `@scalar/api-reference` | TBD | API docs UI (Phase 12) |
+### 3.1 Completed Fixes ✅
+- [x] Bulk GET /api/instances endpoint (1 call instead of 6)
+- [x] Instance store uses bulk endpoint with caching
+- [x] Dashboard + Apps page use shared instance cache
+- [x] 429 retry with jitter in api.ts
+- [x] Rate limiter removed from authenticated routes
+- [x] Dedup page double /api/api/ prefix fixed
+- [x] Downloads page polling 5s → 15s
+- [x] InstanceSwitcher redesigned with app-colored tabs
+- [x] Toggle switch color now works
+- [x] Queue sub-tabs unified with same visual style
+- [x] Services grid → 3-column
+- [x] Min → Max Download Queue Size rename (backend + frontend + migration 047)
 
-**NOT using:**
-- River (overkill — gocron sufficient for single binary)
-- Ristretto (Otter beats it on all metrics)
-- sqlc / squirrel (hand-written pgx queries fine for our scope)
-- Wire / Dig (Uber FX chosen instead)
+### 3.2 Section Header Fixes ✅
+Gold standard: `<h3 class="text-sm font-semibold text-foreground mb-3">`
+- [x] **settings/+page.svelte** — 5 h2 headers → h3/text-sm/mb-3
+- [x] **apps/+page.svelte** — 3 h2 headers → h3/text-sm/mb-3
+- [x] **user/+page.svelte** — 5 h2 headers → h3/text-sm/mb-3
+- [x] **monitoring/+page.svelte** — 3 h2 tags → h3 tags + mb-4→mb-3
+- [x] **+page.svelte (dashboard)** — 4 h2 headers → h3/text-foreground
+- [x] **dedup/+page.svelte** — selectedGroup.name h2 → h3
+
+### 3.3 Queue Page Tab Component Fix ✅
+- [x] Replaced custom inline-flex tab buttons with shared `<Tabs>` component
+- [x] Fixed all section headers: text-xs/muted-foreground/uppercase → text-sm/text-foreground
+- [x] "Global Blocklist Management" h2/text-base → h3/text-sm
+
+### 3.4 Minor Font/Style Fixes ✅
+- [x] **notifications/+page.svelte** — 3 modal headers font-medium → font-semibold
+- [x] **seerr/+page.svelte** — duplicates header font-medium → font-semibold + mb-3
+
+### 3.5 Missing Frontend Features ✅
+- [x] State management UI — exposed GET /api/state + POST /api/state/reset on lurk settings page with per-instance reset buttons
+- [x] Stats dashboard — GET /api/stats + GET /api/stats/hourly-caps on monitoring page with reset all button
+
+---
+
+## Phase 4: Code Quality & Testing
+
+### 4.1 Dedup Helpers ✅
+- [x] `decodeJSON[T]()`, `parseUUID()`, `validAppTypeParam()`, `filterCompleted()` — all extracted
+
+### 4.2 Security ✅
+- [x] Silent error swallowing fixed in auth.go + passkey.go (slog.Error added)
+- [x] Slog secret audit — no secrets logged anywhere
+- [x] Transaction isolation for HandleSetup — `SetupFirstUser()` composite method wraps CreateUser + UpsertGeneralSettings in a single pgx transaction
+
+### 4.3 Unit Test Coverage ✅ (119/119 handlers tested — 100%)
+Previous session added 38 new tests covering 12 of the 13 remaining untested handlers.
+HandleFinishLogin now tested via WebAuthnProvider interface extraction + 7 new tests.
+
+**All handlers tested:**
+- [x] apps.go: HandleListAllInstances, HandleHealthCheckInstance, HandleTestConnection
+- [x] auth.go: HandleSetupCheck
+- [x] notifications.go: HandleGetNotificationHistory
+- [x] queue.go: HandleGetStrikeLog, HandleGetDownloadClientSettings, HandleUpdateDownloadClientSettings
+- [x] queue.go: HandleListSeedingRuleGroups, HandleCreateSeedingRuleGroup, HandleUpdateSeedingRuleGroup, HandleDeleteSeedingRuleGroup
+- [x] seerr.go: HandleScanDuplicates
+- [x] passkey.go: HandleFinishLogin (WebAuthnProvider interface + parse injection, 7 tests: parse error, no session, validation fail, cookie error, success, session rotation, sign count error)
+
+### 4.4 Integration & E2E Tests → Phase 7.5
+- [x] ~~Integration/E2E tests~~ → moved to Phase 7.5
+
+### 4.5 OpenAPI Spec Verification ✅
+- [x] Verify all 119 handlers have corresponding spec entries — 50 missing routes added, 2 orphaned removed
+- [x] Verify request/response schemas match actual implementation — 17 new schemas, QueueCleanerSettings +34 fields, GeneralSettings/SeerrSettings/Enable2FAResponse fixed
+- [x] Spec rewritten: 2503 → 4115 lines, 123/123 routes covered, all tests passing
+
+---
+
+## Phase 5: Deep Audit — Bug Fixes ✅
+
+Comprehensive audit found 8 backend bugs and 10 frontend issues. All critical/high bugs fixed.
+
+### 5.1 Backend Bug Fixes ✅
+- [x] **CRITICAL: Dashboard seerr count crash** — Frontend `+page.svelte` read `res.count` but backend returns `res.total` → `TypeError`. Fixed: `res.count` → `res.total`.
+- [x] **HIGH: Seerr cleanup pagination skip** — `cleanupFulfilledRequests` deleted while paginating with increasing `skip`, causing items to shift and be missed. Fixed: two-phase collect-then-delete approach.
+- [x] **HIGH: MetadataStuckMinutes ignored** — Value was only used as boolean (>0 = enabled), actual minutes never compared. Fixed: added `Added time.Time` to `QueueRecord`, now compares `time.Since(record.Added) >= threshold`.
+- [x] **HIGH: FindDuplicates "adequate" strategy fallback** — When no item met threshold, kept first item by queue order instead of highest-scored. Fixed: falls back to highest-score when no item meets `AdequateThreshold`.
+- [x] **HIGH: HandleSetup non-atomic** — CreateUser + UpsertSettings + Session without transaction. Fixed: `SetupFirstUser()` composite method wraps user creation + settings upsert in single pgx transaction. Session cookie stays separate (non-critical failure — user can re-login).
+- [x] **HIGH: Handle2FAEnable non-atomic** — SetTOTPSecret before SetRecoveryCodes. If recovery codes failed, user had TOTP active with no recovery codes. Fixed: save recovery codes first, then activate TOTP.
+- [x] **MEDIUM: 50% progress `continue` skipped all detection** — Downloads >50% complete with "healthy" status skipped slow speed detection entirely. Fixed: removed `continue` so `detectProblem` still evaluates.
+- [x] **MEDIUM: Webhook URL validation (SSRF)** — Discord/webhook/Gotify/Ntfy/Apprise notification URLs had no validation. Fixed: added `validateProviderURLs()` using existing `validateAPIURL()` (http/https only, no embedded credentials).
+
+### 5.2 Frontend Type Mismatches ✅
+- [x] `SeerrSettings` — added `cleanup_enabled`, `cleanup_after_days`
+- [x] `GeneralSettings` — added `auto_import_interval_minutes`
+- [x] `QueueCleanerSettings` — added 9 missing fields: `deletion_detection_enabled`, `unmonitored_cleanup_enabled`, `unregistered_enabled`, `max_strikes_unregistered`, `recheck_paused_enabled`, `recycle_bin_enabled`, `recycle_bin_path`, `ignored_release_groups`, `public_tracker_list`
+- [x] `SABnzbdSettings` — added `id`, `timeout`, `category`
+
+### 5.3 Test Updates ✅
+- [x] Updated `TestHandle2FAEnable_Success` and `TestHandle2FAEnable_SaveError` for new recovery-codes-first ordering
+- [x] Full test suite passing (all packages)
+- [x] Frontend build passing
+
+---
+
+## Phase 6: Quality Hardening ✅
+
+### Round 1
+- [x] **Fix silently discarded DB errors** — 7 sites across prowlarr.go, apps.go, state.go, passkey.go, server.go now log or return errors instead of using `_ :=`
+- [x] **Fix uTorrent unchecked errors** — `parseTorrent()` now returns errors for critical fields (Hash, Name); remaining fields use explicit `_ =` discard; retry `io.ReadAll` checked
+- [x] **Fix notification nilerr** — improved comment in `validateProviderURLs` clarifying intentional `return nil` design
+- [x] **Remove dead code** — removed `filterCompleted[T]` (helpers.go), `testUser` (testenv_test.go), `rtorrentSeedingTime` (rtorrent.go) + unused imports
+- [x] **Fix import shadowing** — renamed `url` → `pageURL` in arrclient/client.go, `blocklist` → `addToBlocklist` in queuecleaner/cleaner.go
+- [x] **Add missing nolint explanations** — `server.go` bare `//nolint:errcheck` now has `// best-effort copy`
+- [x] **Fix escaped quotes** — corrected `\"` artifacts in server.go OIDC slog call
+
+### Round 2
+- [x] **Fix uTorrent fetchToken io.ReadAll** — now properly returns error instead of falling through to "token not found"
+- [x] **Fix OIDC settings seed error** — `UpdateOIDCSettings` failure now logged with `slog.Error` instead of silently discarded
+- [x] **Activity feed error logging** — all 7 data sources (lurk history, cross-instance, blocklist, auto-import, schedule, strike, notification) now log warnings on query failure instead of silently skipping
+
+### Round 3
+- [x] **Fix json.Marshal error discards** — CreateTag, TagMedia (arrclient/client.go), ReadarrSearchBook, WhisparrSearchEpisode, ErosSearchMovie now return marshal errors
+- [x] **Fix arrclient/seerr io.ReadAll in error paths** — both doRequest (arrclient) and doAction (seerr) now check io.ReadAll errors and include them in error messages
+- [x] **Fix sabnzbd ParseFloat discard** — `strconv.ParseFloat` failure now logged with slog.Warn including nzo_id and raw value
+- [x] **Fix rtorrent IsActive discard** — `IsActive` error now logged with slog.Warn including torrent hash
+
+### Round 4
+- [x] **Fix JSON Content-Type on error responses** — 23 sites across auth (oidc.go, middleware.go), middleware (middleware.go, ratelimit.go), and server.go now send `application/json` Content-Type with JSON error bodies. Added `jsonError()` helper in auth package.
+- [x] **Fix test error discards** — 5 `io.ReadAll` + `json.Unmarshal` discards in notification test mock handlers now properly checked with `t.Fatal`
+- [x] All tests passing (api, auth, notifications), dev image rebuilt and healthy
+
+---
+
+## Phase 7: Feature Completion & Gaps
+
+### 7.1 Dedup / Multi-Arr — Frontend Group Management UI ✅
+Backend is 100% complete (internal/crossarr, instance_groups API, database methods, scanner).
+Frontend dedup page exists but was **unusable** — no UI to create or manage instance groups. Now fixed.
+- [x] Add "Instance Groups" section to `/apps` (Connections) page
+  - List groups per app type (Sonarr, Radarr)
+  - Create group form: name, mode (quality_hierarchy / overlap_detect / split_season)
+  - Edit/Delete group buttons
+- [x] Create member management modal/section
+  - Select instances to add to group
+  - Set quality_rank per member
+  - Toggle is_independent flag
+  - Save → PUT /api/instance-groups/by-id/{id}/members
+- [x] Fix dedup page "Go to Connections" CTA (now includes help text explaining how to create groups)
+- [x] Add "Scan for Overlaps" button to dedup page (calls scanner) — already existed
+- [x] Seed test instance groups in `dev/seed.sh` (Radarr + Radarr 4K group, Sonarr + Sonarr Anime group)
+
+### 7.2 Seed Data Gaps ✅
+Dev seed script enhanced with comprehensive test data for all features.
+- [x] Add Sonarr overlap data: Attack on Titan added to both Sonarr instances for dedup testing
+- [x] Seed queue cleaner settings for sonarr/radarr (dry-run mode, stalled/slow/seeding/orphan detection)
+- [x] Seed lurk app settings for sonarr/radarr/lidarr/readarr (API limits, sync intervals)
+- [x] Add Dev Webhook notification channel → httpbin.org with 4 event types
+- [x] Document Seerr manual setup steps in seed.sh summary section
+- [x] Updated seed summary with all new categories
+
+### 7.3 Bazarr Integration ✅
+Bazarr integrated as a Service (like Prowlarr/Seerr), not an AppType — it manages subtitles, not media.
+
+**Research & Design:**
+- [x] Created docs/research/bazarr.md — API docs, auth (config.ini apikey), integration type decision
+
+**Backend:**
+- [x] Database migration 048_bazarr_settings.sql (singleton settings table: url, api_key, enabled, timeout)
+- [x] BazarrSettings model + MaskedAPIKey() in models.go
+- [x] queries_bazarr.go — GetBazarrSettings() / UpdateBazarrSettings()
+- [x] bazarrclient package — Client struct with TestConnection, GetHealth, GetWantedEpisodes/Movies, GetEpisodeHistory/MovieHistory
+- [x] BazarrHandler (bazarr.go) — HandleTestConnection, HandleGetWanted, HandleGetHealth, HandleGetHistory
+- [x] BazarrSettings handlers (bazarr_settings.go) — HandleGetSettings (masked key), HandleUpdateSettings
+- [x] Store interface + mock updated with Bazarr methods
+- [x] 6 routes registered in server.go (settings GET/PUT, test POST, wanted/health/history GET)
+- [x] OpenAPI spec updated with BazarrSettings schema + 6 endpoints
+
+**Frontend:**
+- [x] BazarrSettings type added to types.ts
+- [x] Bazarr logo downloaded (128x128 PNG from official repo)
+- [x] index.ts mappings: logo, accentBorder (green-400), bgColor (green-500), hoverBg, website, Tailwind safelist
+- [x] Apps page: state vars, loadServices() fetch, saveBazarr/testBazarr functions
+- [x] Apps page: Bazarr items in both dropdown menus (header + empty state)
+- [x] Apps page: Bazarr service card with health badge + "Subtitle manager" label
+- [x] Apps page: Bazarr settings modal (toggle, URL, API key, timeout, save/test)
+
+**Seed:**
+- [x] Bazarr API key extraction from config.ini in seed.sh
+- [x] Bazarr auto-registration via PUT /api/bazarr/settings
+
+**Tests:** All 119 Go tests pass. Frontend build clean.
+
+### 7.4 Research — Future Integrations
+- [ ] Kapowarr API research (comics/manga — evaluate arr-compatibility)
+- [ ] Stash GraphQL API research (adult content manager)
+
+### 7.5 Integration & E2E Tests
+- [ ] Go integration tests with real dev stack (API round-trips using httptest + live DB)
+- [ ] Frontend E2E tests (Playwright against dev stack)
+
+---
+
+## Phase 8: Frontend Design & UX Polish
+
+### 8.1 Design Unification ✅
+All raw HTML interactive elements replaced with shadcn wrapper components across every route.
+- [x] Audit all pages for raw `<button>`, `<input>`, `<select>` — zero remaining in routes
+- [x] Fix `ConfirmAction.svelte` — now uses AlertDialog primitives (modal confirmation with destructive button)
+- [x] Fix HealthBadge / ConnectionCard — uses `Badge.svelte` + semantic colors
+- [x] All forms use `Input`, `Select`, `Toggle` wrappers consistently
+- [x] All pages follow consistent spacing, card usage, section header patterns
+
+### 8.2 shadcn Component Cleanup ✅
+Full shadcn primitive adoption across the frontend.
+- [x] Audit `frontend/src/lib/components/ui/` — all components use shadcn primitives
+- [x] All interactive elements use shadcn-based wrappers
+- [x] All modals use `Modal.svelte` (shadcn Dialog wrapper)
+- [x] All hardcoded colors replaced with CSS variables (`text-foreground`, `bg-muted`, `text-destructive`, etc.)
+
+### 8.5 shadcn Deep Integration ✅
+Installed and integrated all useful shadcn-svelte primitives. Two rounds of installation — initial 7, then 10 more after comprehensive audit.
+
+**Round 1 (7 components):**
+- [x] **Alert** — `variant="destructive"` for offline/error banners, custom `variant="warning"` for yellow callouts (dry-run, recovery codes). Applied to dashboard, login, queue, user pages.
+- [x] **Alert Dialog** — Rewrote `ConfirmAction.svelte` to use AlertDialog primitives. All ~15 confirm actions (dashboard, queue, user, history) now get proper accessible modal confirmations.
+- [x] **Tooltip** — Sidebar nav items, sign out, footer links show tooltips when sidebar collapsed.
+- [x] **Progress** — Both arr-client and SABnzbd download progress bars use `<Progress>` with success color on completion.
+- [x] **Avatar** — Initials avatar in admin users table + sidebar footer with username link to profile.
+- [x] **Scroll Area** — Scheduling history modal, Prowlarr indexers list.
+- [x] **Dropdown Menu** — Apps page "Add Connection" dropdown (header + empty state) uses shadcn DropdownMenu.
+
+**Round 2 (10 components — comprehensive audit):**
+- [x] **Textarea** — notifications page body template field → shadcn `<Textarea>`
+- [x] **Label** — Input.svelte, Select.svelte, notifications page → shadcn `<Label>`
+- [x] **Collapsible** — queue page (per-reason blocklist overrides) + user page (manual TOTP entry) → `Collapsible.Root/Trigger/Content`
+- [x] **Sonner** — Toast.svelte now uses shadcn sonner wrapper (auto theme via mode-watcher)
+- [x] **Pagination** — DataTable.svelte → full numbered pagination with ellipsis, prev/next
+- [x] **Toggle Group** — scheduling page day-of-week picker → `ToggleGroup.Root type="multiple"`
+- [x] **Popover** — HealthBadge.svelte → click badge to see Status + Version info
+- [x] **Sidebar** — complete sidebar rewrite using shadcn Sidebar primitives (S.Root, S.Header, S.Content, S.Group, S.Menu, S.MenuButton, S.Footer, S.Rail). Mobile handled internally by built-in Sheet.
+- [x] **Command** — command palette (Cmd+K / Ctrl+K) for quick navigation to all pages
+- [x] **Toggle** — installed as dependency for toggle-group
+
+**Installed shadcn primitives (32 total):**
+accordion, alert, alert-dialog, avatar, badge, breadcrumb, button, card, checkbox, collapsible, command, dialog, dropdown-menu, input, label, pagination, popover, progress, scroll-area, select, separator, sheet, sidebar, skeleton, sonner, switch, table, tabs, textarea, toggle, toggle-group, tooltip
+
+### 8.3 Dashboard Improvements ✅
+Dashboard enhanced with at-a-glance utility.
+- [x] Quick-action navigation buttons below header (Lurk Settings, Queue Cleaner, Scheduling)
+- [x] Hourly API cap progress bars with color coding (≥90% red, ≥70% yellow) using shadcn Progress
+- [x] Recent activity feed — last 5 events with source icons, badges, timestamps, "View All" link
+- [x] App settings loaded per app type for cap limit display
+- [x] Polling refreshes activity alongside stats every 30s
+- [x] Removed unused appTabLabel import
+
+### 8.4 Large Config Page Structure ✅
+Config-heavy pages restructured with collapsible sections and scroll-to-top for mobile usability.
+- [x] Created `CollapsibleCard.svelte` — reusable Card wrapper with Collapsible header (ChevronRight rotates on open), defaults open=true
+- [x] Created `ScrollToTop.svelte` — fixed bottom-right button, appears after 400px scroll, smooth scroll to top
+- [x] Queue page: all cleaner sections (Stall Detection, Strike System, Actions, Failed Imports, Metadata Mismatch, Seeding Rules, Orphan Cleanup, Advanced) + scoring sections (Preferences, Weights) converted to CollapsibleCard
+- [x] Settings page: General tab sections (Lurking Behaviour, API & Command Execution, Security) + SSO tab sections (OpenID Connect Provider, User Management) converted to CollapsibleCard
+- [x] ScrollToTop added to 10 long pages: queue, settings, lurk, apps, notifications, downloads, scheduling, user, monitoring, history
+
+### 8.6 Breadcrumb Navigation ✅
+Route-aware breadcrumb navigation integrated into root layout.
+- [x] Install shadcn Breadcrumb component
+- [x] Add Breadcrumbs.svelte wrapper with route-aware auto-generation (capitalizes path segments, handles separators)
+- [x] Integrate into root layout (inside S.Inset, above page content)
+- [x] Works on all screen sizes — hidden on mobile header, visible in main content
+
+### 8.7 In-App Help / FAQ System ✅
+Comprehensive searchable Help/FAQ page covering all features.
+- [x] Dedicated `/help` route with 12 accordion sections (Getting Started, Connections, Lurk Settings, Queue Cleaner, Scheduling, Downloads, Seerr, Dedup, Notifications, Security, Monitoring, General Settings)
+- [x] 40+ FAQ items with detailed answers
+- [x] Real-time search filter across questions and answers
+- [x] Per-section icons and FAQ counts via Badge
+- [x] Help link in sidebar nav
+- [x] Uses shadcn Accordion, Input (search), Card, Badge components
+
+### 8.8 Command Palette ✅
+Cmd+K / Ctrl+K command palette for quick page navigation.
+- [x] CommandPalette.svelte using shadcn Command Dialog component
+- [x] All 16 sidebar nav items indexed with searchable keywords
+- [x] Grouped by category (Pages, Configuration, Operations, Monitoring, Admin)
+- [x] Admin-only items filtered based on user role
+- [x] Integrated into root layout
+
+---
+
+## Current Sprint Focus
+> Phase 1–6 complete. 119/119 unit tests. All backend features implemented.
+> Phase 7.1 complete — dedup fully usable with instance group management on Connections page.
+> Phase 7.2, 7.3 complete — seed data comprehensive, Bazarr fully integrated (backend + frontend + seed).
+> Phase 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8 complete — full shadcn design system (32 primitives), breadcrumbs, dashboard improvements, collapsible config pages, help/FAQ, command palette.
+> Priority: 7.4–7.5

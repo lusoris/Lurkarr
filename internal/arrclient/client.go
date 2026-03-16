@@ -40,6 +40,16 @@ func NewClient(baseURL, apiKey string, timeout time.Duration, sslVerify bool) *C
 	}
 }
 
+// NewClientForInstance creates a client using common instance+settings fields.
+// This is a convenience wrapper that converts the timeout from seconds.
+func NewClientForInstance(apiURL, apiKey string, timeoutSec int, sslVerify bool) *Client {
+	timeout := time.Duration(timeoutSec) * time.Second
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+	return NewClient(apiURL, apiKey, timeout, sslVerify)
+}
+
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
 	reqURL := c.BaseURL + path
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
@@ -54,7 +64,10 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 	}
 	if resp.StatusCode >= 400 {
 		defer func() { _ = resp.Body.Close() }()
-		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		errBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if readErr != nil {
+			return nil, fmt.Errorf("api error %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(errBody))
 	}
 	return resp, nil
@@ -113,10 +126,30 @@ type ManualImportItem struct {
 	Name              string       `json:"name"`
 	Size              int64        `json:"size"`
 	Quality           *QualityInfo `json:"quality,omitempty"`
+	Languages         []Language   `json:"languages,omitempty"`
 	CustomFormatScore int          `json:"customFormatScore"`
 	Rejections        []struct {
 		Reason string `json:"reason"`
 	} `json:"rejections"`
+
+	// Media association fields (returned by GET, required for POST).
+	MovieID      int   `json:"movieId,omitempty"`
+	SeriesID     int   `json:"seriesId,omitempty"`
+	SeasonNumber int   `json:"seasonNumber,omitempty"`
+	EpisodeIDs   []int `json:"episodeIds,omitempty"`
+	AlbumID      int   `json:"albumId,omitempty"`
+	ArtistID     int   `json:"artistId,omitempty"`
+	BookID       int   `json:"bookId,omitempty"`
+	AuthorID     int   `json:"authorId,omitempty"`
+
+	// ImportMode is set when POSTing to trigger import ("move" or "copy").
+	ImportMode string `json:"importMode,omitempty"`
+}
+
+// Language represents a language selection for manual import.
+type Language struct {
+	ID   int    `json:"id"`
+	Name string `json:"name,omitempty"`
 }
 
 // GetManualImport lists files available for manual import for a download ID.
@@ -127,6 +160,16 @@ func (c *Client) GetManualImport(ctx context.Context, apiVersion, downloadID str
 		return nil, fmt.Errorf("get manual import: %w", err)
 	}
 	return items, nil
+}
+
+// PostManualImport triggers the import of the given items.
+func (c *Client) PostManualImport(ctx context.Context, apiVersion string, items []ManualImportItem) error {
+	body, err := json.Marshal(items)
+	if err != nil {
+		return fmt.Errorf("marshal manual import: %w", err)
+	}
+	path := fmt.Sprintf("/api/%s/manualimport", apiVersion)
+	return c.post(ctx, path, bytes.NewReader(body), nil)
 }
 
 // SystemStatus represents the status response from any *Arr app.
@@ -221,6 +264,7 @@ type QueueRecord struct {
 	BookID                int             `json:"bookId,omitempty"`
 	AuthorID              int             `json:"authorId,omitempty"`
 	Quality               *QualityInfo    `json:"quality,omitempty"`
+	Added                 time.Time       `json:"added"`
 
 	// Enriched fields (populated when queue is fetched with include* params).
 	Movie   *QueueMovie   `json:"movie,omitempty"`
@@ -435,7 +479,10 @@ func (c *Client) GetTags(ctx context.Context, apiVersion string) ([]Tag, error) 
 
 // CreateTag creates a new tag and returns it.
 func (c *Client) CreateTag(ctx context.Context, apiVersion, label string) (*Tag, error) {
-	body, _ := json.Marshal(map[string]string{"label": label})
+	body, err := json.Marshal(map[string]string{"label": label})
+	if err != nil {
+		return nil, fmt.Errorf("marshal tag: %w", err)
+	}
 	var tag Tag
 	if err := c.post(ctx, "/api/"+apiVersion+"/tag", bytes.NewReader(body), &tag); err != nil {
 		return nil, fmt.Errorf("create tag %q: %w", label, err)
@@ -464,11 +511,14 @@ func (c *Client) TagMedia(ctx context.Context, apiVersion, appType string, media
 	default:
 		return fmt.Errorf("unsupported app type for tagging: %s", appType)
 	}
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		idsKey:      []int{mediaID},
 		"tags":      []int{tagID},
 		"applyTags": "add",
 	})
+	if err != nil {
+		return fmt.Errorf("marshal tag media: %w", err)
+	}
 	return c.put(ctx, path, bytes.NewReader(body))
 }
 
@@ -478,13 +528,52 @@ type QueueResponse struct {
 	Records      []QueueRecord `json:"records"`
 }
 
+// paginatedResponse is a generic wrapper for any arr paginated API response.
+type paginatedResponse[T any] struct {
+	TotalRecords int `json:"totalRecords"`
+	Records      []T `json:"records"`
+}
+
+// getAllPages fetches all pages of a paginated arr API endpoint.
+// The pathWithParams should include query parameters but NOT page/pageSize.
+func getAllPages[T any](ctx context.Context, c *Client, pathWithParams string) ([]T, error) {
+	const pageSize = 1000
+	sep := "&"
+	if !strings.Contains(pathWithParams, "?") {
+		sep = "?"
+	}
+	var all []T
+	for page := 1; ; page++ {
+		var resp paginatedResponse[T]
+		pageURL := fmt.Sprintf("%s%spage=%d&pageSize=%d", pathWithParams, sep, page, pageSize)
+		if err := c.get(ctx, pageURL, &resp); err != nil {
+			return nil, err
+		}
+		all = append(all, resp.Records...)
+		if len(all) >= resp.TotalRecords {
+			break
+		}
+	}
+	return all, nil
+}
+
+// getWanted is a generic helper for fetching wanted/missing or wanted/cutoff pages.
+func getWanted[T any](ctx context.Context, c *Client, apiPrefix, endpoint, sortKey, sortDir, errLabel string) ([]T, error) {
+	path := fmt.Sprintf("%s/wanted/%s?sortKey=%s&sortDirection=%s", apiPrefix, endpoint, sortKey, sortDir)
+	records, err := getAllPages[T](ctx, c, path)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", errLabel, err)
+	}
+	return records, nil
+}
+
 // GetQueue returns the download queue for any arr instance.
 func (c *Client) GetQueue(ctx context.Context, apiVersion string) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, "/api/"+apiVersion+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, "/api/"+apiVersion+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // IsPrivateIP checks if a URL points to a private/loopback address.

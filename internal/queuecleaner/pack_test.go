@@ -102,7 +102,7 @@ func TestPack_AllFilesDeleted(t *testing.T) {
 	withMovie := func(hasFile bool) arrclient.QueueRecord {
 		return arrclient.QueueRecord{
 			TrackedDownloadState: "imported",
-			Movie:               &arrclient.QueueMovie{HasFile: hasFile},
+			Movie:                &arrclient.QueueMovie{HasFile: hasFile},
 		}
 	}
 
@@ -141,7 +141,7 @@ func TestPack_AllUnmonitored(t *testing.T) {
 	withMovie := func(monitored bool) arrclient.QueueRecord {
 		return arrclient.QueueRecord{
 			TrackedDownloadState: "downloading",
-			Movie:               &arrclient.QueueMovie{Monitored: monitored},
+			Movie:                &arrclient.QueueMovie{Monitored: monitored},
 		}
 	}
 	imported := arrclient.QueueRecord{TrackedDownloadState: "imported"}

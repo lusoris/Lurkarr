@@ -180,6 +180,13 @@ var (
 		Name:      "errors_total",
 		Help:      "Total autoimport errors.",
 	}, []string{"app_type", "instance"})
+
+	AutoimportActionsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "lurkarr",
+		Subsystem: "autoimport",
+		Name:      "actions_total",
+		Help:      "Total autoimport actions taken (manual_import, rescan).",
+	}, []string{"app_type", "instance", "action"})
 )
 
 // ── Notification metrics ─────────────────────────────────────────────────────

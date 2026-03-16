@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { getToasts } from '$lib/stores/toast.svelte';
+	import ScrollToTop from '$lib/components/ScrollToTop.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
@@ -9,48 +10,41 @@
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
+	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
 	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import ConfirmAction from '$lib/components/ui/ConfirmAction.svelte';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Label } from '$lib/components/ui/label';
 	import { Bell, Plus, Trash2 } from 'lucide-svelte';
+	import type { NotificationProvider } from '$lib/types';
 
 	const toasts = getToasts();
-
-	interface NotificationProvider {
-		id: string;
-		type: string;
-		name: string;
-		enabled: boolean;
-		config: Record<string, string>;
-		events: string[];
-		created_at: string;
-		updated_at: string;
-	}
 
 	const providerTypes = [
 		{ value: 'discord', label: 'Discord', fields: ['webhook_url'] },
 		{ value: 'telegram', label: 'Telegram', fields: ['bot_token', 'chat_id'] },
 		{ value: 'pushover', label: 'Pushover', fields: ['user_key', 'api_token'] },
-		{ value: 'gotify', label: 'Gotify', fields: ['url', 'token'] },
-		{ value: 'ntfy', label: 'ntfy', fields: ['url', 'topic', 'token'] },
-		{ value: 'apprise', label: 'Apprise', fields: ['url'] },
-		{ value: 'email', label: 'Email', fields: ['smtp_host', 'smtp_port', 'username', 'password', 'from', 'to'] },
+		{ value: 'gotify', label: 'Gotify', fields: ['server_url', 'app_token'] },
+		{ value: 'ntfy', label: 'ntfy', fields: ['server_url', 'topic', 'token'] },
+		{ value: 'apprise', label: 'Apprise', fields: ['server_url', 'urls', 'tag'] },
+		{ value: 'email', label: 'Email', fields: ['host', 'port', 'username', 'password', 'from', 'to'] },
 		{ value: 'webhook', label: 'Webhook', fields: ['url', 'method', 'headers'] }
 	] as const;
 
 	const allEvents = [
-		'lurk.started', 'lurk.completed', 'lurk.error',
-		'queue.blocklisted', 'queue.stalled', 'queue.imported',
-		'health.degraded', 'health.restored',
-		'system.startup', 'system.shutdown'
+		'lurk_started', 'lurk_completed',
+		'queue_item_removed', 'download_stuck',
+		'scheduler_action', 'error'
 	];
 
 	const eventGroups = [
-		{ label: 'Lurking', events: ['lurk.started', 'lurk.completed', 'lurk.error'] },
-		{ label: 'Queue', events: ['queue.blocklisted', 'queue.stalled', 'queue.imported'] },
-		{ label: 'Health', events: ['health.degraded', 'health.restored'] },
-		{ label: 'System', events: ['system.startup', 'system.shutdown'] }
+		{ label: 'Lurking', events: ['lurk_started', 'lurk_completed'] },
+		{ label: 'Queue', events: ['queue_item_removed', 'download_stuck'] },
+		{ label: 'System', events: ['scheduler_action', 'error'] }
 	] as const;
 
 	let providers = $state<NotificationProvider[]>([]);
@@ -59,7 +53,6 @@
 	let editing = $state<NotificationProvider | null>(null);
 	let saving = $state(false);
 	let testing = $state<string | null>(null);
-	let deleteConfirm = $state<string | null>(null);
 
 	// Form state
 	let formType = $state('discord');
@@ -88,20 +81,24 @@
 		chat_id: 'Chat ID',
 		user_key: 'User Key',
 		api_token: 'API Token',
+		app_token: 'App Token',
+		server_url: 'Server URL',
 		url: 'URL',
 		token: 'Token',
 		topic: 'Topic',
-		smtp_host: 'SMTP Host',
-		smtp_port: 'SMTP Port',
+		urls: 'Notification URLs',
+		tag: 'Tag',
+		host: 'SMTP Host',
+		port: 'SMTP Port',
 		username: 'Username',
 		password: 'Password',
 		from: 'From Address',
-		to: 'To Address',
+		to: 'To Address(es)',
 		method: 'HTTP Method',
 		headers: 'Headers (JSON)'
 	};
 
-	const sensitiveFields = new Set(['bot_token', 'api_token', 'token', 'password', 'webhook_url']);
+	const sensitiveFields = new Set(['bot_token', 'api_token', 'app_token', 'token', 'password', 'webhook_url']);
 
 	const fieldPlaceholders: Record<string, string> = {
 		webhook_url: 'https://discord.com/api/webhooks/...',
@@ -109,15 +106,19 @@
 		chat_id: '-1001234567890',
 		user_key: 'uQiRzpo4DXghDmr9QzzfQu27cmVRsG',
 		api_token: 'azGDORePK8gMaC0QOYAMyEEuzJnyUi',
-		url: 'http://hostname:port',
+		app_token: 'AKW3F4_...',
+		server_url: 'http://hostname:port',
+		url: 'https://your-endpoint.example.com/webhook',
 		token: 'tk_...',
 		topic: 'lurkarr',
-		smtp_host: 'smtp.gmail.com',
-		smtp_port: '587',
+		urls: 'mailto://user:pass@gmail.com, slack://token/channel',
+		tag: 'all',
+		host: 'smtp.gmail.com',
+		port: '587',
 		username: 'user@example.com',
 		password: '',
 		from: 'lurkarr@example.com',
-		to: 'you@example.com',
+		to: 'you@example.com, admin@example.com',
 		method: 'POST',
 		headers: '{"Content-Type": "application/json"}'
 	};
@@ -127,7 +128,56 @@
 		bot_token: 'From @BotFather on Telegram',
 		chat_id: 'User, group, or channel ID',
 		topic: 'ntfy topic name to publish to',
-		smtp_port: '587 for STARTTLS, 465 for SSL',
+		urls: 'Comma-separated Apprise notification URLs',
+		tag: 'Optional Apprise tag filter',
+		port: '587 for STARTTLS, 465 for SSL',
+		to: 'Comma-separated recipient addresses',
+		headers: 'JSON object of custom HTTP headers',
+	};
+
+	// Template presets per provider type.
+	const templatePresets: Record<string, { label: string; title: string; body: string }[]> = {
+		_default: [
+			{ label: 'None (use default)', title: '', body: '' },
+			{ label: 'Detailed', title: '[{{.AppType}}] {{.Title}}', body: '{{.Message}}\nInstance: {{.Instance}}' },
+			{ label: 'Compact', title: '{{.Title}}', body: '{{.AppType}}/{{.Instance}}: {{.Message}}' },
+		],
+		discord: [
+			{ label: 'None (use default)', title: '', body: '' },
+			{ label: 'Detailed', title: '[{{.AppType}}] {{.Title}}', body: '{{.Message}}\n\n**Instance:** {{.Instance}}' },
+			{ label: 'Compact', title: '{{.Title}}', body: '`{{.AppType}}`/`{{.Instance}}` — {{.Message}}' },
+		],
+		telegram: [
+			{ label: 'None (use default)', title: '', body: '' },
+			{ label: 'Detailed', title: '[{{.AppType}}] {{.Title}}', body: '<b>{{.Title}}</b>\n{{.Message}}\n<i>Instance:</i> {{.Instance}}' },
+			{ label: 'Compact', title: '{{.Title}}', body: '<code>{{.AppType}}</code>/{{.Instance}}: {{.Message}}' },
+		],
+		email: [
+			{ label: 'None (use default)', title: '', body: '' },
+			{ label: 'Detailed', title: '[Lurkarr] {{.AppType}} — {{.Title}}', body: '{{.Title}}\n\n{{.Message}}\n\nApp: {{.AppType}}\nInstance: {{.Instance}}\nEvent: {{.Type}}' },
+			{ label: 'Compact', title: '[Lurkarr] {{.Title}}', body: '{{.AppType}}/{{.Instance}}: {{.Message}}' },
+		],
+	};
+
+	function getPresets() {
+		return templatePresets[formType] ?? templatePresets['_default'];
+	}
+
+	function applyPreset(idx: number) {
+		const preset = getPresets()[idx];
+		if (preset) {
+			formTitleTemplate = preset.title;
+			formBodyTemplate = preset.body;
+		}
+	}
+
+	const eventLabels: Record<string, string> = {
+		lurk_started: 'Lurk Started',
+		lurk_completed: 'Lurk Completed',
+		queue_item_removed: 'Queue Item Removed',
+		download_stuck: 'Download Stuck',
+		scheduler_action: 'Scheduler Action',
+		error: 'Error',
 	};
 
 	async function load() {
@@ -159,7 +209,12 @@
 		formName = p.name;
 		formEnabled = p.enabled;
 		const fields = providerTypes.find(pt => pt.value === p.type)?.fields ?? [];
-		formConfig = Object.fromEntries(fields.map(f => [f, p.config[f] ?? '']));
+		formConfig = Object.fromEntries(fields.map(f => {
+			const v = p.config[f];
+			// Convert arrays back to comma-separated strings for form inputs
+			if (Array.isArray(v)) return [f, v.join(', ')];
+			return [f, v != null ? String(v) : ''];
+		}));
 		formEvents = [...p.events];
 		formTitleTemplate = p.config['title_template'] ?? '';
 		formBodyTemplate = p.config['body_template'] ?? '';
@@ -177,9 +232,23 @@
 	async function save() {
 		saving = true;
 		try {
-			const config: Record<string, string> = { ...formConfig };
+			const config: Record<string, any> = { ...formConfig };
 			if (formTitleTemplate.trim()) config['title_template'] = formTitleTemplate.trim();
 			if (formBodyTemplate.trim()) config['body_template'] = formBodyTemplate.trim();
+
+			// Convert types to match backend expectations
+			if (formType === 'email') {
+				if (typeof config['to'] === 'string') {
+					config['to'] = (config['to'] as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+				}
+				if (config['port']) config['port'] = Number(config['port']);
+			}
+			if (formType === 'apprise' && typeof config['urls'] === 'string') {
+				config['urls'] = (config['urls'] as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+			}
+			if (formType === 'webhook' && typeof config['headers'] === 'string' && config['headers'].trim()) {
+				try { config['headers'] = JSON.parse(config['headers'] as string); } catch { /* keep as string, backend will ignore */ }
+			}
 
 			const body = {
 				type: formType,
@@ -219,7 +288,6 @@
 		try {
 			await api.del(`/notifications/providers/${id}`);
 			toasts.success('Provider deleted');
-			deleteConfirm = null;
 			await load();
 		} catch {
 			toasts.error('Failed to delete provider');
@@ -268,11 +336,11 @@
 	}
 
 	const historyColumns = [
-		{ key: 'title' as const, label: 'Title', sortable: true },
-		{ key: 'provider_name' as const, label: 'Provider', sortable: true },
-		{ key: 'event_type' as const, label: 'Event', sortable: true },
-		{ key: 'status' as const, label: 'Status', sortable: true },
-		{ key: 'created_at' as const, label: 'Date', sortable: true }
+		{ key: 'title' as const, header: 'Title', sortable: true },
+		{ key: 'provider_name' as const, header: 'Provider', sortable: true },
+		{ key: 'event_type' as const, header: 'Event', sortable: true },
+		{ key: 'status' as const, header: 'Status', sortable: true },
+		{ key: 'created_at' as const, header: 'Date', sortable: true }
 	];
 
 	function onTabChange(tab: string) {
@@ -296,6 +364,7 @@
 					Add Provider
 				</Button>
 			{/if}
+			<HelpDrawer page="notifications" />
 		{/snippet}
 	</PageHeader>
 
@@ -338,17 +407,13 @@
 							</p>
 						</div>
 						<div class="flex items-center gap-2 shrink-0">
-							{#if deleteConfirm === provider.id}
-								<span class="text-xs text-red-400 mr-1">Delete?</span>
-								<Button size="sm" variant="danger" onclick={() => deleteProvider(provider.id)}>Yes</Button>
-								<Button size="sm" variant="ghost" onclick={() => deleteConfirm = null}>No</Button>
-							{:else}
-								<Button size="sm" variant="secondary" loading={testing === provider.id} onclick={() => testProvider(provider.id)}>Test</Button>
-								<Button size="sm" variant="ghost" onclick={() => openEdit(provider)}>Edit</Button>
-								<Button size="sm" variant="ghost" onclick={() => deleteConfirm = provider.id}>
-									<Trash2 class="w-4 h-4 text-red-400" />
+							<Button size="sm" variant="secondary" loading={testing === provider.id} onclick={() => testProvider(provider.id)}>Test</Button>
+							<Button size="sm" variant="ghost" onclick={() => openEdit(provider)}>Edit</Button>
+							<ConfirmAction onconfirm={() => deleteProvider(provider.id)}>
+								<Button size="sm" variant="ghost">
+									<Trash2 class="w-4 h-4 text-destructive" />
 								</Button>
-							{/if}
+							</ConfirmAction>
 						</div>
 					</div>
 				</Card>
@@ -369,11 +434,11 @@
 					<td class="px-4 py-2 text-sm">
 						<Badge>{item.provider_name || item.provider_type}</Badge>
 					</td>
-					<td class="px-4 py-2 text-sm font-mono text-xs">{item.event_type}</td>
+					<td class="px-4 py-2 font-mono text-xs">{item.event_type}</td>
 					<td class="px-4 py-2 text-sm">
 						<Badge variant={statusVariant(item.status)}>{item.status}</Badge>
 						{#if item.error}
-							<span class="block text-[10px] text-red-400 mt-0.5 truncate max-w-[200px]" title={item.error}>{item.error}</span>
+							<span class="block text-[10px] text-destructive mt-0.5 truncate max-w-[200px]" title={item.error}>{item.error}</span>
 						{/if}
 					</td>
 					<td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
@@ -402,21 +467,21 @@
 		<!-- Provider-specific config fields -->
 		{#if selectedProvider}
 			<div class="border-t border-border pt-4">
-				<h3 class="text-sm font-medium text-muted-foreground mb-3">Configuration</h3>
+				<h3 class="text-sm font-semibold text-foreground mb-3">Configuration</h3>
 				<div class="space-y-3">
 					{#if formType === 'email'}
 						<!-- Email: group SMTP connection and addresses -->
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<Input bind:value={formConfig['smtp_host']} label="SMTP Host" />
-							<Input bind:value={formConfig['smtp_port']} label="SMTP Port" />
-						</div>
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<Input bind:value={formConfig['username']} label="Username" />
-							<Input bind:value={formConfig['password']} label="Password" type="password" />
-						</div>
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<Input bind:value={formConfig['from']} label="From Address" />
-							<Input bind:value={formConfig['to']} label="To Address" />
+						<Input bind:value={formConfig['host']} label="SMTP Host" placeholder={fieldPlaceholders['host']} />
+						<Input bind:value={formConfig['port']} label="SMTP Port" placeholder={fieldPlaceholders['port']} hint={fieldHints['port']} />
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<Input bind:value={formConfig['username']} label="Username" />
+						<Input bind:value={formConfig['password']} label="Password" type="password" />
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<Input bind:value={formConfig['from']} label="From Address" placeholder={fieldPlaceholders['from']} />
+						<Input bind:value={formConfig['to']} label="To Address(es)" placeholder={fieldPlaceholders['to']} hint={fieldHints['to']} />
 						</div>
 					{:else}
 						{#each selectedProvider.fields as field}
@@ -436,19 +501,21 @@
 		<!-- Templates -->
 		<div class="border-t border-border pt-4">
 			<div class="flex items-center justify-between mb-3">
-				<h3 class="text-sm font-medium text-muted-foreground">Templates</h3>
+				<h3 class="text-sm font-semibold text-foreground">Templates</h3>
+				<Select value="0" onchange={(e: Event) => applyPreset(Number((e.target as HTMLSelectElement).value))} label="" class="w-40 h-8 text-xs">
+					{#each getPresets() as preset, i}
+						<option value={i}>{preset.label}</option>
+					{/each}
+				</Select>
 			</div>
 			<p class="text-xs text-muted-foreground mb-3">
 				Customise notification text with Go templates. Available: {'{{.Title}}'}, {'{{.Message}}'}, {'{{.AppType}}'}, {'{{.Instance}}'}, {'{{.Type}}'}, {'{{index .Fields "key"}}'}.
 			</p>
 			<div class="space-y-3">
-				<div>
-					<label for="title-tpl" class="block text-sm font-medium text-foreground mb-1">Title Template</label>
-					<input id="title-tpl" bind:value={formTitleTemplate} placeholder="Leave blank for default" class="w-full rounded-md bg-muted border border-border px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-				</div>
-				<div>
-					<label for="body-tpl" class="block text-sm font-medium text-foreground mb-1">Body Template</label>
-					<textarea id="body-tpl" bind:value={formBodyTemplate} placeholder="Leave blank for default" rows={3} class="w-full rounded-md bg-muted border border-border px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"></textarea>
+				<Input bind:value={formTitleTemplate} label="Title Template" placeholder="Leave blank for default" class="font-mono" />
+				<div class="space-y-1.5">
+					<Label for="body-tpl">Body Template</Label>
+					<Textarea id="body-tpl" bind:value={formBodyTemplate} placeholder="Leave blank for default" rows={3} class="font-mono resize-y" />
 				</div>
 			</div>
 		</div>
@@ -456,13 +523,10 @@
 		<!-- Events -->
 		<div class="border-t border-border pt-4">
 			<div class="flex items-center justify-between mb-3">
-				<h3 class="text-sm font-medium text-muted-foreground">Events</h3>
-				<button
-					onclick={() => formEvents = formEvents.length === allEvents.length ? [] : [...allEvents]}
-					class="text-xs text-primary hover:text-primary/80"
-				>
+				<h3 class="text-sm font-semibold text-foreground">Events</h3>
+				<Button size="sm" variant="link" class="h-auto p-0 text-xs" onclick={() => formEvents = formEvents.length === allEvents.length ? [] : [...allEvents]}>
 					{formEvents.length === allEvents.length ? 'Deselect all' : 'Select all'}
-				</button>
+				</Button>
 			</div>
 			<div class="space-y-3">
 				{#each eventGroups as group}
@@ -470,9 +534,9 @@
 						<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">{group.label}</span>
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
 							{#each group.events as event}
-								<label class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors hover:bg-muted {formEvents.includes(event) ? 'text-foreground' : 'text-muted-foreground'}">
-									<input type="checkbox" checked={formEvents.includes(event)} onchange={() => toggleEvent(event)} class="rounded border-border text-primary focus:ring-ring bg-muted" />
-									<span class="font-mono text-xs">{event}</span>
+							<label class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors hover:bg-muted {formEvents.includes(event) ? 'text-foreground' : 'text-muted-foreground'}">
+									<Checkbox checked={formEvents.includes(event)} onchange={() => toggleEvent(event)} />
+									<span class="text-xs">{eventLabels[event] ?? event}</span>
 								</label>
 							{/each}
 						</div>
@@ -487,3 +551,5 @@
 		</div>
 	</div>
 </Modal>
+
+<ScrollToTop />

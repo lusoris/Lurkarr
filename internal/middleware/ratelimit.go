@@ -22,6 +22,7 @@ type IPRateLimiter struct {
 	limiters map[string]*entry
 	rate     rate.Limit
 	burst    int
+	done     chan struct{}
 }
 
 type entry struct {
@@ -35,6 +36,7 @@ func NewIPRateLimiter(r rate.Limit, burst int) *IPRateLimiter {
 		limiters: make(map[string]*entry),
 		rate:     r,
 		burst:    burst,
+		done:     make(chan struct{}),
 	}
 	go rl.cleanup()
 	return rl
@@ -57,16 +59,27 @@ func (rl *IPRateLimiter) Allow(ip string) bool {
 
 // cleanup removes stale entries every 3 minutes.
 func (rl *IPRateLimiter) cleanup() {
+	ticker := time.NewTicker(3 * time.Minute)
+	defer ticker.Stop()
 	for {
-		time.Sleep(3 * time.Minute)
-		rl.mu.Lock()
-		for ip, e := range rl.limiters {
-			if time.Since(e.lastSeen) > 5*time.Minute {
-				delete(rl.limiters, ip)
+		select {
+		case <-rl.done:
+			return
+		case <-ticker.C:
+			rl.mu.Lock()
+			for ip, e := range rl.limiters {
+				if time.Since(e.lastSeen) > 5*time.Minute {
+					delete(rl.limiters, ip)
+				}
 			}
+			rl.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
+}
+
+// Stop terminates the background cleanup goroutine.
+func (rl *IPRateLimiter) Stop() {
+	close(rl.done)
 }
 
 // RateLimit wraps a handler with per-IP rate limiting.
@@ -77,7 +90,8 @@ func RateLimit(limiter *IPRateLimiter) func(http.Handler) http.Handler {
 			if !limiter.Allow(ip) {
 				slog.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path) //nolint:gosec // G706: slog structured logging
 				metrics.HTTPRateLimitHits.WithLabelValues(normalizePath(r.URL.Path)).Inc()
-				w.Header().Set("Retry-After", "60")
+				w.Header().Set("Retry-After", "1")
+				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"too many requests"}`, http.StatusTooManyRequests)
 				return
 			}

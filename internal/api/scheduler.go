@@ -1,11 +1,10 @@
 package api
 
 import (
-	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/scheduler"
 )
@@ -23,16 +22,17 @@ func (h *SchedulerHandler) HandleListSchedules(w http.ResponseWriter, r *http.Re
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to list schedules"))
 		return
 	}
+	if schedules == nil {
+		schedules = []database.Schedule{}
+	}
 
 	writeJSON(w, http.StatusOK, schedules)
 }
 
 // HandleCreateSchedule handles POST /api/schedules.
 func (h *SchedulerHandler) HandleCreateSchedule(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var sched database.Schedule
-	if err := json.NewDecoder(r.Body).Decode(&sched); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	sched, ok := decodeJSON[database.Schedule](w, r)
+	if !ok {
 		return
 	}
 
@@ -47,23 +47,22 @@ func (h *SchedulerHandler) HandleCreateSchedule(w http.ResponseWriter, r *http.R
 	}
 
 	// Reload scheduler
-	_ = h.Scheduler.Reload(r.Context())
+	if err := h.Scheduler.Reload(r.Context()); err != nil {
+		slog.Error("failed to reload scheduler after create", "error", err)
+	}
 
 	writeJSON(w, http.StatusCreated, sched)
 }
 
 // HandleUpdateSchedule handles PUT /api/schedules/{id}.
 func (h *SchedulerHandler) HandleUpdateSchedule(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid schedule ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var sched database.Schedule
-	if err := json.NewDecoder(r.Body).Decode(&sched); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	sched, ok := decodeJSON[database.Schedule](w, r)
+	if !ok {
 		return
 	}
 	sched.ID = id
@@ -73,16 +72,17 @@ func (h *SchedulerHandler) HandleUpdateSchedule(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	_ = h.Scheduler.Reload(r.Context())
+	if err := h.Scheduler.Reload(r.Context()); err != nil {
+		slog.Error("failed to reload scheduler after update", "error", err)
+	}
 
 	writeJSON(w, http.StatusOK, sched)
 }
 
 // HandleDeleteSchedule handles DELETE /api/schedules/{id}.
 func (h *SchedulerHandler) HandleDeleteSchedule(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid schedule ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -91,7 +91,9 @@ func (h *SchedulerHandler) HandleDeleteSchedule(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	_ = h.Scheduler.Reload(r.Context())
+	if err := h.Scheduler.Reload(r.Context()); err != nil {
+		slog.Error("failed to reload scheduler after delete", "error", err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -109,6 +111,9 @@ func (h *SchedulerHandler) HandleScheduleHistory(w http.ResponseWriter, r *http.
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load schedule history"))
 		return
+	}
+	if executions == nil {
+		executions = []database.ScheduleExecution{}
 	}
 
 	writeJSON(w, http.StatusOK, executions)

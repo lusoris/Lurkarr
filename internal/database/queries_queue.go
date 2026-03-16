@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // --- Queue Cleaner Settings ---
@@ -39,8 +40,11 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		        blocklist_stalled, blocklist_slow, blocklist_metadata,
 		        blocklist_duplicate, blocklist_unregistered,
 		        ignored_download_clients,
+		        ignored_release_groups,
 		        mismatch_enabled, max_strikes_mismatch, blocklist_mismatch,
-		        keep_archives
+		        keep_archives,
+		        public_tracker_list,
+		        custom_unregistered_keywords, custom_mismatch_keywords
 		 FROM queue_cleaner_settings WHERE app_type = $1`, appType,
 	).Scan(&s.AppType, &s.Enabled, &s.StalledThresholdMinutes, &s.SlowThresholdBytesPerSec,
 		&s.MaxStrikes, &s.StrikeWindowHours, &s.CheckIntervalSeconds,
@@ -68,8 +72,11 @@ func (db *DB) GetQueueCleanerSettings(ctx context.Context, appType AppType) (*Qu
 		&s.BlocklistStalled, &s.BlocklistSlow, &s.BlocklistMetadata,
 		&s.BlocklistDuplicate, &s.BlocklistUnregistered,
 		&s.IgnoredDownloadClients,
+		&s.IgnoredReleaseGroups,
 		&s.MismatchEnabled, &s.MaxStrikesMismatch, &s.BlocklistMismatch,
-		&s.KeepArchives)
+		&s.KeepArchives,
+		&s.PublicTrackerList,
+		&s.CustomUnregisteredKeywords, &s.CustomMismatchKeywords)
 	if err != nil {
 		return nil, fmt.Errorf("get queue cleaner settings: %w", err)
 	}
@@ -107,8 +114,11 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		        blocklist_stalled = $54, blocklist_slow = $55, blocklist_metadata = $56,
 		        blocklist_duplicate = $57, blocklist_unregistered = $58,
 		        ignored_download_clients = $59,
-		        mismatch_enabled = $60, max_strikes_mismatch = $61, blocklist_mismatch = $62,
-		        keep_archives = $63
+		        ignored_release_groups = $60,
+		        mismatch_enabled = $61, max_strikes_mismatch = $62, blocklist_mismatch = $63,
+		        keep_archives = $64,
+		        public_tracker_list = $65,
+		        custom_unregistered_keywords = $66, custom_mismatch_keywords = $67
 		 WHERE app_type = $1`,
 		s.AppType, s.Enabled, s.StalledThresholdMinutes, s.SlowThresholdBytesPerSec,
 		s.MaxStrikes, s.StrikeWindowHours, s.CheckIntervalSeconds,
@@ -136,8 +146,11 @@ func (db *DB) UpdateQueueCleanerSettings(ctx context.Context, s *QueueCleanerSet
 		s.BlocklistStalled, s.BlocklistSlow, s.BlocklistMetadata,
 		s.BlocklistDuplicate, s.BlocklistUnregistered,
 		s.IgnoredDownloadClients,
+		s.IgnoredReleaseGroups,
 		s.MismatchEnabled, s.MaxStrikesMismatch, s.BlocklistMismatch,
-		s.KeepArchives)
+		s.KeepArchives,
+		s.PublicTrackerList,
+		s.CustomUnregisteredKeywords, s.CustomMismatchKeywords)
 	if err != nil {
 		return fmt.Errorf("update queue cleaner settings: %w", err)
 	}
@@ -216,17 +229,7 @@ func (db *DB) GetStrikeLog(ctx context.Context, appType AppType, limit int) ([]Q
 	if err != nil {
 		return nil, fmt.Errorf("get strike log: %w", err)
 	}
-	defer rows.Close()
-
-	var strikes []QueueStrike
-	for rows.Next() {
-		var s QueueStrike
-		if err := rows.Scan(&s.ID, &s.AppType, &s.InstanceID, &s.DownloadID, &s.Title, &s.Reason, &s.StruckAt); err != nil {
-			return nil, fmt.Errorf("scan strike log: %w", err)
-		}
-		strikes = append(strikes, s)
-	}
-	return strikes, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[QueueStrike])
 }
 
 // --- Auto Import Log ---
@@ -249,17 +252,7 @@ func (db *DB) GetAutoImportLog(ctx context.Context, appType AppType, limit int) 
 	if err != nil {
 		return nil, fmt.Errorf("get auto import log: %w", err)
 	}
-	defer rows.Close()
-
-	var logs []AutoImportLog
-	for rows.Next() {
-		var l AutoImportLog
-		if err := rows.Scan(&l.ID, &l.AppType, &l.InstanceID, &l.MediaID, &l.MediaTitle, &l.QueueItemID, &l.Action, &l.Reason, &l.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan auto import log: %w", err)
-		}
-		logs = append(logs, l)
-	}
-	return logs, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[AutoImportLog])
 }
 
 func (db *DB) PruneAutoImportLog(ctx context.Context, olderThan time.Duration) error {
@@ -277,10 +270,10 @@ func (db *DB) GetScoringProfile(ctx context.Context, appType AppType) (*ScoringP
 	var p ScoringProfile
 	err := db.Pool.QueryRow(ctx,
 		`SELECT id, app_type, name, strategy, adequate_threshold, prefer_higher_quality, prefer_larger_size, prefer_indexer_flags,
-		        custom_format_weight, size_weight, age_weight, seeders_weight, resolution_weight, source_weight, revision_bonus, created_at
+		        custom_format_weight, size_weight, age_weight, seeders_weight, resolution_weight, source_weight, hdr_weight, audio_weight, revision_bonus, created_at
 		 FROM scoring_profiles WHERE app_type = $1`, appType,
 	).Scan(&p.ID, &p.AppType, &p.Name, &p.Strategy, &p.AdequateThreshold, &p.PreferHigherQuality, &p.PreferLargerSize, &p.PreferIndexerFlags,
-		&p.CustomFormatWeight, &p.SizeWeight, &p.AgeWeight, &p.SeedersWeight, &p.ResolutionWeight, &p.SourceWeight, &p.RevisionBonus, &p.CreatedAt)
+		&p.CustomFormatWeight, &p.SizeWeight, &p.AgeWeight, &p.SeedersWeight, &p.ResolutionWeight, &p.SourceWeight, &p.HDRWeight, &p.AudioWeight, &p.RevisionBonus, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get scoring profile: %w", err)
 	}
@@ -293,12 +286,12 @@ func (db *DB) UpdateScoringProfile(ctx context.Context, p *ScoringProfile) error
 		        name = $2, strategy = $3, adequate_threshold = $4,
 		        prefer_higher_quality = $5, prefer_larger_size = $6, prefer_indexer_flags = $7,
 		        custom_format_weight = $8, size_weight = $9, age_weight = $10, seeders_weight = $11,
-		        resolution_weight = $12, source_weight = $13, revision_bonus = $14
+		        resolution_weight = $12, source_weight = $13, hdr_weight = $14, audio_weight = $15, revision_bonus = $16
 		 WHERE id = $1`,
 		p.ID, p.Name, p.Strategy, p.AdequateThreshold,
 		p.PreferHigherQuality, p.PreferLargerSize, p.PreferIndexerFlags,
 		p.CustomFormatWeight, p.SizeWeight, p.AgeWeight, p.SeedersWeight,
-		p.ResolutionWeight, p.SourceWeight, p.RevisionBonus)
+		p.ResolutionWeight, p.SourceWeight, p.HDRWeight, p.AudioWeight, p.RevisionBonus)
 	if err != nil {
 		return fmt.Errorf("update scoring profile: %w", err)
 	}
@@ -325,17 +318,7 @@ func (db *DB) GetBlocklistLog(ctx context.Context, appType AppType, limit int) (
 	if err != nil {
 		return nil, fmt.Errorf("get blocklist log: %w", err)
 	}
-	defer rows.Close()
-
-	var logs []BlocklistLog
-	for rows.Next() {
-		var l BlocklistLog
-		if err := rows.Scan(&l.ID, &l.AppType, &l.InstanceID, &l.DownloadID, &l.Title, &l.Reason, &l.BlocklistedAt); err != nil {
-			return nil, fmt.Errorf("scan blocklist log: %w", err)
-		}
-		logs = append(logs, l)
-	}
-	return logs, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[BlocklistLog])
 }
 
 func (db *DB) PruneBlocklistLog(ctx context.Context, olderThan time.Duration) error {
@@ -427,19 +410,7 @@ func (db *DB) ListSeedingRuleGroups(ctx context.Context) ([]SeedingRuleGroup, er
 	if err != nil {
 		return nil, fmt.Errorf("list seeding rule groups: %w", err)
 	}
-	defer rows.Close()
-
-	var groups []SeedingRuleGroup
-	for rows.Next() {
-		var g SeedingRuleGroup
-		if err := rows.Scan(&g.ID, &g.Name, &g.Priority, &g.MatchType, &g.MatchPattern,
-			&g.MaxRatio, &g.MaxHours, &g.SeedingMode, &g.SkipRemoval, &g.DeleteFiles,
-			&g.CreatedAt, &g.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan seeding rule group: %w", err)
-		}
-		groups = append(groups, g)
-	}
-	return groups, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[SeedingRuleGroup])
 }
 
 func (db *DB) CreateSeedingRuleGroup(ctx context.Context, g *SeedingRuleGroup) (*SeedingRuleGroup, error) {

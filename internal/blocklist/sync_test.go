@@ -15,6 +15,7 @@ group:FGT
 regex:(?i)\bCAM\b
 indexer:BadIndexer
 contains:HDTS
+file:(?i)\.(exe|scr)$
 
 # Empty lines are skipped
 
@@ -36,6 +37,7 @@ YIFY
 		{`(?i)\bCAM\b`, "title_regex"},
 		{"BadIndexer", "indexer"},
 		{"HDTS", "title_contains"},
+		{`(?i)\.(exe|scr)$`, "file_pattern"},
 		{"YIFY", "release_group"},
 	}
 

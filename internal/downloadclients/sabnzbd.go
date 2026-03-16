@@ -2,6 +2,7 @@ package downloadclient
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 
 	"github.com/lusoris/lurkarr/internal/downloadclients/usenet/sabnzbd"
@@ -24,7 +25,10 @@ func (a *SABnzbdAdapter) GetItems(ctx context.Context) ([]DownloadItem, error) {
 	}
 	items := make([]DownloadItem, 0, len(queue.Slots))
 	for _, s := range queue.Slots {
-		pct, _ := strconv.ParseFloat(s.Percentage, 64)
+		pct, err := strconv.ParseFloat(s.Percentage, 64)
+		if err != nil {
+			slog.Warn("sabnzbd: failed to parse percentage", "nzo_id", s.NzoID, "value", s.Percentage, "error", err)
+		}
 		items = append(items, DownloadItem{
 			ID:       s.NzoID,
 			Name:     s.Filename,

@@ -155,9 +155,11 @@ func (e *SyncEngine) sync(ctx context.Context, settings *Settings) {
 // whose last update is older than the configured grace period.
 func (e *SyncEngine) cleanupFulfilledRequests(ctx context.Context, client *Client, afterDays int) {
 	cutoff := time.Now().AddDate(0, 0, -afterDays)
-	cleaned := 0
 
-	// Paginate through available requests.
+	// Phase 1: Collect all IDs eligible for deletion. We must not delete while
+	// paginating because Seerr's offset-based pagination shifts items when
+	// earlier entries are removed, causing us to skip records.
+	var toDelete []int
 	for skip := 0; ; skip += 50 {
 		resp, err := client.ListRequests(ctx, "available", 50, skip)
 		if err != nil {
@@ -172,22 +174,22 @@ func (e *SyncEngine) cleanupFulfilledRequests(ctx context.Context, client *Clien
 			if req.UpdatedAt.After(cutoff) {
 				continue
 			}
-			if err := client.DeleteRequest(ctx, req.ID); err != nil {
-				slog.Error("seerr: failed to delete fulfilled request",
-					"request_id", req.ID, "error", err)
-			} else {
-				cleaned++
-				slog.Info("seerr: cleaned up fulfilled request",
-					"request_id", req.ID,
-					"type", req.Type,
-					"tmdb_id", req.Media.TmdbID,
-					"fulfilled_at", req.UpdatedAt,
-				)
-			}
+			toDelete = append(toDelete, req.ID)
 		}
 
 		if len(resp.Results) < 50 {
 			break
+		}
+	}
+
+	// Phase 2: Delete collected requests.
+	cleaned := 0
+	for _, id := range toDelete {
+		if err := client.DeleteRequest(ctx, id); err != nil {
+			slog.Error("seerr: failed to delete fulfilled request",
+				"request_id", id, "error", err)
+		} else {
+			cleaned++
 		}
 	}
 

@@ -23,34 +23,23 @@ type WhisparrEpisode struct {
 
 // WhisparrGetMissing fetches scenes/movies without files via the wanted/missing endpoint.
 func (c *Client) WhisparrGetMissing(ctx context.Context) ([]WhisparrEpisode, error) {
-	var resp struct {
-		TotalRecords int               `json:"totalRecords"`
-		Records      []WhisparrEpisode `json:"records"`
-	}
-	if err := c.get(ctx, whisparrAPI+"/wanted/missing?sortKey=releaseDate&sortDirection=descending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("whisparr get missing: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[WhisparrEpisode](ctx, c, whisparrAPI, "missing", "releaseDate", "descending", "whisparr get missing")
 }
 
 // WhisparrGetCutoffUnmet fetches scenes/movies that haven't met quality cutoff.
 func (c *Client) WhisparrGetCutoffUnmet(ctx context.Context) ([]WhisparrEpisode, error) {
-	var resp struct {
-		TotalRecords int               `json:"totalRecords"`
-		Records      []WhisparrEpisode `json:"records"`
-	}
-	if err := c.get(ctx, whisparrAPI+"/wanted/cutoff?sortKey=releaseDate&sortDirection=descending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("whisparr get cutoff unmet: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[WhisparrEpisode](ctx, c, whisparrAPI, "cutoff", "releaseDate", "descending", "whisparr get cutoff unmet")
 }
 
 // WhisparrSearchEpisode triggers a search for specific episode (scene/movie) IDs.
 func (c *Client) WhisparrSearchEpisode(ctx context.Context, episodeIDs []int) (*CommandResponse, error) {
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		"name":       "EpisodeSearch",
 		"episodeIds": episodeIDs,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal whisparr search: %w", err)
+	}
 	var resp CommandResponse
 	if err := c.post(ctx, whisparrAPI+"/command", bytes.NewReader(body), &resp); err != nil {
 		return nil, fmt.Errorf("whisparr search episode: %w", err)
@@ -60,20 +49,20 @@ func (c *Client) WhisparrSearchEpisode(ctx context.Context, episodeIDs []int) (*
 
 // WhisparrGetQueue returns the current download queue.
 func (c *Client) WhisparrGetQueue(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, whisparrAPI+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, whisparrAPI+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("whisparr get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // WhisparrGetQueueEnriched returns the queue with embedded series+episode data.
 func (c *Client) WhisparrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, whisparrAPI+"/queue?pageSize=1000&includeSeries=true&includeEpisode=true", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, whisparrAPI+"/queue?includeSeries=true&includeEpisode=true")
+	if err != nil {
 		return nil, fmt.Errorf("whisparr get enriched queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // WhisparrTestConnection tests the Whisparr v2 API connection.

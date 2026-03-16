@@ -4,6 +4,8 @@ interface User {
 	id: string;
 	username: string;
 	is_admin: boolean;
+	has_2fa: boolean;
+	auth_provider: string;
 	created_at: string;
 }
 
@@ -14,7 +16,11 @@ export function getAuth() {
 	async function check() {
 		loading = true;
 		try {
-			user = await api.get<User>('/user');
+			const fetched = await api.get<User>('/user');
+			// Only update if user actually changed (avoids $effect cascades).
+			if (!user || user.id !== fetched.id || user.username !== fetched.username) {
+				user = fetched;
+			}
 		} catch {
 			user = null;
 		} finally {

@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/notifications"
 )
@@ -51,9 +50,8 @@ func (h *NotificationHandler) HandleListProviders(w http.ResponseWriter, r *http
 
 // HandleGetProvider handles GET /api/notifications/providers/{id}.
 func (h *NotificationHandler) HandleGetProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid provider ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -67,16 +65,18 @@ func (h *NotificationHandler) HandleGetProvider(w http.ResponseWriter, r *http.R
 
 // HandleCreateProvider handles POST /api/notifications/providers.
 func (h *NotificationHandler) HandleCreateProvider(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-
-	var provider database.NotificationProvider
-	if err := json.NewDecoder(r.Body).Decode(&provider); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	provider, ok := decodeJSON[database.NotificationProvider](w, r)
+	if !ok {
 		return
 	}
 
 	if !validProviderType(provider.Type) {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid provider type"))
+		return
+	}
+
+	if err := validateProviderURLs(provider.Type, provider.Config); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 
@@ -91,23 +91,24 @@ func (h *NotificationHandler) HandleCreateProvider(w http.ResponseWriter, r *htt
 
 // HandleUpdateProvider handles PUT /api/notifications/providers/{id}.
 func (h *NotificationHandler) HandleUpdateProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid provider ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-
-	var provider database.NotificationProvider
-	if err := json.NewDecoder(r.Body).Decode(&provider); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	provider, ok := decodeJSON[database.NotificationProvider](w, r)
+	if !ok {
 		return
 	}
 	provider.ID = id
 
 	if !validProviderType(provider.Type) {
 		writeJSON(w, http.StatusBadRequest, errorResponse("invalid provider type"))
+		return
+	}
+
+	if err := validateProviderURLs(provider.Type, provider.Config); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(err.Error()))
 		return
 	}
 
@@ -122,9 +123,8 @@ func (h *NotificationHandler) HandleUpdateProvider(w http.ResponseWriter, r *htt
 
 // HandleDeleteProvider handles DELETE /api/notifications/providers/{id}.
 func (h *NotificationHandler) HandleDeleteProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid provider ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -134,14 +134,13 @@ func (h *NotificationHandler) HandleDeleteProvider(w http.ResponseWriter, r *htt
 	}
 
 	h.syncManager(r)
-	writeJSON(w, http.StatusNoContent, nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // HandleTestProvider handles POST /api/notifications/providers/{id}/test.
 func (h *NotificationHandler) HandleTestProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid provider ID"))
+	id, ok := parseUUID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -181,6 +180,41 @@ func validProviderType(t string) bool {
 		return true
 	}
 	return false
+}
+
+// validateProviderURLs checks that any URL fields in the provider config
+// use http/https and have a valid host (prevents SSRF via file://, gopher://, etc).
+func validateProviderURLs(providerType string, config json.RawMessage) error {
+	var raw map[string]any
+	if err := json.Unmarshal(config, &raw); err != nil {
+		// Config isn't simple key-value — let BuildProvider handle malformed JSON.
+		return nil
+	}
+
+	str := func(key string) string {
+		v, _ := raw[key].(string)
+		return v
+	}
+
+	// Map provider types to their URL config keys
+	var urlKeys []string
+	switch notifications.ProviderType(providerType) {
+	case notifications.ProviderDiscord:
+		urlKeys = []string{"webhook_url"}
+	case notifications.ProviderGotify, notifications.ProviderNtfy, notifications.ProviderApprise:
+		urlKeys = []string{"server_url"}
+	case notifications.ProviderWebhook:
+		urlKeys = []string{"url"}
+	}
+
+	for _, key := range urlKeys {
+		if v := str(key); v != "" {
+			if err := validateAPIURL(v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // HandleGetNotificationHistory handles GET /api/notifications/history.

@@ -34,26 +34,12 @@ type SonarrEpisode struct {
 
 // SonarrGetMissing fetches episodes without files.
 func (c *Client) SonarrGetMissing(ctx context.Context) ([]SonarrEpisode, error) {
-	var resp struct {
-		TotalRecords int             `json:"totalRecords"`
-		Records      []SonarrEpisode `json:"records"`
-	}
-	if err := c.get(ctx, sonarrAPI+"/wanted/missing?sortKey=airDateUtc&sortDirection=descending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("sonarr get missing: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[SonarrEpisode](ctx, c, sonarrAPI, "missing", "airDateUtc", "descending", "sonarr get missing")
 }
 
 // SonarrGetCutoffUnmet fetches episodes that haven't met quality cutoff.
 func (c *Client) SonarrGetCutoffUnmet(ctx context.Context) ([]SonarrEpisode, error) {
-	var resp struct {
-		TotalRecords int             `json:"totalRecords"`
-		Records      []SonarrEpisode `json:"records"`
-	}
-	if err := c.get(ctx, sonarrAPI+"/wanted/cutoff?sortKey=airDateUtc&sortDirection=descending&pageSize=1000", &resp); err != nil {
-		return nil, fmt.Errorf("sonarr get cutoff unmet: %w", err)
-	}
-	return resp.Records, nil
+	return getWanted[SonarrEpisode](ctx, c, sonarrAPI, "cutoff", "airDateUtc", "descending", "sonarr get cutoff unmet")
 }
 
 // SonarrSearchEpisode triggers a search for specific episode IDs.
@@ -98,21 +84,21 @@ func (c *Client) SonarrSearchSeries(ctx context.Context, seriesID int) (*Command
 
 // SonarrGetQueue returns the current download queue.
 func (c *Client) SonarrGetQueue(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, sonarrAPI+"/queue?pageSize=1000", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, sonarrAPI+"/queue")
+	if err != nil {
 		return nil, fmt.Errorf("sonarr get queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // SonarrGetQueueEnriched returns the queue with embedded series+episode data.
 // Used for cross-arr sync to match by TVDB ID + season instead of title.
 func (c *Client) SonarrGetQueueEnriched(ctx context.Context) (*QueueResponse, error) {
-	var resp QueueResponse
-	if err := c.get(ctx, sonarrAPI+"/queue?pageSize=1000&includeSeries=true&includeEpisode=true", &resp); err != nil {
+	records, err := getAllPages[QueueRecord](ctx, c, sonarrAPI+"/queue?includeSeries=true&includeEpisode=true")
+	if err != nil {
 		return nil, fmt.Errorf("sonarr get enriched queue: %w", err)
 	}
-	return &resp, nil
+	return &QueueResponse{TotalRecords: len(records), Records: records}, nil
 }
 
 // SonarrTestConnection tests the Sonarr API connection.

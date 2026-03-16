@@ -178,7 +178,7 @@ type GeneralSettings struct {
 	StatefulResetHours        int    `json:"stateful_reset_hours"`
 	CommandWaitDelay          int    `json:"command_wait_delay"`
 	CommandWaitAttempts       int    `json:"command_wait_attempts"`
-	MinDownloadQueueSize      int    `json:"min_download_queue_size"`
+	MaxDownloadQueueSize      int    `json:"max_download_queue_size"`
 	AutoImportIntervalMinutes int    `json:"auto_import_interval_minutes"`
 }
 
@@ -282,6 +282,62 @@ func (s *SABnzbdSettings) MaskedAPIKey() string {
 	return "****" + s.APIKey[len(s.APIKey)-4:]
 }
 
+type BazarrSettings struct {
+	ID        int       `json:"id"`
+	URL       string    `json:"url"`
+	APIKey    string    `json:"api_key"`
+	Enabled   bool      `json:"enabled"`
+	Timeout   int       `json:"timeout"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// MaskedAPIKey returns the Bazarr API key masked.
+func (b *BazarrSettings) MaskedAPIKey() string {
+	if len(b.APIKey) <= 4 {
+		return "****"
+	}
+	return "****" + b.APIKey[len(b.APIKey)-4:]
+}
+
+// KapowarrSettings holds the singleton Kapowarr connection config.
+type KapowarrSettings struct {
+	ID        int       `json:"id"`
+	URL       string    `json:"url"`
+	APIKey    string    `json:"api_key"`
+	Enabled   bool      `json:"enabled"`
+	Timeout   int       `json:"timeout"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// MaskedAPIKey returns the Kapowarr API key masked.
+func (k *KapowarrSettings) MaskedAPIKey() string {
+	if len(k.APIKey) <= 4 {
+		return "****"
+	}
+	return "****" + k.APIKey[len(k.APIKey)-4:]
+}
+
+// ShokoSettings holds the singleton Shoko connection config.
+type ShokoSettings struct {
+	ID        int       `json:"id"`
+	URL       string    `json:"url"`
+	APIKey    string    `json:"api_key"`
+	Enabled   bool      `json:"enabled"`
+	Timeout   int       `json:"timeout"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// MaskedAPIKey returns the Shoko API key masked.
+func (s *ShokoSettings) MaskedAPIKey() string {
+	if len(s.APIKey) <= 4 {
+		return "****"
+	}
+	return "****" + s.APIKey[len(s.APIKey)-4:]
+}
+
 // QueueCleanerSettings holds per-app queue cleaning configuration.
 type QueueCleanerSettings struct {
 	AppType                  AppType `json:"app_type"`
@@ -367,12 +423,19 @@ type QueueCleanerSettings struct {
 	BlocklistUnregistered bool `json:"blocklist_unregistered"` // Blocklist when removing unregistered torrents
 	// Ignore specific download clients
 	IgnoredDownloadClients string `json:"ignored_download_clients"` // Comma-separated download client names to skip during cleanup
+	// Ignore specific release groups (allow-list)
+	IgnoredReleaseGroups string `json:"ignored_release_groups"` // Comma-separated release group names exempt from all cleanup
 	// Metadata mismatch detection
 	MismatchEnabled    bool `json:"mismatch_enabled"`     // Detect and strike downloads with wrong metadata (wrong series/movie/episode)
 	MaxStrikesMismatch int  `json:"max_strikes_mismatch"` // Override max_strikes for mismatch items (0 = use global)
 	BlocklistMismatch  bool `json:"blocklist_mismatch"`   // Blocklist when removing mismatched items
 	// Keep archives for unpackerr
 	KeepArchives bool `json:"keep_archives"` // Preserve download files for unpackerr when removing (override removeFromClient to false)
+	// Configurable public tracker list
+	PublicTrackerList string `json:"public_tracker_list"` // Comma-separated known public indexer names for private/public tracker detection
+	// Custom keyword overrides for detection heuristics (comma-separated, empty = use defaults)
+	CustomUnregisteredKeywords string `json:"custom_unregistered_keywords"` // Extra keywords for unregistered torrent detection
+	CustomMismatchKeywords     string `json:"custom_mismatch_keywords"`     // Extra keywords for metadata mismatch detection
 }
 
 // QueueStrike represents a strike against a problematic download.
@@ -415,6 +478,8 @@ type ScoringProfile struct {
 	SeedersWeight       int       `json:"seeders_weight"`
 	ResolutionWeight    int       `json:"resolution_weight"`
 	SourceWeight        int       `json:"source_weight"`
+	HDRWeight           int       `json:"hdr_weight"`
+	AudioWeight         int       `json:"audio_weight"`
 	RevisionBonus       int       `json:"revision_bonus"`
 	CreatedAt           time.Time `json:"created_at"`
 }
@@ -425,7 +490,7 @@ type SeedingRuleGroup struct {
 	ID           int       `json:"id"`
 	Name         string    `json:"name"`
 	Priority     int       `json:"priority"`
-	MatchType    string    `json:"match_type"`    // "tracker", "category", "tag"
+	MatchType    string    `json:"match_type"` // "tracker", "category", "tag"
 	MatchPattern string    `json:"match_pattern"`
 	MaxRatio     float64   `json:"max_ratio"`
 	MaxHours     int       `json:"max_hours"`

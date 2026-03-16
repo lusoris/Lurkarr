@@ -57,7 +57,9 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !auth.CheckPassword(req.Password, user.Password) {
-		_ = h.DB.IncrementFailedLogins(r.Context(), user.ID, maxFailedLogins, lockoutDuration)
+		if err := h.DB.IncrementFailedLogins(r.Context(), user.ID, maxFailedLogins, lockoutDuration); err != nil {
+			slog.Error("failed to increment failed logins", "error", err, "user_id", user.ID)
+		}
 		writeJSON(w, http.StatusUnauthorized, errorResponse("invalid credentials"))
 		return
 	}
@@ -95,13 +97,17 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Reset failed login counter on successful authentication
 	if user.FailedLoginAttempts > 0 {
-		_ = h.DB.ResetFailedLogins(r.Context(), user.ID)
+		if err := h.DB.ResetFailedLogins(r.Context(), user.ID); err != nil {
+			slog.Error("failed to reset failed logins", "error", err, "user_id", user.ID)
+		}
 	}
 
 	// Session rotation: invalidate any existing session before creating a new one
 	if cookie, err := r.Cookie("lurkarr_session"); err == nil {
 		if oldID, err := uuid.Parse(cookie.Value); err == nil {
-			_ = h.DB.DeleteSession(r.Context(), oldID)
+			if err := h.DB.DeleteSession(r.Context(), oldID); err != nil {
+				slog.Error("failed to delete old session during rotation", "error", err, "session_id", oldID)
+			}
 		}
 	}
 
@@ -165,13 +171,7 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.DB.CreateUser(r.Context(), req.Username, hash)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to create user"))
-		return
-	}
-
-	// Generate and store secret key
+	// Generate secret key for initial settings.
 	secretKey, err := auth.GenerateSecretKey(32)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to generate secret key"))
@@ -179,17 +179,20 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := &database.GeneralSettings{
-		SecretKey:                  secretKey,
-		SSLVerify:                  true,
-		APITimeout:                 120,
-		StatefulResetHours:         168,
-		CommandWaitDelay:           1,
-		CommandWaitAttempts:        600,
-		MinDownloadQueueSize:       0,
-		AutoImportIntervalMinutes:  5,
+		SecretKey:                 secretKey,
+		SSLVerify:                 true,
+		APITimeout:                120,
+		StatefulResetHours:        168,
+		CommandWaitDelay:          1,
+		CommandWaitAttempts:       600,
+		MaxDownloadQueueSize:      0,
+		AutoImportIntervalMinutes: 5,
 	}
-	if err := h.DB.UpsertGeneralSettings(r.Context(), settings); err != nil {
-		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save settings"))
+
+	// Atomically create the first user and initial settings in one transaction.
+	user, err := h.DB.SetupFirstUser(r.Context(), req.Username, hash, settings)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to complete setup"))
 		return
 	}
 
@@ -215,13 +218,7 @@ func (h *AuthHandler) Handle2FAEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store secret temporarily — will be confirmed on verify
-	if err := h.DB.SetTOTPSecret(r.Context(), user.ID, &secret); err != nil {
-		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save TOTP secret"))
-		return
-	}
-
-	// Generate recovery codes
+	// Generate recovery codes first — if this fails, TOTP stays disabled
 	plainCodes, hashedCodes, err := auth.GenerateRecoveryCodes()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to generate recovery codes"))
@@ -229,6 +226,12 @@ func (h *AuthHandler) Handle2FAEnable(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.DB.SetRecoveryCodes(r.Context(), user.ID, hashedCodes); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save recovery codes"))
+		return
+	}
+
+	// Now activate TOTP — recovery codes are already persisted
+	if err := h.DB.SetTOTPSecret(r.Context(), user.ID, &secret); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to save TOTP secret"))
 		return
 	}
 

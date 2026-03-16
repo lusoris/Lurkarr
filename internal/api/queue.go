@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -15,13 +14,12 @@ type QueueHandler struct {
 
 // HandleGetQueueCleanerSettings handles GET /api/queue/settings/{app}.
 func (h *QueueHandler) HandleGetQueueCleanerSettings(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	settings, err := h.DB.GetQueueCleanerSettings(r.Context(), database.AppType(appType))
+	settings, err := h.DB.GetQueueCleanerSettings(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get queue cleaner settings"))
 		return
@@ -32,19 +30,16 @@ func (h *QueueHandler) HandleGetQueueCleanerSettings(w http.ResponseWriter, r *h
 
 // HandleUpdateQueueCleanerSettings handles PUT /api/queue/settings/{app}.
 func (h *QueueHandler) HandleUpdateQueueCleanerSettings(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var s database.QueueCleanerSettings
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	s, ok := decodeJSON[database.QueueCleanerSettings](w, r)
+	if !ok {
 		return
 	}
-	s.AppType = database.AppType(appType)
+	s.AppType = appType
 
 	if err := h.DB.UpdateQueueCleanerSettings(r.Context(), &s); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to update queue cleaner settings"))
@@ -56,13 +51,12 @@ func (h *QueueHandler) HandleUpdateQueueCleanerSettings(w http.ResponseWriter, r
 
 // HandleGetScoringProfile handles GET /api/queue/scoring/{app}.
 func (h *QueueHandler) HandleGetScoringProfile(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	profile, err := h.DB.GetScoringProfile(r.Context(), database.AppType(appType))
+	profile, err := h.DB.GetScoringProfile(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get scoring profile"))
 		return
@@ -73,21 +67,18 @@ func (h *QueueHandler) HandleGetScoringProfile(w http.ResponseWriter, r *http.Re
 
 // HandleUpdateScoringProfile handles PUT /api/queue/scoring/{app}.
 func (h *QueueHandler) HandleUpdateScoringProfile(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var p database.ScoringProfile
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	p, ok := decodeJSON[database.ScoringProfile](w, r)
+	if !ok {
 		return
 	}
 
 	// Load existing to get the ID
-	existing, err := h.DB.GetScoringProfile(r.Context(), database.AppType(appType))
+	existing, err := h.DB.GetScoringProfile(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get existing profile"))
 		return
@@ -104,13 +95,12 @@ func (h *QueueHandler) HandleUpdateScoringProfile(w http.ResponseWriter, r *http
 
 // HandleGetBlocklistLog handles GET /api/queue/blocklist/{app}.
 func (h *QueueHandler) HandleGetBlocklistLog(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	logs, err := h.DB.GetBlocklistLog(r.Context(), database.AppType(appType), 100)
+	logs, err := h.DB.GetBlocklistLog(r.Context(), appType, 100)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get blocklist log"))
 		return
@@ -124,13 +114,12 @@ func (h *QueueHandler) HandleGetBlocklistLog(w http.ResponseWriter, r *http.Requ
 
 // HandleGetStrikeLog handles GET /api/queue/strikes/{app}.
 func (h *QueueHandler) HandleGetStrikeLog(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	strikes, err := h.DB.GetStrikeLog(r.Context(), database.AppType(appType), 200)
+	strikes, err := h.DB.GetStrikeLog(r.Context(), appType, 200)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get strike log"))
 		return
@@ -144,13 +133,12 @@ func (h *QueueHandler) HandleGetStrikeLog(w http.ResponseWriter, r *http.Request
 
 // HandleGetAutoImportLog handles GET /api/queue/imports/{app}.
 func (h *QueueHandler) HandleGetAutoImportLog(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	logs, err := h.DB.GetAutoImportLog(r.Context(), database.AppType(appType), 100)
+	logs, err := h.DB.GetAutoImportLog(r.Context(), appType, 100)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get auto import log"))
 		return
@@ -164,13 +152,12 @@ func (h *QueueHandler) HandleGetAutoImportLog(w http.ResponseWriter, r *http.Req
 
 // HandleGetDownloadClientSettings handles GET /api/queue/download-client/{app}.
 func (h *QueueHandler) HandleGetDownloadClientSettings(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	settings, err := h.DB.GetDownloadClientSettings(r.Context(), database.AppType(appType))
+	settings, err := h.DB.GetDownloadClientSettings(r.Context(), appType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to get download client settings"))
 		return
@@ -182,19 +169,16 @@ func (h *QueueHandler) HandleGetDownloadClientSettings(w http.ResponseWriter, r 
 
 // HandleUpdateDownloadClientSettings handles PUT /api/queue/download-client/{app}.
 func (h *QueueHandler) HandleUpdateDownloadClientSettings(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	limitBody(w, r)
-	var s database.DownloadClientSettings
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	s, ok := decodeJSON[database.DownloadClientSettings](w, r)
+	if !ok {
 		return
 	}
-	s.AppType = database.AppType(appType)
+	s.AppType = appType
 
 	// If masked password sent back, preserve existing.
 	if s.Password == "" || s.Password == "****" {
@@ -228,10 +212,8 @@ func (h *QueueHandler) HandleListSeedingRuleGroups(w http.ResponseWriter, r *htt
 
 // HandleCreateSeedingRuleGroup handles POST /api/queue/seeding-groups.
 func (h *QueueHandler) HandleCreateSeedingRuleGroup(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var g database.SeedingRuleGroup
-	if err := json.NewDecoder(r.Body).Decode(&g); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	g, ok := decodeJSON[database.SeedingRuleGroup](w, r)
+	if !ok {
 		return
 	}
 	created, err := h.DB.CreateSeedingRuleGroup(r.Context(), &g)
@@ -244,10 +226,8 @@ func (h *QueueHandler) HandleCreateSeedingRuleGroup(w http.ResponseWriter, r *ht
 
 // HandleUpdateSeedingRuleGroup handles PUT /api/queue/seeding-groups/{id}.
 func (h *QueueHandler) HandleUpdateSeedingRuleGroup(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var g database.SeedingRuleGroup
-	if err := json.NewDecoder(r.Body).Decode(&g); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	g, ok := decodeJSON[database.SeedingRuleGroup](w, r)
+	if !ok {
 		return
 	}
 	idStr := r.PathValue("id")

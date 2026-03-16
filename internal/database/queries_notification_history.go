@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // InsertNotificationHistory records a single notification delivery.
@@ -40,21 +41,7 @@ func (db *DB) ListNotificationHistory(ctx context.Context, limit int) ([]Notific
 	if err != nil {
 		return nil, fmt.Errorf("list notification history: %w", err)
 	}
-	defer rows.Close()
-
-	var items []NotificationHistory
-	for rows.Next() {
-		var h NotificationHistory
-		if err := rows.Scan(
-			&h.ID, &h.ProviderID, &h.ProviderType, &h.ProviderName, &h.EventType,
-			&h.Title, &h.Message, &h.AppType, &h.Instance,
-			&h.Status, &h.Error, &h.DurationMs, &h.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan notification history: %w", err)
-		}
-		items = append(items, h)
-	}
-	return items, rows.Err()
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[NotificationHistory])
 }
 
 // DeleteOldNotificationHistory removes entries older than the given time.

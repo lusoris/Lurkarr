@@ -17,8 +17,7 @@ import (
 // SyncStore defines the database operations needed by the syncer.
 type SyncStore interface {
 	ListBlocklistSources(ctx context.Context) ([]database.BlocklistSource, error)
-	DeleteBlocklistRulesBySource(ctx context.Context, sourceID uuid.UUID) error
-	CreateBlocklistRule(ctx context.Context, r *database.BlocklistRule) error
+	ReplaceBlocklistRulesForSource(ctx context.Context, sourceID uuid.UUID, rules []database.BlocklistRule) error
 	UpdateBlocklistSourceSync(ctx context.Context, id uuid.UUID, etag string) error
 }
 
@@ -90,17 +89,13 @@ func (s *Syncer) SyncSource(ctx context.Context, src database.BlocklistSource) e
 		return fmt.Errorf("parse source %s: %w", src.Name, err)
 	}
 
-	// Replace all rules for this source atomically.
-	if err := s.db.DeleteBlocklistRulesBySource(ctx, src.ID); err != nil {
-		return fmt.Errorf("delete old rules for %s: %w", src.Name, err)
-	}
-
+	// Replace all rules for this source atomically within a transaction.
 	for i := range rules {
 		rules[i].SourceID = &src.ID
 		rules[i].Enabled = true
-		if err := s.db.CreateBlocklistRule(ctx, &rules[i]); err != nil {
-			return fmt.Errorf("create rule for %s: %w", src.Name, err)
-		}
+	}
+	if err := s.db.ReplaceBlocklistRulesForSource(ctx, src.ID, rules); err != nil {
+		return fmt.Errorf("replace rules for %s: %w", src.Name, err)
 	}
 
 	etag := resp.Header.Get("ETag")
@@ -145,6 +140,9 @@ func ParseBlocklist(r io.Reader) ([]database.BlocklistRule, error) {
 				pattern = strings.TrimSpace(line[idx+1:])
 			case "contains":
 				patternType = "title_contains"
+				pattern = strings.TrimSpace(line[idx+1:])
+			case "file":
+				patternType = "file_pattern"
 				pattern = strings.TrimSpace(line[idx+1:])
 			}
 		}

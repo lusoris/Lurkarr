@@ -30,6 +30,7 @@ func New(ctx context.Context, databaseURL string, maxConns int32) (*DB, error) {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
 	config.MaxConns = maxConns
+	config.ConnConfig.RuntimeParams["statement_timeout"] = "30000" // 30s
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {

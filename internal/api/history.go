@@ -37,6 +37,9 @@ func (h *HistoryHandler) HandleListHistory(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to load history"))
 		return
 	}
+	if items == nil {
+		items = []database.LurkHistory{}
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"items": items,
@@ -46,13 +49,12 @@ func (h *HistoryHandler) HandleListHistory(w http.ResponseWriter, r *http.Reques
 
 // HandleDeleteHistory handles DELETE /api/history/{app}.
 func (h *HistoryHandler) HandleDeleteHistory(w http.ResponseWriter, r *http.Request) {
-	appType := r.PathValue("app")
-	if !database.ValidAppType(appType) {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid app type"))
+	appType, ok := validAppTypeParam(w, r)
+	if !ok {
 		return
 	}
 
-	if err := h.DB.DeleteHistory(r.Context(), database.AppType(appType)); err != nil {
+	if err := h.DB.DeleteHistory(r.Context(), appType); err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse("failed to delete history"))
 		return
 	}

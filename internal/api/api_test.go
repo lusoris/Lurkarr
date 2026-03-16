@@ -18,28 +18,11 @@ import (
 	"github.com/lusoris/lurkarr/internal/logging"
 	"github.com/lusoris/lurkarr/internal/mocks"
 	"github.com/lusoris/lurkarr/internal/scheduler"
+	"github.com/lusoris/lurkarr/internal/seerr"
 )
 
 // Silence unused import
 var _ = slog.Default
-
-// --- helpers ---
-
-func reqWithPathValue(method, path string, body []byte, key, value string) *http.Request {
-	var r *http.Request
-	if body != nil {
-		r = httptest.NewRequest(method, path, bytes.NewReader(body))
-	} else {
-		r = httptest.NewRequest(method, path, http.NoBody)
-	}
-	r.SetPathValue(key, value)
-	return r
-}
-
-func reqWithUserCtx(r *http.Request, user *database.User) *http.Request {
-	ctx := auth.ContextWithUser(r.Context(), user)
-	return r.WithContext(ctx)
-}
 
 func newTestSchedulerHandler(t *testing.T, ctrl *gomock.Controller) (sh *SchedulerHandler, apiStore *MockStore, schedStore *mocks.MockStore) {
 	t.Helper()
@@ -450,7 +433,7 @@ func TestHandleUpdateGeneralSettings_NegativeMinQueue(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{SecretKey: "s"}, nil)
 	h := &SettingsHandler{DB: store}
-	body, _ := json.Marshal(database.GeneralSettings{APITimeout: 30, MinDownloadQueueSize: -1})
+	body, _ := json.Marshal(database.GeneralSettings{APITimeout: 30, MaxDownloadQueueSize: -1})
 	w := httptest.NewRecorder()
 	h.HandleUpdateGeneralSettings(w, httptest.NewRequest("PUT", "/api/settings/general", bytes.NewReader(body)))
 	if w.Code != 400 {
@@ -1802,7 +1785,7 @@ func TestHandleSetup_CreateUserError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	store.EXPECT().UserCount(gomock.Any()).Return(0, nil)
-	store.EXPECT().CreateUser(gomock.Any(), "admin", gomock.Any()).Return(nil, errors.New("fail"))
+	store.EXPECT().SetupFirstUser(gomock.Any(), "admin", gomock.Any(), gomock.Any()).Return(nil, errors.New("fail"))
 	h := &AuthHandler{DB: store}
 	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "Testpass1"})
 	w := httptest.NewRecorder()
@@ -1817,12 +1800,11 @@ func TestHandleSetup_Success(t *testing.T) {
 	store := NewMockStore(ctrl)
 	store.EXPECT().UserCount(gomock.Any()).Return(0, nil)
 	var createdUser string
-	store.EXPECT().CreateUser(gomock.Any(), "admin", gomock.Any()).DoAndReturn(
-		func(_ interface{}, username, _ string) (*database.User, error) {
+	store.EXPECT().SetupFirstUser(gomock.Any(), "admin", gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ interface{}, username, _ string, _ *database.GeneralSettings) (*database.User, error) {
 			createdUser = username
 			return &database.User{ID: uuid.New(), Username: username}, nil
 		})
-	store.EXPECT().UpsertGeneralSettings(gomock.Any(), gomock.Any()).Return(nil)
 	// Setup calls Auth.SetSessionCookie which will panic since Auth is nil.
 	h := &AuthHandler{DB: store, Auth: nil}
 	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "Testpass1"})
@@ -1954,8 +1936,8 @@ func TestHandle2FAEnable_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	user := &database.User{ID: uuid.New(), Username: "admin"}
-	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Any()).Return(nil)
 	store.EXPECT().SetRecoveryCodes(gomock.Any(), user.ID, gomock.Any()).Return(nil)
+	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Any()).Return(nil)
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", http.NoBody)
@@ -1975,7 +1957,7 @@ func TestHandle2FAEnable_SaveError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	store := NewMockStore(ctrl)
 	user := &database.User{ID: uuid.New(), Username: "admin"}
-	store.EXPECT().SetTOTPSecret(gomock.Any(), user.ID, gomock.Any()).Return(errors.New("fail"))
+	store.EXPECT().SetRecoveryCodes(gomock.Any(), user.ID, gomock.Any()).Return(errors.New("fail"))
 	h := &AuthHandler{DB: store}
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/auth/2fa/enable", http.NoBody)
@@ -2540,5 +2522,700 @@ func TestHandleToggleAdmin_DBError(t *testing.T) {
 	h.HandleToggleAdmin(w, r)
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// AppsHandler — HandleListAllInstances tests
+// =============================================================================
+
+func TestHandleListAllInstances(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListAllInstances(gomock.Any()).Return([]database.AppInstance{
+		{ID: uuid.New(), AppType: "sonarr", Name: "Sonarr", APIKey: "abcdef123456"},
+		{ID: uuid.New(), AppType: "radarr", Name: "Radarr", APIKey: "xyz789"},
+	}, nil)
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListAllInstances(w, httptest.NewRequest("GET", "/api/instances", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var result map[string][]database.AppInstance
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result["sonarr"]) != 1 || len(result["radarr"]) != 1 {
+		t.Fatalf("expected grouped by app type, got %v", result)
+	}
+	// Verify API keys are masked
+	if result["sonarr"][0].APIKey == "abcdef123456" {
+		t.Fatal("API key should be masked")
+	}
+}
+
+func TestHandleListAllInstances_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListAllInstances(gomock.Any()).Return(nil, nil)
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListAllInstances(w, httptest.NewRequest("GET", "/api/instances", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListAllInstances_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListAllInstances(gomock.Any()).Return(nil, errors.New("db error"))
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListAllInstances(w, httptest.NewRequest("GET", "/api/instances", http.NoBody))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// AppsHandler — HandleHealthCheckInstance tests
+// =============================================================================
+
+func TestHandleHealthCheckInstance_NotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	id := uuid.New()
+	store.EXPECT().GetInstance(gomock.Any(), id).Return(nil, errors.New("not found"))
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("GET", "/api/instances/"+id.String()+"/health", nil, "id", id.String())
+	h.HandleHealthCheckInstance(w, r)
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestHandleHealthCheckInstance_BadUUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("GET", "/api/instances/bad-uuid/health", nil, "id", "bad-uuid")
+	h.HandleHealthCheckInstance(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleHealthCheckInstance_SettingsError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	id := uuid.New()
+	store.EXPECT().GetInstance(gomock.Any(), id).Return(&database.AppInstance{
+		ID: id, AppType: "sonarr", APIURL: "http://localhost:8989", APIKey: "testkey",
+	}, nil)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(nil, errors.New("db error"))
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("GET", "/api/instances/"+id.String()+"/health", nil, "id", id.String())
+	h.HandleHealthCheckInstance(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// AppsHandler — HandleTestConnection tests
+// =============================================================================
+
+func TestHandleTestConnection_MissingFields(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &AppsHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{"api_url": ""})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instances/test", bytes.NewReader(body))
+	h.HandleTestConnection(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleTestConnection_InvalidBody(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &AppsHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instances/test", bytes.NewReader([]byte("bad")))
+	h.HandleTestConnection(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleTestConnection_InvalidAppType(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &AppsHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{
+		"api_url":  "http://localhost:8989",
+		"api_key":  "testkey",
+		"app_type": "bogus",
+	})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instances/test", bytes.NewReader(body))
+	h.HandleTestConnection(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleTestConnection_InvalidURL(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &AppsHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{
+		"api_url":  "ftp://bad",
+		"api_key":  "testkey",
+		"app_type": "sonarr",
+	})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instances/test", bytes.NewReader(body))
+	h.HandleTestConnection(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleTestConnection_MaskedKeyResolution(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	id := uuid.New()
+	store.EXPECT().GetInstance(gomock.Any(), id).Return(&database.AppInstance{
+		ID: id, AppType: "sonarr", APIURL: "http://localhost:8989", APIKey: "realkey123",
+	}, nil)
+	store.EXPECT().GetGeneralSettings(gomock.Any()).Return(&database.GeneralSettings{SSLVerify: true}, nil)
+	h := &AppsHandler{DB: store}
+	body, _ := json.Marshal(map[string]string{
+		"id":       id.String(),
+		"api_url":  "http://localhost:8989",
+		"api_key":  "****key123",
+		"app_type": "sonarr",
+	})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/instances/test", bytes.NewReader(body))
+	h.HandleTestConnection(w, r)
+	// It will try to connect and fail (no real server) → 502
+	if w.Code != 502 {
+		t.Fatalf("expected 502, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// AuthHandler — HandleSetupCheck tests
+// =============================================================================
+
+func TestHandleSetupCheck_NeedsSetup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UserCount(gomock.Any()).Return(0, nil)
+	h := &AuthHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleSetupCheck(w, httptest.NewRequest("GET", "/api/auth/setup", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var result map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !result["needs_setup"] {
+		t.Fatal("expected needs_setup=true when no users exist")
+	}
+}
+
+func TestHandleSetupCheck_SetupDone(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UserCount(gomock.Any()).Return(1, nil)
+	h := &AuthHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleSetupCheck(w, httptest.NewRequest("GET", "/api/auth/setup", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var result map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result["needs_setup"] {
+		t.Fatal("expected needs_setup=false when users exist")
+	}
+}
+
+func TestHandleSetupCheck_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UserCount(gomock.Any()).Return(0, errors.New("db error"))
+	h := &AuthHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleSetupCheck(w, httptest.NewRequest("GET", "/api/auth/setup", http.NoBody))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// NotificationHandler — HandleGetNotificationHistory tests
+// =============================================================================
+
+func TestHandleGetNotificationHistory(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListNotificationHistory(gomock.Any(), 200).Return([]database.NotificationHistory{
+		{ID: uuid.New(), EventType: "lurk.completed"},
+	}, nil)
+	h := &NotificationHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetNotificationHistory(w, httptest.NewRequest("GET", "/api/notifications/history", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleGetNotificationHistory_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListNotificationHistory(gomock.Any(), 200).Return(nil, nil)
+	h := &NotificationHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetNotificationHistory(w, httptest.NewRequest("GET", "/api/notifications/history", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleGetNotificationHistory_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListNotificationHistory(gomock.Any(), 200).Return(nil, errors.New("fail"))
+	h := &NotificationHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetNotificationHistory(w, httptest.NewRequest("GET", "/api/notifications/history", http.NoBody))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleGetStrikeLog tests
+// =============================================================================
+
+func TestHandleGetStrikeLog(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetStrikeLog(gomock.Any(), database.AppType("sonarr"), 200).Return([]database.QueueStrike{
+		{ID: 1, AppType: "sonarr", Title: "test"},
+	}, nil)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetStrikeLog(w, reqWithPathValue("GET", "/api/queue/strikes/sonarr", nil, "app", "sonarr"))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleGetStrikeLog_InvalidApp(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetStrikeLog(w, reqWithPathValue("GET", "/api/queue/strikes/bogus", nil, "app", "bogus"))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleGetStrikeLog_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetStrikeLog(gomock.Any(), database.AppType("sonarr"), 200).Return(nil, errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetStrikeLog(w, reqWithPathValue("GET", "/api/queue/strikes/sonarr", nil, "app", "sonarr"))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestHandleGetStrikeLog_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetStrikeLog(gomock.Any(), database.AppType("sonarr"), 200).Return(nil, nil)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetStrikeLog(w, reqWithPathValue("GET", "/api/queue/strikes/sonarr", nil, "app", "sonarr"))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleGetDownloadClientSettings tests
+// =============================================================================
+
+func TestHandleGetDownloadClientSettings(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetDownloadClientSettings(gomock.Any(), database.AppType("sonarr")).Return(&database.DownloadClientSettings{
+		AppType: "sonarr", Password: "secret123",
+	}, nil)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetDownloadClientSettings(w, reqWithPathValue("GET", "/api/queue/download-client/sonarr", nil, "app", "sonarr"))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var result database.DownloadClientSettings
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Password != "****" {
+		t.Fatalf("expected masked password, got %q", result.Password)
+	}
+}
+
+func TestHandleGetDownloadClientSettings_InvalidApp(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetDownloadClientSettings(w, reqWithPathValue("GET", "/api/queue/download-client/bogus", nil, "app", "bogus"))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleGetDownloadClientSettings_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetDownloadClientSettings(gomock.Any(), database.AppType("sonarr")).Return(nil, errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleGetDownloadClientSettings(w, reqWithPathValue("GET", "/api/queue/download-client/sonarr", nil, "app", "sonarr"))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleUpdateDownloadClientSettings tests
+// =============================================================================
+
+func TestHandleUpdateDownloadClientSettings(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UpdateDownloadClientSettings(gomock.Any(), gomock.Any()).Return(nil)
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.DownloadClientSettings{
+		ClientType: "qbittorrent", URL: "http://localhost:8080", Password: "newpass",
+	})
+	w := httptest.NewRecorder()
+	h.HandleUpdateDownloadClientSettings(w, reqWithPathValue("PUT", "/api/queue/download-client/sonarr", body, "app", "sonarr"))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var result database.DownloadClientSettings
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Password != "****" {
+		t.Fatalf("expected masked password in response, got %q", result.Password)
+	}
+}
+
+func TestHandleUpdateDownloadClientSettings_MaskedPassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetDownloadClientSettings(gomock.Any(), database.AppType("sonarr")).Return(&database.DownloadClientSettings{
+		AppType: "sonarr", Password: "existing-secret",
+	}, nil)
+	store.EXPECT().UpdateDownloadClientSettings(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, s *database.DownloadClientSettings) error {
+			if s.Password != "existing-secret" {
+				t.Errorf("expected preserved password, got %q", s.Password)
+			}
+			return nil
+		},
+	)
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.DownloadClientSettings{
+		ClientType: "qbittorrent", Password: "****",
+	})
+	w := httptest.NewRecorder()
+	h.HandleUpdateDownloadClientSettings(w, reqWithPathValue("PUT", "/api/queue/download-client/sonarr", body, "app", "sonarr"))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateDownloadClientSettings_InvalidApp(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleUpdateDownloadClientSettings(w, reqWithPathValue("PUT", "/api/queue/download-client/bogus", nil, "app", "bogus"))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateDownloadClientSettings_BadBody(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleUpdateDownloadClientSettings(w, reqWithPathValue("PUT", "/api/queue/download-client/sonarr", []byte("bad"), "app", "sonarr"))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateDownloadClientSettings_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UpdateDownloadClientSettings(gomock.Any(), gomock.Any()).Return(errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.DownloadClientSettings{Password: "new"})
+	w := httptest.NewRecorder()
+	h.HandleUpdateDownloadClientSettings(w, reqWithPathValue("PUT", "/api/queue/download-client/sonarr", body, "app", "sonarr"))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleListSeedingRuleGroups tests
+// =============================================================================
+
+func TestHandleListSeedingRuleGroups(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListSeedingRuleGroups(gomock.Any()).Return([]database.SeedingRuleGroup{
+		{ID: 1, Name: "public trackers"},
+	}, nil)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListSeedingRuleGroups(w, httptest.NewRequest("GET", "/api/queue/seeding-groups", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListSeedingRuleGroups_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListSeedingRuleGroups(gomock.Any()).Return(nil, nil)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListSeedingRuleGroups(w, httptest.NewRequest("GET", "/api/queue/seeding-groups", http.NoBody))
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleListSeedingRuleGroups_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().ListSeedingRuleGroups(gomock.Any()).Return(nil, errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	h.HandleListSeedingRuleGroups(w, httptest.NewRequest("GET", "/api/queue/seeding-groups", http.NoBody))
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleCreateSeedingRuleGroup tests
+// =============================================================================
+
+func TestHandleCreateSeedingRuleGroup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().CreateSeedingRuleGroup(gomock.Any(), gomock.Any()).Return(&database.SeedingRuleGroup{
+		ID: 1, Name: "public trackers",
+	}, nil)
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.SeedingRuleGroup{Name: "public trackers", MaxRatio: 2.0})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/queue/seeding-groups", bytes.NewReader(body))
+	h.HandleCreateSeedingRuleGroup(w, r)
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateSeedingRuleGroup_BadBody(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/queue/seeding-groups", bytes.NewReader([]byte("bad")))
+	h.HandleCreateSeedingRuleGroup(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateSeedingRuleGroup_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().CreateSeedingRuleGroup(gomock.Any(), gomock.Any()).Return(nil, errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.SeedingRuleGroup{Name: "test"})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/queue/seeding-groups", bytes.NewReader(body))
+	h.HandleCreateSeedingRuleGroup(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleUpdateSeedingRuleGroup tests
+// =============================================================================
+
+func TestHandleUpdateSeedingRuleGroup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UpdateSeedingRuleGroup(gomock.Any(), gomock.Any()).Return(nil)
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.SeedingRuleGroup{Name: "updated", MaxRatio: 3.0})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("PUT", "/api/queue/seeding-groups/1", body, "id", "1")
+	h.HandleUpdateSeedingRuleGroup(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateSeedingRuleGroup_BadID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.SeedingRuleGroup{Name: "test"})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("PUT", "/api/queue/seeding-groups/abc", body, "id", "abc")
+	h.HandleUpdateSeedingRuleGroup(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateSeedingRuleGroup_BadBody(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("PUT", "/api/queue/seeding-groups/1", []byte("bad"), "id", "1")
+	h.HandleUpdateSeedingRuleGroup(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleUpdateSeedingRuleGroup_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().UpdateSeedingRuleGroup(gomock.Any(), gomock.Any()).Return(errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	body, _ := json.Marshal(database.SeedingRuleGroup{Name: "test"})
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("PUT", "/api/queue/seeding-groups/1", body, "id", "1")
+	h.HandleUpdateSeedingRuleGroup(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// QueueHandler — HandleDeleteSeedingRuleGroup tests
+// =============================================================================
+
+func TestHandleDeleteSeedingRuleGroup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().DeleteSeedingRuleGroup(gomock.Any(), 1).Return(nil)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/queue/seeding-groups/1", nil, "id", "1")
+	h.HandleDeleteSeedingRuleGroup(w, r)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteSeedingRuleGroup_BadID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/queue/seeding-groups/abc", nil, "id", "abc")
+	h.HandleDeleteSeedingRuleGroup(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleDeleteSeedingRuleGroup_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().DeleteSeedingRuleGroup(gomock.Any(), 1).Return(errors.New("fail"))
+	h := &QueueHandler{DB: store}
+	w := httptest.NewRecorder()
+	r := reqWithPathValue("DELETE", "/api/queue/seeding-groups/1", nil, "id", "1")
+	h.HandleDeleteSeedingRuleGroup(w, r)
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// =============================================================================
+// SeerrHandler — HandleScanDuplicates tests
+// =============================================================================
+
+func TestHandleScanDuplicates_NilRouter(t *testing.T) {
+	h := &SeerrHandler{Router: nil}
+	w := httptest.NewRecorder()
+	h.HandleScanDuplicates(w, httptest.NewRequest("GET", "/api/seerr/duplicates", http.NoBody))
+	if w.Code != 503 {
+		t.Fatalf("expected 503, got %d", w.Code)
+	}
+}
+
+func TestHandleScanDuplicates_NotConfigured(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetSeerrSettings(gomock.Any()).Return(&database.SeerrSettings{}, nil)
+	h := &SeerrHandler{DB: store, Router: &seerr.RequestRouter{}}
+	w := httptest.NewRecorder()
+	h.HandleScanDuplicates(w, httptest.NewRequest("GET", "/api/seerr/duplicates", http.NoBody))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleScanDuplicates_DBError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := NewMockStore(ctrl)
+	store.EXPECT().GetSeerrSettings(gomock.Any()).Return(nil, errors.New("fail"))
+	h := &SeerrHandler{DB: store, Router: &seerr.RequestRouter{}}
+	w := httptest.NewRecorder()
+	h.HandleScanDuplicates(w, httptest.NewRequest("GET", "/api/seerr/duplicates", http.NoBody))
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }

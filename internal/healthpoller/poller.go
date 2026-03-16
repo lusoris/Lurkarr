@@ -10,6 +10,7 @@ import (
 	"github.com/lusoris/lurkarr/internal/arrclient"
 	"github.com/lusoris/lurkarr/internal/database"
 	"github.com/lusoris/lurkarr/internal/metrics"
+	"golang.org/x/sync/errgroup"
 )
 
 // Store abstracts the DB operations needed by the health poller.
@@ -73,9 +74,15 @@ func (p *Poller) pollAll(ctx context.Context) {
 			continue
 		}
 		apiVersion := arrclient.APIVersionFor(string(appType))
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(10)
 		for _, inst := range instances {
-			p.pollInstance(ctx, appType, inst, apiVersion, timeout, genSettings.SSLVerify)
+			g.Go(func() error {
+				p.pollInstance(gctx, appType, inst, apiVersion, timeout, genSettings.SSLVerify)
+				return nil
+			})
 		}
+		_ = g.Wait()
 	}
 }
 

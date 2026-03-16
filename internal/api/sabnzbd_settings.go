@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/lusoris/lurkarr/internal/database"
@@ -20,10 +19,8 @@ func (h *SABnzbdHandler) HandleGetSettings(w http.ResponseWriter, r *http.Reques
 
 // HandleUpdateSABnzbdSettings updates SABnzbd settings.
 func (h *SABnzbdHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) {
-	limitBody(w, r)
-	var update database.SABnzbdSettings
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("invalid request body"))
+	update, ok := decodeJSON[database.SABnzbdSettings](w, r)
+	if !ok {
 		return
 	}
 	// If masked key sent back, preserve existing

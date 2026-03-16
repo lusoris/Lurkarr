@@ -2,23 +2,47 @@
 #
 # Usage:
 #   docker compose -f docker-compose.dev.yml up -d --build
+#   ./dev/seed.sh                                  # (optional) populate arr apps with test data
 #
-# Then open:
-#   Lurkarr:     http://localhost:9705
-#   Grafana:     http://localhost:3000  (admin/admin)
-#   Prometheus:  http://localhost:9090
-#   Sonarr:      http://localhost:8989
-#   Radarr:      http://localhost:7878
-#   Lidarr:      http://localhost:8686
-#   Readarr:     http://localhost:8787
-#   Prowlarr:    http://localhost:9696
-#   Whisparr:    http://localhost:6969
-#   Seerr:       http://localhost:5055
-#   SABnzbd:     http://localhost:8080
-#   qBittorrent: http://localhost:8181
+# Ports:
+#   Lurkarr:        http://localhost:9705
+#   Grafana:        http://localhost:3000  (admin/admin)
+#   Prometheus:     http://localhost:9090
+#   ── Arr Apps ──
+#   Sonarr:         http://localhost:8989
+#   Sonarr (anime): http://localhost:8990
+#   Radarr:         http://localhost:7878
+#   Radarr (4K):    http://localhost:7879
+#   Lidarr:         http://localhost:8686
+#   Readarr:        http://localhost:8787
+#   Whisparr v3:    http://localhost:6969           (eros — Radarr-based)
+#   Whisparr v2:    http://localhost:6968           (Sonarr-based)
+#   ── Services ──
+#   Prowlarr:       http://localhost:9696
+#   Bazarr:         http://localhost:6767
+#   Kapowarr:       http://localhost:5656
+#   Shoko:          http://localhost:8111
+#   Jellyfin:       http://localhost:8097
+#   Seerr:          http://localhost:5055           (Jellyseerr — needs Jellyfin setup first)
+#   ── Download Clients ──
+#   SABnzbd:        http://localhost:8085
+#   NZBGet:         http://localhost:6789
+#   qBittorrent:    http://localhost:8181
+#   Transmission:   http://localhost:9091
+#   Deluge:         http://localhost:8112
+#   rTorrent:       http://localhost:8484  (web UI)  /  http://localhost:8000/RPC2 (XMLRPC)
+
+x-common: &common
+  restart: unless-stopped
+  environment: &common-env
+    PUID: 1000
+    PGID: 1000
+    TZ: Europe/Berlin
 
 services:
-  # ── Lurkarr ───────────────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════════
+  # Lurkarr
+  # ════════════════════════════════════════════════════════════════════════
   lurkarr:
     build: .
     ports:
@@ -27,7 +51,7 @@ services:
       DATABASE_URL: postgres://lurkarr:lurkarr@db:5432/lurkarr?sslmode=disable
       LISTEN_ADDR: ":9705"
       SECRET_KEY: dev-secret-key-32-bytes-minimum!
-      CSRF_KEY: dev-csrf-key-must-be-32-bytes!
+      CSRF_KEY: dev-csrf-key-must-be-32-bytes!!
       WEBAUTHN_RP_ID: localhost
       WEBAUTHN_RP_NAME: Lurkarr
       WEBAUTHN_RP_ORIGINS: http://localhost:9705
@@ -36,7 +60,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── Infrastructure ────────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════════
+  # Infrastructure
+  # ════════════════════════════════════════════════════════════════════════
   db:
     image: postgres:17-alpine
     ports:
@@ -46,7 +72,7 @@ services:
       POSTGRES_PASSWORD: lurkarr
       POSTGRES_DB: lurkarr
     volumes:
-      - pgdata-dev:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lurkarr"]
       interval: 5s
@@ -61,9 +87,6 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    depends_on:
-      db:
-        condition: service_healthy
 
   grafana:
     image: grafana/grafana:12.0.0
@@ -79,124 +102,247 @@ services:
     depends_on:
       - prometheus
 
-  # ── Arr apps (hotio) ──────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════════
+  # Arr Apps — primary instances
+  # ════════════════════════════════════════════════════════════════════════
   sonarr:
+    <<: *common
     image: ghcr.io/hotio/sonarr:release
     ports:
       - "8989:8989"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
       - sonarr-config:/config
-      - downloads:/downloads
+      - media:/data
 
   radarr:
+    <<: *common
     image: ghcr.io/hotio/radarr:release
     ports:
       - "7878:7878"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
       - radarr-config:/config
-      - downloads:/downloads
+      - media:/data
 
   lidarr:
+    <<: *common
     image: ghcr.io/hotio/lidarr:release
     ports:
       - "8686:8686"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
       - lidarr-config:/config
-      - downloads:/downloads
+      - media:/data
 
   readarr:
-    image: ghcr.io/linuxserver/readarr:0.4.10-nightly
+    <<: *common
+    image: lscr.io/linuxserver/readarr:0.4.10-nightly
     ports:
       - "8787:8787"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
       - readarr-config:/config
-      - downloads:/downloads
+      - media:/data
 
-  prowlarr:
-    image: ghcr.io/hotio/prowlarr:release
+  # ════════════════════════════════════════════════════════════════════════
+  # Arr Apps — second instances (multi-instance / dedup testing)
+  # ════════════════════════════════════════════════════════════════════════
+  sonarr-anime:
+    <<: *common
+    image: ghcr.io/hotio/sonarr:release
     ports:
-      - "9696:9696"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
+      - "8990:8989"
     volumes:
-      - prowlarr-config:/config
+      - sonarr-anime-config:/config
+      - media:/data
 
-  whisparr:
+  radarr-4k:
+    <<: *common
+    image: ghcr.io/hotio/radarr:release
+    ports:
+      - "7879:7878"
+    volumes:
+      - radarr-4k-config:/config
+      - media:/data
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Whisparr — v3 (eros, Radarr-based) + v2 (Sonarr-based)
+  # ════════════════════════════════════════════════════════════════════════
+  whisparr-v3:
+    <<: *common
     image: ghcr.io/hotio/whisparr:v3
     ports:
       - "6969:6969"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
-      - whisparr-config:/config
-      - downloads:/downloads
+      - whisparr-v3-config:/config
+      - media:/data
 
-  # ── Seerr ──────────────────────────────────────────────────────────────
+  whisparr-v2:
+    <<: *common
+    image: ghcr.io/hotio/whisparr:v2
+    ports:
+      - "6968:6969"
+    volumes:
+      - whisparr-v2-config:/config
+      - media:/data
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Services — indexer, subtitles, media server, request management
+  # ════════════════════════════════════════════════════════════════════════
+  prowlarr:
+    <<: *common
+    image: ghcr.io/hotio/prowlarr:release
+    ports:
+      - "9696:9696"
+    volumes:
+      - prowlarr-config:/config
+
+  bazarr:
+    <<: *common
+    image: ghcr.io/hotio/bazarr:release
+    ports:
+      - "6767:6767"
+    volumes:
+      - bazarr-config:/config
+      - media:/data
+
+  kapowarr:
+    <<: *common
+    image: mrcas/kapowarr:latest
+    ports:
+      - "5656:5656"
+    volumes:
+      - kapowarr-config:/app/db
+      - media:/data
+
+  shoko:
+    <<: *common
+    image: shokoanime/server:latest
+    ports:
+      - "8111:8111"
+    volumes:
+      - shoko-config:/home/shoko/.shoko
+      - media:/data
+
+  jellyfin:
+    <<: *common
+    image: ghcr.io/hotio/jellyfin:release
+    ports:
+      - "8097:8096"
+    volumes:
+      - jellyfin-config:/config
+      - media:/data
+
   seerr:
+    <<: *common
     image: fallenbagel/jellyseerr:latest
     ports:
       - "5055:5055"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
       - seerr-config:/app/config
+    depends_on:
+      - jellyfin
 
-  # ── Download clients ──────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════════
+  # Download Clients — Usenet
+  # ════════════════════════════════════════════════════════════════════════
   sabnzbd:
+    <<: *common
     image: ghcr.io/hotio/sabnzbd:release
     ports:
-      - "8080:8080"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
+      - "8085:8080"
     volumes:
       - sabnzbd-config:/config
-      - downloads:/downloads
+      - media:/data
 
+  nzbget:
+    <<: *common
+    image: ghcr.io/hotio/nzbget:release
+    ports:
+      - "6789:6789"
+    volumes:
+      - nzbget-config:/config
+      - media:/data
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Download Clients — Torrent
+  # ════════════════════════════════════════════════════════════════════════
   qbittorrent:
+    <<: *common
     image: ghcr.io/hotio/qbittorrent:release
     ports:
       - "8181:8080"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Berlin
     volumes:
       - qbittorrent-config:/config
-      - downloads:/downloads
+      - media:/data
+
+  transmission:
+    <<: *common
+    image: lscr.io/linuxserver/transmission:latest
+    ports:
+      - "9091:9091"
+    environment:
+      <<: *common-env
+      USER: admin
+      PASS: adminadmin
+    volumes:
+      - transmission-config:/config
+      - media:/data
+
+  deluge:
+    <<: *common
+    image: lscr.io/linuxserver/deluge:latest
+    ports:
+      - "8112:8112"
+    environment:
+      <<: *common-env
+      DELUGE_LOGLEVEL: error
+    volumes:
+      - deluge-config:/config
+      - media:/data
+
+  rtorrent:
+    <<: *common
+    image: ghcr.io/crazy-max/rtorrent-rutorrent:latest
+    ports:
+      - "8484:8080"     # ruTorrent web UI
+      - "8000:8000"     # XMLRPC (/RPC2)
+      - "50000:50000"   # incoming torrent connections
+    environment:
+      <<: *common-env
+      XMLRPC_PORT: 8000
+      RUTORRENT_PORT: 8080
+      RT_DHT_PORT: 6881
+      RT_INC_PORT: 50000
+    volumes:
+      - rtorrent-config:/data
+      - media:/data/media
 
 volumes:
-  pgdata-dev:
+  # Infrastructure
+  pgdata:
+  # Arr apps — primary
   sonarr-config:
   radarr-config:
   lidarr-config:
   readarr-config:
+  # Arr apps — secondary instances
+  sonarr-anime-config:
+  radarr-4k-config:
+  # Whisparr
+  whisparr-v3-config:
+  whisparr-v2-config:
+  # Services
   prowlarr-config:
-  whisparr-config:
+  bazarr-config:
+  kapowarr-config:
+  shoko-config:
+  jellyfin-config:
   seerr-config:
+  # Download clients — usenet
   sabnzbd-config:
+  nzbget-config:
+  # Download clients — torrent
   qbittorrent-config:
-  downloads:
+  transmission-config:
+  deluge-config:
+  rtorrent-config:
+  # Shared media + downloads
+  media:
