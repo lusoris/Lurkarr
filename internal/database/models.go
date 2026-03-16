@@ -20,14 +20,24 @@ const (
 	AppProwlarr AppType = "prowlarr"
 )
 
-// AllAppTypes returns all supported app types.
+// AllAppTypes returns all supported *Arr application types (arr apps only).
+// Prowlarr is explicitly excluded as it is an indexer manager, not an arr application.
 func AllAppTypes() []AppType {
-	return []AppType{AppSonarr, AppRadarr, AppLidarr, AppReadarr, AppWhisparr, AppEros, AppProwlarr}
+	return []AppType{AppSonarr, AppRadarr, AppLidarr, AppReadarr, AppWhisparr, AppEros}
 }
 
-// ValidAppType checks if a string is a valid app type.
+// LurkableAppTypes returns app types that support lurking.
+// These are the same as AllAppTypes (all arr apps can lurk).
+func LurkableAppTypes() []AppType {
+	return AllAppTypes()
+}
+
+// ValidAppType checks if a string is a valid/known app type.
+// All constants (including Prowlarr) are valid for configuration,
+// but only AllAppTypes are used for lurking operations.
 func ValidAppType(s string) bool {
-	for _, t := range AllAppTypes() {
+	validTypes := []AppType{AppSonarr, AppRadarr, AppLidarr, AppReadarr, AppWhisparr, AppEros, AppProwlarr}
+	for _, t := range validTypes {
 		if string(t) == s {
 			return true
 		}

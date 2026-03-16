@@ -102,7 +102,7 @@ func provideConfig() (*config.Config, error) {
 
 // provideDatabase creates the DB connection pool and runs migrations.
 func provideDatabase(lc fx.Lifecycle, cfg *config.Config) (*database.DB, error) {
-	db, err := database.New(context.Background(), cfg.DatabaseURL, cfg.DBMaxConns)
+	db, err := database.New(context.Background(), cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -450,6 +450,7 @@ func startMetricsPersistence(lc fx.Lifecycle, db *database.DB) {
 			var flushCtx context.Context
 			flushCtx, cancel = context.WithCancel(ctx) //nolint:gosec // G118: cancel is called in OnStop
 			go p.FlushLoop(flushCtx, 30*time.Second)
+			go collectPoolStats(flushCtx, db)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -462,4 +463,27 @@ func startMetricsPersistence(lc fx.Lifecycle, db *database.DB) {
 			return nil
 		},
 	})
+}
+
+// collectPoolStats periodically updates Prometheus gauges with pgxpool stats.
+func collectPoolStats(ctx context.Context, db *database.DB) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s := db.Pool.Stat()
+			metrics.DBPoolAcquireCount.Set(float64(s.AcquireCount()))
+			metrics.DBPoolAcquiredConns.Set(float64(s.AcquiredConns()))
+			metrics.DBPoolIdleConns.Set(float64(s.IdleConns()))
+			metrics.DBPoolTotalConns.Set(float64(s.TotalConns()))
+			metrics.DBPoolMaxConns.Set(float64(s.MaxConns()))
+
+			if count, err := db.CountActiveSessions(ctx); err == nil {
+				metrics.ActiveSessions.Set(float64(count))
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }

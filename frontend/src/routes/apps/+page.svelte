@@ -5,21 +5,21 @@
 	import { getToasts } from '$lib/stores/toast.svelte';
 	import { getInstances } from '$lib/stores/instances.svelte';
 	import { onMount, untrack } from 'svelte';
-	import Card from '$lib/components/ui/Card.svelte';
-	import Badge from '$lib/components/ui/Badge.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
-	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import Modal from '$lib/components/ui/Modal.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
-	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import * as Select from '$lib/components/ui/select/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import HelpDrawer from '$lib/components/HelpDrawer.svelte';
-	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as ScrollArea from '$lib/components/ui/scroll-area';
-	import { Plus, Cable as CableIcon, Layers, Trash2, GripVertical } from 'lucide-svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as ScrollArea from '$lib/components/ui/scroll-area/index.js';
+	import { Plus, Cable as CableIcon, Layers, Trash2, GripVertical } from '@lucide/svelte';
 	import type { AppInstance, ProwlarrSettings, SeerrSettings, BazarrSettings, KapowarrSettings, ShokoSettings, DownloadClientInstance, HealthInfo, InstanceGroup, InstanceGroupMember } from '$lib/types';
 	import HealthBadge from '$lib/components/ui/HealthBadge.svelte';
 
@@ -67,7 +67,7 @@
 	let showBazarrModal = $state(false);
 	let showKapowarrModal = $state(false);
 	let showShokoModal = $state(false);
-	let prowlarrIndexers = $state<{ id: number; name: string; enable: boolean; protocol: string; priority: number; fields?: { name: string; value: any }[] }[]>([]);
+	let prowlarrIndexers = $state<{ id: number; name: string; enable: boolean; protocol: string; priority: number; fields?: { name: string; value: string | number | boolean | null }[] }[]>([]);
 	let indexersLoading = $state(false);
 
 	// ── Download client instances state ─────────────────────
@@ -580,7 +580,7 @@
 							{#each visibleAppTypes as app}
 								{@const logo = appLogo(app)}
 								<DropdownMenu.Item onclick={() => openAddArr(app)}>
-									{#if logo}<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />{/if}
+									{#if logo}<img src={logo} alt="{appDisplayName(app)} logo" class="w-4 h-4 rounded shrink-0" />{/if}
 									<span>{appDisplayName(app)}</span>
 								</DropdownMenu.Item>
 							{/each}
@@ -591,7 +591,7 @@
 							{#each clientTypes as ct}
 								{@const logo = appLogo(ct)}
 								<DropdownMenu.Item onclick={() => openAddDl(ct)}>
-									{#if logo}<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />{/if}
+									{#if logo}<img src={logo} alt="{appDisplayName(ct)} logo" class="w-4 h-4 rounded shrink-0" />{/if}
 									<span>{appDisplayName(ct)}</span>
 								</DropdownMenu.Item>
 							{/each}
@@ -600,23 +600,23 @@
 						<DropdownMenu.Group>
 							<DropdownMenu.GroupHeading>Services</DropdownMenu.GroupHeading>
 							<DropdownMenu.Item onclick={() => { showProwlarrModal = true; }}>
-								<img src={appLogo('prowlarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('prowlarr')} alt="Prowlarr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Prowlarr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showSeerrModal = true; }}>
-								<img src={appLogo('seerr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('seerr')} alt="Seerr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Seerr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showBazarrModal = true; }}>
-								<img src={appLogo('bazarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('bazarr')} alt="Bazarr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Bazarr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showKapowarrModal = true; }}>
-								<img src={appLogo('kapowarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('kapowarr')} alt="Kapowarr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Kapowarr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showShokoModal = true; }}>
-								<img src={appLogo('shoko')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('shoko')} alt="Shoko logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Shoko</span>
 							</DropdownMenu.Item>
 						</DropdownMenu.Group>
@@ -652,7 +652,7 @@
 							{#each visibleAppTypes as app}
 								{@const logo = appLogo(app)}
 								<DropdownMenu.Item onclick={() => openAddArr(app)}>
-									{#if logo}<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />{/if}
+									{#if logo}<img src={logo} alt="{appDisplayName(app)} logo" class="w-4 h-4 rounded shrink-0" />{/if}
 									<span>{appDisplayName(app)}</span>
 								</DropdownMenu.Item>
 							{/each}
@@ -663,7 +663,7 @@
 							{#each clientTypes as ct}
 								{@const logo = appLogo(ct)}
 								<DropdownMenu.Item onclick={() => openAddDl(ct)}>
-									{#if logo}<img src={logo} alt="" class="w-4 h-4 rounded shrink-0" />{/if}
+									{#if logo}<img src={logo} alt="{appDisplayName(ct)} logo" class="w-4 h-4 rounded shrink-0" />{/if}
 									<span>{appDisplayName(ct)}</span>
 								</DropdownMenu.Item>
 							{/each}
@@ -672,23 +672,23 @@
 						<DropdownMenu.Group>
 							<DropdownMenu.GroupHeading>Services</DropdownMenu.GroupHeading>
 							<DropdownMenu.Item onclick={() => { showProwlarrModal = true; }}>
-								<img src={appLogo('prowlarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('prowlarr')} alt="Prowlarr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Prowlarr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showSeerrModal = true; }}>
-								<img src={appLogo('seerr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('seerr')} alt="Seerr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Seerr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showBazarrModal = true; }}>
-								<img src={appLogo('bazarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('bazarr')} alt="Bazarr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Bazarr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showKapowarrModal = true; }}>
-								<img src={appLogo('kapowarr')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('kapowarr')} alt="Kapowarr logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Kapowarr</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item onclick={() => { showShokoModal = true; }}>
-								<img src={appLogo('shoko')} alt="" class="w-4 h-4 rounded shrink-0" />
+								<img src={appLogo('shoko')} alt="Shoko logo" class="w-4 h-4 rounded shrink-0" />
 								<span>Shoko</span>
 							</DropdownMenu.Item>
 						</DropdownMenu.Group>
@@ -716,24 +716,31 @@
 							: (instances[app] ?? [])}
 						{#each appInstances as inst}
 							{@const instLogo = appLogo(inst.app_type)}
-							<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder(inst.app_type)}" onclick={() => openEditArr(inst)}>
-								<div class="flex items-start justify-between gap-2 mb-2">
-									<div class="flex items-center gap-2 min-w-0">
-										{#if instLogo}
-										<img src={instLogo} alt="" class="w-5 h-5 rounded shrink-0" />
-										{/if}
-										<span class="font-medium text-sm text-foreground truncate">{inst.name}</span>
-										{#if app === 'whisparr'}
-											<span class="text-[10px] {appColor(inst.app_type)} shrink-0">({inst.app_type === 'eros' ? 'v3' : 'v2'})</span>
+							<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder(inst.app_type)}" onclick={() => openEditArr(inst)}>
+								<Card.Content class="p-4">
+									<div class="flex items-start justify-between gap-2 mb-2">
+										<div class="flex items-center gap-2 min-w-0">
+											{#if instLogo}
+											<img src={instLogo} alt="{appDisplayName(inst.app_type)} logo" class="w-5 h-5 rounded shrink-0" />
+											{/if}
+											<span class="font-medium text-sm text-foreground truncate">{inst.name}</span>
+											{#if app === 'whisparr'}
+												<span class="text-[10px] {appColor(inst.app_type)} shrink-0">({inst.app_type === 'eros' ? 'v3' : 'v2'})</span>
+											{/if}
+										</div>
+										<HealthBadge health={healthStatus[inst.id]} />
+									</div>
+									<p class="text-[11px] text-muted-foreground truncate mb-2">{inst.api_url}</p>
+									<div class="flex items-center gap-1.5 pt-1">
+										<Badge variant={inst.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+											{inst.enabled ? 'Enabled' : 'Disabled'}
+										</Badge>
+										{#if inst.app_type === 'readarr'}
+											<Badge variant="warning" class="text-[10px] px-1.5 py-0">Deprecated</Badge>
 										{/if}
 									</div>
-								<HealthBadge health={healthStatus[inst.id]} />
-								</div>
-								<p class="text-xs text-muted-foreground truncate mb-1">{inst.api_url}</p>
-								<Badge variant={inst.enabled ? 'success' : 'error'}>
-									{inst.enabled ? 'Enabled' : 'Disabled'}
-								</Badge>
-							</Card>
+								</Card.Content>
+							</Card.Root>
 						{/each}
 					{/each}
 				</div>
@@ -747,29 +754,31 @@
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 					{#each dlClients as dl}
 						{@const logo = appLogo(dl.client_type)}
-						<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder(dl.client_type)}" onclick={() => openEditDl(dl)}>
-							<div class="flex items-start justify-between gap-2 mb-2">
-								<div class="flex items-center gap-2 min-w-0">
-									{#if logo}
-									<img src={logo} alt="" class="w-5 h-5 rounded shrink-0" />
+						<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder(dl.client_type)}" onclick={() => openEditDl(dl)}>
+							<Card.Content class="p-4">
+								<div class="flex items-start justify-between gap-2 mb-2">
+									<div class="flex items-center gap-2 min-w-0">
+										{#if logo}
+										<img src={logo} alt="{appDisplayName(dl.client_type)} logo" class="w-5 h-5 rounded shrink-0" />
+										{/if}
+											<span class="font-medium text-sm text-foreground truncate">{dl.name}</span>
+									</div>
+								{#if dl.enabled}
+									<HealthBadge health={dlHealthStatus[dl.id]} />
 									{/if}
-										<span class="font-medium text-sm text-foreground truncate">{dl.name}</span>
 								</div>
-							{#if dl.enabled}
-								<HealthBadge health={dlHealthStatus[dl.id]} />
-								{/if}
-							</div>
-							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="info">{appDisplayName(dl.client_type)}</Badge>
-								{#if dl.category}
-										<span class="text-[10px] text-muted-foreground">cat: {dl.category}</span>
-								{/if}
-							</div>
-							<p class="text-xs text-muted-foreground truncate mb-1">{dl.url}</p>
-							<Badge variant={dl.enabled ? 'success' : 'error'}>
-								{dl.enabled ? 'Enabled' : 'Disabled'}
-							</Badge>
-						</Card>
+								<div class="flex items-center gap-2 mb-1">
+									<Badge variant="info" class="text-[10px] px-1.5 py-0">{appDisplayName(dl.client_type)}</Badge>
+									{#if dl.category}
+											<span class="text-[10px] text-muted-foreground">cat: {dl.category}</span>
+									{/if}
+								</div>
+								<p class="text-[11px] text-muted-foreground truncate mb-2">{dl.url}</p>
+								<Badge variant={dl.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+									{dl.enabled ? 'Enabled' : 'Disabled'}
+								</Badge>
+							</Card.Content>
+						</Card.Root>
 					{/each}
 				</div>
 			</section>
@@ -781,119 +790,129 @@
 		<h3 class="text-sm font-semibold text-foreground mb-3">Services</h3>
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 			<!-- Prowlarr card -->
-			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder('prowlarr')}" onclick={() => showProwlarrModal = true}>
-				<div class="flex items-start justify-between gap-2 mb-2">
-					<div class="flex items-center gap-2">
-						<img src={appLogo('prowlarr')} alt="Prowlarr" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-foreground">Prowlarr</span>
+			<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder('prowlarr')}" onclick={() => showProwlarrModal = true}>
+				<Card.Content class="p-4">
+					<div class="flex items-start justify-between gap-2 mb-2">
+						<div class="flex items-center gap-2">
+							<img src={appLogo('prowlarr')} alt="Prowlarr" class="w-5 h-5 rounded" />
+							<span class="font-medium text-sm text-foreground">Prowlarr</span>
+						</div>
+						{#if prowlarr?.enabled}
+							<HealthBadge health={prowlarrHealth} />
+						{:else}
+							<Badge variant={prowlarr?.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+								{prowlarr?.enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						{/if}
 					</div>
-					{#if prowlarr?.enabled}
-						<HealthBadge health={prowlarrHealth} />
+					{#if prowlarr?.url}
+						<p class="text-[11px] text-muted-foreground truncate mb-2">{prowlarr.url}</p>
 					{:else}
-						<Badge variant={prowlarr?.enabled ? 'success' : 'error'}>
-							{prowlarr?.enabled ? 'Enabled' : 'Disabled'}
-						</Badge>
+						<p class="text-[11px] text-muted-foreground/50 mb-2">Not configured</p>
 					{/if}
-				</div>
-				{#if prowlarr?.url}
-					<p class="text-xs text-muted-foreground truncate mb-1">{prowlarr.url}</p>
-				{:else}
-					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
-				{/if}
-				<p class="text-[10px] text-muted-foreground/50">Indexer manager</p>
-			</Card>
+					<p class="text-[10px] text-muted-foreground/50">Indexer manager</p>
+				</Card.Content>
+			</Card.Root>
 
 			<!-- Seerr card -->
-			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder('seerr')}" onclick={() => showSeerrModal = true}>
-				<div class="flex items-start justify-between gap-2 mb-2">
-					<div class="flex items-center gap-2">
-						<img src={appLogo('seerr')} alt="Seerr" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-foreground">Seerr</span>
+			<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder('seerr')}" onclick={() => showSeerrModal = true}>
+				<Card.Content class="p-4">
+					<div class="flex items-start justify-between gap-2 mb-2">
+						<div class="flex items-center gap-2">
+							<img src={appLogo('seerr')} alt="Seerr" class="w-5 h-5 rounded" />
+							<span class="font-medium text-sm text-foreground">Seerr</span>
+						</div>
+						{#if seerr?.enabled}
+							<HealthBadge health={seerrHealth} />
+						{:else}
+							<Badge variant={seerr?.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+								{seerr?.enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						{/if}
 					</div>
-					{#if seerr?.enabled}
-						<HealthBadge health={seerrHealth} />
+					{#if seerr?.url}
+						<p class="text-[11px] text-muted-foreground truncate mb-2">{seerr.url}</p>
 					{:else}
-						<Badge variant={seerr?.enabled ? 'success' : 'error'}>
-							{seerr?.enabled ? 'Enabled' : 'Disabled'}
-						</Badge>
+						<p class="text-[11px] text-muted-foreground/50 mb-2">Not configured</p>
 					{/if}
-				</div>
-				{#if seerr?.url}
-					<p class="text-xs text-muted-foreground truncate mb-1">{seerr.url}</p>
-				{:else}
-					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
-				{/if}
-				<p class="text-[10px] text-muted-foreground/50">Request management</p>
-			</Card>
+					<p class="text-[10px] text-muted-foreground/50">Request management</p>
+				</Card.Content>
+			</Card.Root>
 
 			<!-- Bazarr card -->
-			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder('bazarr')}" onclick={() => showBazarrModal = true}>
-				<div class="flex items-start justify-between gap-2 mb-2">
-					<div class="flex items-center gap-2">
-						<img src={appLogo('bazarr')} alt="Bazarr" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-foreground">Bazarr</span>
+			<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder('bazarr')}" onclick={() => showBazarrModal = true}>
+				<Card.Content class="p-4">
+					<div class="flex items-start justify-between gap-2 mb-2">
+						<div class="flex items-center gap-2">
+							<img src={appLogo('bazarr')} alt="Bazarr" class="w-5 h-5 rounded" />
+							<span class="font-medium text-sm text-foreground">Bazarr</span>
+						</div>
+						{#if bazarr?.enabled}
+							<HealthBadge health={bazarrHealth} />
+						{:else}
+							<Badge variant={bazarr?.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+								{bazarr?.enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						{/if}
 					</div>
-					{#if bazarr?.enabled}
-						<HealthBadge health={bazarrHealth} />
+					{#if bazarr?.url}
+						<p class="text-[11px] text-muted-foreground truncate mb-2">{bazarr.url}</p>
 					{:else}
-						<Badge variant={bazarr?.enabled ? 'success' : 'error'}>
-							{bazarr?.enabled ? 'Enabled' : 'Disabled'}
-						</Badge>
+						<p class="text-[11px] text-muted-foreground/50 mb-2">Not configured</p>
 					{/if}
-				</div>
-				{#if bazarr?.url}
-					<p class="text-xs text-muted-foreground truncate mb-1">{bazarr.url}</p>
-				{:else}
-					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
-				{/if}
-				<p class="text-[10px] text-muted-foreground/50">Subtitle manager</p>
-			</Card>
+					<p class="text-[10px] text-muted-foreground/50">Subtitle manager</p>
+				</Card.Content>
+			</Card.Root>
 
 			<!-- Kapowarr card -->
-			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder('kapowarr')}" onclick={() => showKapowarrModal = true}>
-				<div class="flex items-start justify-between gap-2 mb-2">
-					<div class="flex items-center gap-2">
-						<img src={appLogo('kapowarr')} alt="Kapowarr" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-foreground">Kapowarr</span>
+			<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder('kapowarr')}" onclick={() => showKapowarrModal = true}>
+				<Card.Content class="p-4">
+					<div class="flex items-start justify-between gap-2 mb-2">
+						<div class="flex items-center gap-2">
+							<img src={appLogo('kapowarr')} alt="Kapowarr" class="w-5 h-5 rounded" />
+							<span class="font-medium text-sm text-foreground">Kapowarr</span>
+						</div>
+						{#if kapowarr?.enabled}
+							<HealthBadge health={kapowarrHealth} />
+						{:else}
+							<Badge variant={kapowarr?.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+								{kapowarr?.enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						{/if}
 					</div>
-					{#if kapowarr?.enabled}
-						<HealthBadge health={kapowarrHealth} />
+					{#if kapowarr?.url}
+						<p class="text-[11px] text-muted-foreground truncate mb-2">{kapowarr.url}</p>
 					{:else}
-						<Badge variant={kapowarr?.enabled ? 'success' : 'error'}>
-							{kapowarr?.enabled ? 'Enabled' : 'Disabled'}
-						</Badge>
+						<p class="text-[11px] text-muted-foreground/50 mb-2">Not configured</p>
 					{/if}
-				</div>
-				{#if kapowarr?.url}
-					<p class="text-xs text-muted-foreground truncate mb-1">{kapowarr.url}</p>
-				{:else}
-					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
-				{/if}
-				<p class="text-[10px] text-muted-foreground/50">Comic book manager</p>
-			</Card>
+					<p class="text-[10px] text-muted-foreground/50">Comic book manager</p>
+				</Card.Content>
+			</Card.Root>
 
 			<!-- Shoko card -->
-			<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder('shoko')}" onclick={() => showShokoModal = true}>
-				<div class="flex items-start justify-between gap-2 mb-2">
-					<div class="flex items-center gap-2">
-						<img src={appLogo('shoko')} alt="Shoko" class="w-5 h-5 rounded" />
-						<span class="font-medium text-sm text-foreground">Shoko</span>
+			<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder('shoko')}" onclick={() => showShokoModal = true}>
+				<Card.Content class="p-4">
+					<div class="flex items-start justify-between gap-2 mb-2">
+						<div class="flex items-center gap-2">
+							<img src={appLogo('shoko')} alt="Shoko" class="w-5 h-5 rounded" />
+							<span class="font-medium text-sm text-foreground">Shoko</span>
+						</div>
+						{#if shoko?.enabled}
+							<HealthBadge health={shokoHealth} />
+						{:else}
+							<Badge variant={shoko?.enabled ? 'success' : 'error'} class="text-[10px] px-1.5 py-0">
+								{shoko?.enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						{/if}
 					</div>
-					{#if shoko?.enabled}
-						<HealthBadge health={shokoHealth} />
+					{#if shoko?.url}
+						<p class="text-[11px] text-muted-foreground truncate mb-2">{shoko.url}</p>
 					{:else}
-						<Badge variant={shoko?.enabled ? 'success' : 'error'}>
-							{shoko?.enabled ? 'Enabled' : 'Disabled'}
-						</Badge>
+						<p class="text-[11px] text-muted-foreground/50 mb-2">Not configured</p>
 					{/if}
-				</div>
-				{#if shoko?.url}
-					<p class="text-xs text-muted-foreground truncate mb-1">{shoko.url}</p>
-				{:else}
-					<p class="text-xs text-muted-foreground/50 mb-1">Not configured</p>
-				{/if}
-				<p class="text-[10px] text-muted-foreground/50">Anime library manager</p>
-			</Card>
+					<p class="text-[10px] text-muted-foreground/50">Anime library manager</p>
+				</Card.Content>
+			</Card.Root>
 		</div>
 	</section>
 
@@ -910,40 +929,44 @@
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 				{#each instanceGroups as group}
 					{@const modeInfo = groupModes.find(m => m.value === group.mode)}
-					<Card class="!p-4 cursor-pointer hover:border-muted-foreground transition-colors border-l-2 {appAccentBorder(group.app_type)}" onclick={() => openEditGroup(group)}>
-						<div class="flex items-start justify-between gap-2 mb-2">
-							<div class="flex items-center gap-2 min-w-0">
-								<Layers class="w-4 h-4 shrink-0 text-muted-foreground" />
-								<span class="font-medium text-sm text-foreground truncate">{group.name}</span>
+					<Card.Root class="cursor-pointer hover:bg-accent/50 transition-colors border-l-2 {appAccentBorder(group.app_type)}" onclick={() => openEditGroup(group)}>
+						<Card.Content class="p-4">
+							<div class="flex items-start justify-between gap-2 mb-2">
+								<div class="flex items-center gap-2 min-w-0">
+									<Layers class="w-4 h-4 shrink-0 text-muted-foreground" />
+									<span class="font-medium text-sm text-foreground truncate">{group.name}</span>
+								</div>
+								<Badge variant="info" class="text-[10px] px-1.5 py-0">{appDisplayName(group.app_type)}</Badge>
 							</div>
-							<Badge variant="info">{appDisplayName(group.app_type)}</Badge>
-						</div>
-						<div class="flex items-center gap-2 mb-2">
-							<Badge variant={group.mode === 'quality_hierarchy' ? 'success' : 'default'}>
-								{modeInfo?.label ?? group.mode}
-							</Badge>
-							<span class="text-[10px] text-muted-foreground">{group.members?.length ?? 0} member{(group.members?.length ?? 0) !== 1 ? 's' : ''}</span>
-						</div>
-						{#if group.members && group.members.length > 0}
-							<div class="flex flex-wrap gap-1">
-								{#each group.members.sort((a, b) => a.quality_rank - b.quality_rank) as member}
-									<span class="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
-										#{member.quality_rank} {member.instance_name ?? member.instance_id.slice(0, 8)}
-									</span>
-								{/each}
+							<div class="flex items-center gap-2 mb-2">
+								<Badge variant={group.mode === 'quality_hierarchy' ? 'success' : 'outline'} class="text-[10px] px-1.5 py-0">
+									{modeInfo?.label ?? group.mode}
+								</Badge>
+								<span class="text-[10px] text-muted-foreground">{group.members?.length ?? 0} member{(group.members?.length ?? 0) !== 1 ? 's' : ''}</span>
 							</div>
-						{:else}
-							<p class="text-[10px] text-muted-foreground/50 italic">No members — click to configure</p>
-						{/if}
-					</Card>
+							{#if group.members && group.members.length > 0}
+								<div class="flex flex-wrap gap-1">
+									{#each group.members.sort((a, b) => a.quality_rank - b.quality_rank) as member}
+										<span class="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+											#{member.quality_rank} {member.instance_name ?? member.instance_id.slice(0, 8)}
+										</span>
+									{/each}
+								</div>
+							{:else}
+								<p class="text-[10px] text-muted-foreground/50 italic">No members — click to configure</p>
+							{/if}
+						</Card.Content>
+					</Card.Root>
 				{/each}
 			</div>
 		{:else}
-			<Card class="!p-6 text-center">
-				<Layers class="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-				<p class="text-sm text-muted-foreground mb-1">No instance groups yet</p>
-				<p class="text-xs text-muted-foreground/60">Group multiple instances of the same app to enable cross-instance dedup on the <a href="/dedup" class="underline hover:text-foreground">Dedup page</a>.</p>
-			</Card>
+			<Card.Root>
+				<Card.Content class="p-6 text-center">
+					<Layers class="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+					<p class="text-sm text-muted-foreground mb-1">No instance groups yet</p>
+					<p class="text-xs text-muted-foreground/60">Group multiple instances of the same app to enable cross-instance dedup on the <a href="/dedup" class="underline hover:text-foreground">Dedup page</a>.</p>
+				</Card.Content>
+			</Card.Root>
 		{/if}
 	</section>
 </div>
@@ -957,9 +980,9 @@
 				<option value="eros">v3</option>
 			</Select>
 		{/if}
-		<Input bind:value={arrForm.name} label="Name" placeholder="My {appDisplayName(modalApp)}" />
-		<Input bind:value={arrForm.api_url} label="URL" placeholder={appPlaceholderUrl(effectiveAppType)} />
-		<Input bind:value={arrForm.api_key} type="password" label={editingInstance ? 'API Key (leave empty to keep current)' : 'API Key'} />
+		<Input bind:value={arrForm.name} label="Name" placeholder="My {appDisplayName(modalApp)}" required maxlength={100} />
+		<Input bind:value={arrForm.api_url} label="URL" placeholder={appPlaceholderUrl(effectiveAppType)} required />
+		<Input bind:value={arrForm.api_key} type="password" label={editingInstance ? 'API Key (leave empty to keep current)' : 'API Key'} required={!editingInstance} />
 		{#if editingInstance}
 			<Toggle bind:checked={arrForm.enabled} label="Enabled" color={appBgColor(effectiveAppType)} />
 		{/if}
@@ -983,13 +1006,13 @@
 <!-- ── Add/Edit Download Client Modal ────────────────────── -->
 <Modal bind:open={showDlModal} title={editingDl ? 'Edit Download Client' : 'Add Download Client'} onclose={() => showDlModal = false}>
 	<form onsubmit={(e: Event) => { e.preventDefault(); saveDlClient(); }} class="space-y-4">
-		<Input bind:value={dlForm.name} label="Name" placeholder="My {appDisplayName(dlForm.client_type)}" />
+		<Input bind:value={dlForm.name} label="Name" placeholder="My {appDisplayName(dlForm.client_type)}" required maxlength={100} />
 		<Select bind:value={dlForm.client_type} label="Client Type" disabled={!!editingDl}>
 			{#each clientTypes as ct}
 				<option value={ct}>{appDisplayName(ct)}</option>
 			{/each}
 		</Select>
-		<Input bind:value={dlForm.url} label="URL" placeholder="{clientDefaults[dlForm.client_type]?.url ?? 'http://localhost'}:{clientDefaults[dlForm.client_type]?.port ?? 8080}" hint="Including port number" />
+		<Input bind:value={dlForm.url} label="URL" placeholder="{clientDefaults[dlForm.client_type]?.url ?? 'http://localhost'}:{clientDefaults[dlForm.client_type]?.port ?? 8080}" hint="Including port number" required />
 		{#if dlForm.client_type === 'sabnzbd' || dlForm.client_type === 'nzbget'}
 			<Input bind:value={dlForm.api_key} type="password" label={editingDl ? 'API Key (leave empty to keep current)' : 'API Key'} hint="Found in {dlForm.client_type === 'sabnzbd' ? 'SABnzbd → Config → General' : 'NZBGet → Settings → Security'}" />
 		{/if}
@@ -1002,7 +1025,7 @@
 		{#if dlForm.client_type === 'sabnzbd'}
 			<Input bind:value={dlForm.category} label="Category" placeholder="Optional" hint="SABnzbd category to assign to downloads" />
 		{/if}
-		<Input bind:value={dlForm.timeout} type="number" label="Timeout (seconds)" hint="Connection timeout" />
+		<Input bind:value={dlForm.timeout} type="number" label="Timeout (seconds)" hint="Connection timeout" required min={1} max={300} />
 		{#if editingDl}
 			<Toggle bind:checked={dlForm.enabled} label="Enabled" color={appBgColor(dlForm.client_type)} />
 		{/if}
@@ -1177,7 +1200,7 @@
 						{/each}
 					</Select>
 					<Checkbox bind:checked={member.is_independent} label="Indie" class="shrink-0" />
-					<Button type="button" size="icon" variant="ghost" class="h-auto w-auto p-1 text-muted-foreground hover:text-destructive" onclick={() => removeMember(idx)}>
+					<Button type="button" size="icon" variant="ghost" class="h-auto w-auto p-1 text-muted-foreground hover:text-destructive" onclick={() => removeMember(idx)} aria-label="Remove member">
 						<Trash2 class="h-3.5 w-3.5" />
 					</Button>
 				</div>

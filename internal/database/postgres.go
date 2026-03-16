@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lusoris/lurkarr/internal/config"
 	"github.com/pressly/goose/v3"
 
 	// goose requires database/sql for migrations
@@ -24,12 +25,12 @@ type DB struct {
 }
 
 // New creates a new database connection pool and runs migrations.
-func New(ctx context.Context, databaseURL string, maxConns int32) (*DB, error) {
-	config, err := pgxpool.ParseConfig(databaseURL)
+func New(ctx context.Context, cfg *config.Config) (*DB, error) {
+	config, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
-	config.MaxConns = maxConns
+	config.MaxConns = cfg.DBMaxConns
 	config.ConnConfig.RuntimeParams["statement_timeout"] = "30000" // 30s
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
@@ -43,12 +44,17 @@ func New(ctx context.Context, databaseURL string, maxConns int32) (*DB, error) {
 	}
 
 	db := &DB{Pool: pool}
-	if err := db.migrate(databaseURL); err != nil {
+	if err := db.migrate(cfg.DatabaseURL); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
-	slog.Info("database connected and migrated", "max_conns", config.MaxConns)
+	// Run auto-provisioning
+	if err := db.AutoProvision(ctx, cfg); err != nil {
+		slog.Warn("auto-provisioning failed", "error", err)
+	}
+
+	slog.Info("database connected, migrated, and auto-provisioned", "max_conns", config.MaxConns)
 	return db, nil
 }
 

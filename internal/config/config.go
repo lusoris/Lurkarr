@@ -45,6 +45,16 @@ type Config struct {
 
 	// Run-once mode
 	RunOnce bool
+
+	// Auto-provisioning defaults
+	SonarrAPIKey   string
+	RadarrAPIKey   string
+	LidarrAPIKey   string
+	ReadarrAPIKey  string
+	ProwlarrAPIKey string
+	BazarrAPIKey   string
+	KapowarrAPIKey string
+	SeerrAPIKey    string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -79,6 +89,24 @@ func Load() (*Config, error) {
 
 		// Run-once
 		RunOnce: getEnvBool("RUN_ONCE", false),
+
+		// Auto-provisioning
+		SonarrAPIKey:   getEnv("SONARR_API_KEY", ""),
+		RadarrAPIKey:   getEnv("RADARR_API_KEY", ""),
+		LidarrAPIKey:   getEnv("LIDARR_API_KEY", ""),
+		ReadarrAPIKey:  getEnv("READARR_API_KEY", ""),
+		ProwlarrAPIKey: getEnv("PROWL_API_KEY", ""), // Prowlarr key is often PROWL_API_KEY in some stacks
+		BazarrAPIKey:   getEnv("BAZARR_API_KEY", ""),
+		KapowarrAPIKey: getEnv("KAPOW_API_KEY", ""),
+		SeerrAPIKey:    getEnv("SEERR_API_KEY", ""),
+	}
+
+	// Internal override check for Prowlarr/Kapowarr common aliases
+	if cfg.ProwlarrAPIKey == "" {
+		cfg.ProwlarrAPIKey = getEnv("PROWLARR_API_KEY", "")
+	}
+	if cfg.KapowarrAPIKey == "" {
+		cfg.KapowarrAPIKey = getEnv("KAPOWARR_API_KEY", "")
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -141,6 +169,30 @@ func Load() (*Config, error) {
 				cfg.WebAuthnRPOrigins = append(cfg.WebAuthnRPOrigins, o)
 			}
 		}
+	}
+
+	// Warn if CSRF_KEY is empty — sessions will invalidate on every restart.
+	if cfg.CSRFKey == "" {
+		slog.Warn("CSRF_KEY is empty; a random key will be generated each restart, invalidating all user sessions")
+	}
+
+	// Enforce minimum rate limits to prevent accidental disabling.
+	if cfg.LoginRateLimit < 1 {
+		slog.Warn("LOGIN_RATE_LIMIT too low, clamping to 1", "configured", cfg.LoginRateLimit)
+		cfg.LoginRateLimit = 1
+	}
+	if cfg.APIRateLimit < 1 {
+		slog.Warn("API_RATE_LIMIT too low, clamping to 1", "configured", cfg.APIRateLimit)
+		cfg.APIRateLimit = 1
+	}
+
+	// Validate LOG_LEVEL against known values.
+	switch cfg.LogLevel {
+	case "debug", "info", "warn", "error":
+		// valid
+	default:
+		slog.Warn("unknown LOG_LEVEL, defaulting to info", "configured", cfg.LogLevel)
+		cfg.LogLevel = "info"
 	}
 
 	return cfg, nil

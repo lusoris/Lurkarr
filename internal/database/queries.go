@@ -236,6 +236,13 @@ func (db *DB) CleanExpiredSessions(ctx context.Context) (int64, error) {
 	return ct.RowsAffected(), nil
 }
 
+// CountActiveSessions returns the number of non-expired sessions.
+func (db *DB) CountActiveSessions(ctx context.Context) (int64, error) {
+	var count int64
+	err := db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM sessions WHERE expires_at > now()`).Scan(&count)
+	return count, err
+}
+
 // ListUserSessions returns all active sessions for a user.
 func (db *DB) ListUserSessions(ctx context.Context, userID uuid.UUID) ([]Session, error) {
 	rows, err := db.Pool.Query(ctx,
@@ -1029,9 +1036,15 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 	if err != nil {
 		return nil, fmt.Errorf("list instance groups: %w", err)
 	}
-	groups, err := pgx.CollectRows(rows, pgx.RowToStructByPos[InstanceGroup])
-	if err != nil {
-		return nil, fmt.Errorf("scan instance groups: %w", err)
+	defer rows.Close()
+
+	var groups []InstanceGroup
+	for rows.Next() {
+		var g InstanceGroup
+		if err := rows.Scan(&g.ID, &g.AppType, &g.Name, &g.Mode, &g.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan instance group: %w", err)
+		}
+		groups = append(groups, g)
 	}
 
 	// Load members for each group in a single query
@@ -1052,14 +1065,19 @@ func (db *DB) ListInstanceGroups(ctx context.Context, appType AppType) ([]Instan
 		if err != nil {
 			return nil, fmt.Errorf("list instance group members: %w", err)
 		}
-		members, err := pgx.CollectRows(mRows, pgx.RowToStructByPos[InstanceGroupMember])
-		if err != nil {
-			return nil, fmt.Errorf("scan instance group member: %w", err)
-		}
-		for _, m := range members {
+		defer mRows.Close()
+
+		for mRows.Next() {
+			var m InstanceGroupMember
+			if err := mRows.Scan(&m.GroupID, &m.InstanceID, &m.InstanceName, &m.QualityRank, &m.IsIndependent); err != nil {
+				return nil, fmt.Errorf("scan instance group member: %w", err)
+			}
 			if g, ok := groupMap[m.GroupID]; ok {
 				g.Members = append(g.Members, m)
 			}
+		}
+		if err := mRows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate instance group members: %w", err)
 		}
 	}
 	return groups, nil
